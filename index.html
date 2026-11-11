@@ -1,4 +1,4 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>ห้อง 2D Multiplayer Voice</title><script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><style>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>บ้านและเหมือง · เกม 2D Multiplayer</title><script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><style>
 *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#101a2b;color:#fff;font:14px system-ui,'Noto Sans Thai',sans-serif;touch-action:none}canvas{display:block;width:100vw;height:100dvh}.panel{position:fixed;top:10px;left:10px;background:#14263de8;border:1px solid #ffffff30;border-radius:13px;padding:10px;max-width:min(78vw,350px);z-index:3}.panel small{color:#b9d0e9}.panel button,.panel input,.chat button{border:0;border-radius:8px;padding:8px;background:#5ec7bc;color:#102232;font-weight:700}.panel input{background:#fff;color:#111;width:110px}.row{display:flex;gap:5px;align-items:center;margin-top:6px;flex-wrap:wrap}.joy{position:fixed;bottom:26px;left:20px;width:145px;height:145px;border-radius:100%;border:2px solid #ffffff60;background:#ffffff20;display:grid;place-items:center}.stick{height:62px;width:62px;background:#63c7ff;border:3px solid #d8f8ff;border-radius:100%;pointer-events:none}.controls{position:fixed;bottom:24px;right:15px;display:flex;align-items:center;gap:8px}.controls button{height:64px;min-width:64px;border-radius:40px;border:2px solid #ffffff80;background:#294a70;color:white;font-size:26px}.controls button.on{background:#b93554}.chat{position:fixed;bottom:180px;left:50%;transform:translateX(-50%);display:flex;gap:5px;width:min(75vw,310px)}.chat input{width:100%;min-width:0;background:#152e49;color:white;border:1px solid #ffffff70;border-radius:10px;padding:10px;touch-action:manipulation;user-select:text}.chat button{min-width:46px}.toast{position:fixed;top:10px;right:10px;max-width:42vw;text-align:right;color:#d7f3ff;text-shadow:0 2px 5px #000;pointer-events:none}.wave{height:24px;display:flex;gap:3px;align-items:center;justify-content:center}.wave i{width:4px;height:5px;border-radius:4px;background:#8ceee3}@media(max-width:450px){.panel{font-size:12px;max-width:80vw}.toast{top:145px;max-width:75vw}.chat{bottom:185px}}
 
 /* Living room v2 UI */
@@ -8,25 +8,191 @@ body{background:#0b1527}.panel{backdrop-filter:blur(15px);box-shadow:0 14px 30px
 .action.show{display:block}@keyframes pop{from{transform:scale(.85);opacity:.5}to{transform:scale(1);opacity:1}}
 .room-help{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:11px;text-align:center;background:#102138ac;border-radius:20px;padding:5px 10px;color:#e5f8ff;pointer-events:none;white-space:nowrap;max-width:55vw;overflow:hidden;text-overflow:ellipsis}
 @media(max-width:700px){.action{right:13px;bottom:110px;padding:10px 13px;font-size:13px}.room-help{bottom:4px;max-width:60vw}.controls button{height:56px;min-width:56px}.controls{bottom:22px}.chat{bottom:174px}}
-</style></head><body><canvas id="game"></canvas><section class="panel"><b>🏠 ห้อง 2D Multiplayer</b><div id="state"><small>กำลังเชื่อมต่อ...</small></div><div class="row"><input id="name" maxlength="14" placeholder="ชื่อผู้เล่น"><button id="rename">ตั้งชื่อ</button></div><div class="row"><button id="create">สร้างห้อง</button><button id="copy">คัดลอกลิงก์</button></div><div class="row"><input id="room" placeholder="รหัสห้อง"><button id="join">เข้าห้อง</button></div><div class="row"><button id="leaveRoom" class="room-exit" title="ออกจากห้องออนไลน์">🚪 ออกจากห้อง</button></div><small id="count">ออนไลน์ 1 คน</small></section><div class="toast" id="toast">กดสร้างห้อง แล้วแชร์ลิงก์ให้เพื่อน</div><div class="joy" id="joy"><div class="stick" id="stick"></div></div><form class="chat" id="chat"><input id="input" maxlength="120" placeholder="พิมพ์ข้อความหรือกดไมค์..." autocomplete="off"><button>ส่ง</button></form><button id="rise" class="action" title="ลุกขึ้น (คีย์ E)">🧍 ลุกขึ้น</button><div class="room-help">⌨️ WASD / ลูกศร • เดินชนเตียงเพื่อเอนตัวนอน • E ลุกขึ้น</div><div class="controls"><button id="speaker" title="เปิด/ปิดเสียงผู้เล่นอื่น">🔊</button><div><div class="wave" id="wave"></div><button id="mic" title="เปิด/ปิดไมค์">🎤</button></div></div>
+
+/* Underground mining extension, v3 */
+.mine-nav{position:fixed;right:12px;top:12px;z-index:8;border:1px solid #d9b66c;background:linear-gradient(135deg,#e9ae49,#bb7430);color:#281909;border-radius:13px;padding:10px 14px;font-weight:900;font-size:14px;box-shadow:0 6px 24px #0007;cursor:pointer;touch-action:manipulation}
+.mine-ui{display:none}body.mine-mode .mine-ui{display:flex}
+body.mine-mode .panel{max-width:215px;font-size:11px;padding:7px}body.mine-mode .panel .row{margin-top:3px}body.mine-mode .panel button,body.mine-mode .panel input{padding:5px}body.mine-mode .panel b{font-size:12px}
+.mine-hud{position:fixed;left:12px;top:224px;z-index:5;flex-direction:column;gap:6px;width:208px;padding:12px;border:1px solid #ffffff36;border-radius:13px;background:#101b2bdb;backdrop-filter:blur(12px);box-shadow:0 6px 25px #0007}
+.mine-hud .level{display:flex;align-items:center;justify-content:space-between;font-weight:900;font-size:15px}.mine-hud small{font-size:11px;color:#cfe5ff}.xp-track{height:9px;border-radius:8px;background:#33455d;overflow:hidden}.xp-fill{height:100%;width:0%;border-radius:8px;background:linear-gradient(90deg,#77ebc4,#fcd36c);transition:width .25s}.mine-row{display:flex;justify-content:space-between;gap:5px;font-size:12px;color:#dfebf9}
+.mine-tools{position:fixed;right:12px;top:65px;z-index:6;flex-direction:column;gap:7px;align-items:stretch}.mine-tool{position:relative;width:58px;min-height:57px;border-radius:12px;border:2px solid #ffffff45;background:#24374d;color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 18px #0007;touch-action:manipulation}.mine-tool small{display:block;font-size:10px;color:#dae9ff}.mine-tool.equipped{background:#745027;border-color:#ffe59c;box-shadow:0 0 0 3px #ffcc6d33}.mine-tool.locked{opacity:.65;filter:grayscale(.7)}
+.mine-hit{position:fixed;right:17px;bottom:118px;z-index:7;border-radius:55px;border:3px solid #ffd98a;background:linear-gradient(135deg,#df8c33,#b04d28);box-shadow:0 5px 25px #0009;color:#fff;font-size:28px;font-weight:900;width:90px;height:90px;cursor:pointer;touch-action:none;user-select:none}.mine-hit:active{transform:scale(.95)}body.mine-mode .mine-hit{align-items:center;justify-content:center;flex-direction:column;line-height:1.05}
+.mine-instructions{position:fixed;left:50%;transform:translateX(-50%);bottom:80px;z-index:3;width:max-content;max-width:55vw;border-radius:12px;background:#111b2bcc;color:#dce7fb;font-size:12px;padding:7px 10px;text-align:center;pointer-events:none}
+body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.mine-mode .chat{bottom:160px}
+@media(max-width:700px){.mine-nav{top:8px;right:8px;padding:8px 10px;font-size:12px}.mine-tools{top:53px;right:8px;gap:5px}.mine-tool{width:52px;min-height:51px;font-size:21px}.mine-hud{top:214px;left:7px;width:169px;padding:9px}.mine-hud .level{font-size:13px}.mine-hud small,.mine-row{font-size:10px}.mine-hit{bottom:105px;right:12px;width:77px;height:77px;font-size:25px}.mine-instructions{bottom:184px;max-width:75vw;font-size:10px}.mine-ui.chat{bottom:172px}}
+@media(max-width:380px){.mine-hud{top:207px;width:157px}.mine-instructions{font-size:10px}}
+
+.life-top{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:#162c2cef;border:1px solid #aac9a866;border-radius:14px;padding:8px 12px;z-index:4;color:#effbed}
+.life-top strong{white-space:nowrap;color:#f9da98}.needs{display:flex;gap:10px}.needs label{display:grid;grid-template-columns:auto auto;gap:2px 4px;font-size:11px;white-space:nowrap}.needs meter{grid-column:span 2;width:65px;height:9px;accent-color:#7bd2a6}
+.life-top button,.life-card button,.interact{border:0;border-radius:9px;background:#d5edbe;color:#243925;padding:8px 10px;font-weight:750;cursor:pointer;touch-action:manipulation}
+.interact{position:fixed;right:17px;bottom:108px;z-index:6;background:#ffdb91;color:#453321;box-shadow:0 5px 20px #0006}
+.life-card{max-height:76dvh;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;width:min(460px,calc(100vw - 28px));border:1px solid #a5ccaa75;border-radius:19px;padding:18px;background:#172b2a;color:#edf6e7;box-shadow:0 18px 58px #0008}
+.life-card::backdrop{background:#071413a8}.life-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.life-card h2{font-size:20px;margin:0;color:#f8d891}.life-row{display:flex;align-items:center;gap:8px;border-top:1px solid #a5ccaa35;padding:11px 0}.life-row span{flex:1}.life-row button{flex-shrink:0}.life-card button:disabled{opacity:.45;cursor:default}
+.toast{top:61px;z-index:5}.panel summary{cursor:pointer;list-style:none;font-weight:750}.panel summary::before{content:'▸ ';color:#80d5c8}.panel details[open] summary::before{content:'▾ '}.panel small{display:block;margin-top:5px}.mine-hud{top:186px}
+@media(max-width:920px){.life-top{top:53px;left:auto;right:8px;transform:none;gap:6px;padding:6px;flex-wrap:wrap;justify-content:flex-end;max-width:206px}.life-top strong{font-size:12px}.needs{order:3;gap:7px}.needs meter{width:53px}.toast{top:auto;bottom:70px;right:14px;max-width:57vw}.mine-tools{top:145px}.interact{bottom:104px}}
+@media(max-width:700px){.joy{width:115px;height:115px;left:12px;bottom:20px}.chat,body.mine-mode .chat{bottom:136px}.toast{bottom:80px;max-width:56vw;font-size:12px}.mine-instructions{bottom:170px}.controls button{min-width:48px;height:48px}.mine-hud{top:181px}.mine-hit{bottom:107px}}
+@media(max-width:490px){.panel{max-width:calc(100vw - 150px);padding:7px}.panel input{width:85px}.panel .row{gap:3px}.panel input,.panel button{padding:6px}.life-top{top:49px;max-width:174px}.needs{gap:5px}.needs meter{width:49px}.needs label{font-size:10px}}
+</style></head><body><canvas id="game"></canvas><section class="panel"><details><summary>👥 ห้องออนไลน์</summary><div id="state"></div><div class="row"><input id="name" maxlength="14" placeholder="ชื่อผู้เล่น"><button id="rename">ตั้งชื่อ</button></div><div class="row"><button id="create">สร้างห้อง</button><button id="copy">คัดลอกลิงก์</button></div><div class="row"><input id="room" placeholder="รหัสห้อง"><button id="join">เข้าห้อง</button></div><div class="row"><button id="leaveRoom" class="room-exit" title="ออกจากห้องออนไลน์">🚪 ออกจากห้อง</button></div><small id="count">ออนไลน์ 1 คน</small></details></section><button class="mine-nav" id="mineToggle">⛏️ ไปเหมือง</button>
+
+<section class="life-top" aria-label="สถานะตัวละคร">
+ <strong id="place"></strong>
+ <div class="needs">
+  <label>อิ่ม <span id="fullnessValue"></span><meter id="fullness" min="0" max="100" low="25" high="75" optimum="100"></meter></label>
+  <label>พลัง <span id="energyValue"></span><meter id="energy" min="0" max="100" low="25" high="75" optimum="100"></meter></label>
+  <label>สุข <span id="moodValue"></span><meter id="mood" min="0" max="100" low="25" high="75" optimum="100"></meter></label>
+ </div>
+ <button id="bag" title="เปิดกระเป๋า (I)">🎒 กระเป๋า</button>
+</section>
+<button id="interact" class="interact" hidden></button>
+<dialog id="lifeDialog" class="life-card" aria-labelledby="lifeTitle">
+ <header><h2 id="lifeTitle"></h2><button id="lifeClose" autofocus>ปิด</button></header>
+ <div id="lifeRows"></div>
+</dialog>
+<section class="mine-ui mine-hud" id="mineHud" aria-label="เลเวลขุดหิน">
+ <div class="level"><span id="mineLevel">⛏️ Lv. 1</span><span id="mineSpeed">1.0×</span></div>
+ <div class="xp-track"><div class="xp-fill" id="mineXpBar"></div></div>
+ <small id="mineXpLabel">EXP 0 / 28</small>
+ <div class="mine-row"><span id="mineOre">🪨 หิน 0</span><span id="mineHps">⚡ 1 / ครั้ง</span></div>
+ <small id="mineToolName">ถือ: ⛏️ อีเต้อเริ่มต้น</small>
+</section>
+<div class="mine-ui mine-tools" id="mineTools" aria-label="เลือกอาวุธในมือ">
+ <button type="button" class="mine-tool equipped" data-tool="0" title="ช่อง 1 - อีเต้อ">⛏️<small>1</small></button>
+ <button type="button" class="mine-tool locked" data-tool="1" title="ช่อง 2 - ค้อน (ปลดล็อกเลเวล 3)">🔨<small>Lv.3</small></button>
+ <button type="button" class="mine-tool locked" data-tool="2" title="ช่อง 3 - สว่าน (ปลดล็อกเลเวล 6)">⚙️<small>Lv.6</small></button>
+</div>
+<button id="mineHit" class="mine-ui mine-hit" type="button" title="กดทุบหิน (Space)">💥<small style="display:block;font-size:12px">ทุบหิน</small></button>
+<div class="mine-ui mine-instructions">WASD / จอยเดิน • หันไปหาหิน • Space / 💥 เพื่อทุบ • 1-3 เปลี่ยนอุปกรณ์</div>
+<div class="toast" id="toast">กดสร้างห้อง แล้วแชร์ลิงก์ให้เพื่อน</div><div class="joy" id="joy"><div class="stick" id="stick"></div></div><form class="chat" id="chat"><input id="input" maxlength="120" placeholder="พิมพ์ข้อความหรือกดไมค์..." autocomplete="off"><button>ส่ง</button></form><button id="rise" class="action" title="ลุกขึ้น (คีย์ E)">🧍 ลุกขึ้น</button><div class="room-help">WASD / ลูกศร • E ใช้งาน • I กระเป๋า</div><div class="controls"><button id="speaker" title="เปิด/ปิดเสียงผู้เล่นอื่น">🔊</button><div><div class="wave" id="wave"></div><button id="mic" title="เปิด/ปิดไมค์">🎤</button></div></div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');let W=0,H=0,last=performance.now(),vx=0,vy=0,joyPointer=null;function resize(){W=innerWidth;H=innerHeight;const d=Math.min(devicePixelRatio||1,2);canvas.width=W*d;canvas.height=H*d;ctx.setTransform(d,0,0,d,0,0)}addEventListener('resize',resize);resize();
-const world={w:780,h:550},objects=[{x:125,y:95,w:130,h:68,t:'sofa'},{x:310,y:120,w:140,h:80,t:'table'},{x:570,y:95,w:105,h:105,t:'plant'},{x:120,y:370,w:120,h:75,t:'bed'},{x:555,y:370,w:115,h:70,t:'cabinet'},{x:475,y:120,w:65,h:65,t:'chair'}];const me={x:390,y:310,face:0,name:'ผู้เล่น',text:'',until:0,color:'#527bea',pose:'stand',furniture:null,walking:false};const others=new Map(),connections=new Map(),calls=new Map(),audios=new Map();let peer=null,myId='',hostId='',roomCode='',isHost=false,localStream=null,recognition=null,recStop=false,speakerOn=true,analyser=null,audioCtx=null,frame=0,lastVoiceSignal=0,voiceActive=false;const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-function toast(t){$('toast').textContent=t}function status(){const n=1+others.size;$('count').textContent='ออนไลน์ '+n+' คน';$('state').textContent=roomCode?'ห้อง '+roomCode+(isHost?' (เจ้าของห้อง)':''):'ยังไม่ได้เข้าห้อง'}function color(id){let n=0;for(const c of id)n=(n*31+c.charCodeAt(0))>>>0;return ['#527bea','#e27a89','#6fbd84','#c49a55','#aa80d6','#61b7c2'][n%6]}
+const world={w:780,h:550},objects=[{x:125,y:95,w:130,h:68,t:'sofa'},{x:310,y:120,w:140,h:80,t:'table'},{x:570,y:95,w:105,h:105,t:'plant'},{x:120,y:370,w:120,h:75,t:'bed'},{x:555,y:370,w:115,h:70,t:'cabinet'},{x:475,y:120,w:65,h:65,t:'chair'}];const me={x:390,y:310,face:0,name:'ผู้เล่น',text:'',until:0,color:'#527bea',pose:'stand',furniture:null,walking:false,scene:'room',tool:0};const others=new Map(),connections=new Map(),calls=new Map(),incomingCalls=new Map(),audios=new Map();let peer=null,myId='',hostId='',roomCode='',isHost=false,localStream=null,recognition=null,recStop=false,speakerOn=true,analyser=null,audioCtx=null,frame=0,lastVoiceSignal=0,voiceActive=false;const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+function toast(t){$('toast').textContent=t}function status(){const n=1+others.size;$('count').textContent=roomCode?'ในห้อง '+n+' คน':'เล่นคนเดียว';$('state').textContent=roomCode?'ห้อง '+roomCode+(isHost?' (เจ้าของห้อง)':[...connections.values()].some(c=>c.open)?' • เชื่อมต่อแล้ว':' • กำลังเชื่อมต่อ...'):'ยังไม่ได้เข้าห้อง'}function color(id){let n=0;for(const c of id)n=(n*31+c.charCodeAt(0))>>>0;return ['#527bea','#e27a89','#6fbd84','#c49a55','#aa80d6','#61b7c2'][n%6]}
 function cleanName(t){return String(t||'ผู้เล่น').trim().slice(0,14)||'ผู้เล่น'}function code(t){return String(t||'').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24)}function idForRoom(c){return 'thai2droom-'+c}function rand(){return Math.random().toString(36).slice(2,8)}
-function sendTo(id,msg){const c=connections.get(id);if(c?.open)try{c.send(msg)}catch(e){}}function broadcast(msg){for(const id of connections.keys())sendTo(id,msg)}function snapshot(){return {type:'state',id:myId,x:Math.round(me.x),y:Math.round(me.y),face:me.face,name:me.name,text:me.text,until:me.until,talking:voiceActive,pose:me.pose,walking:me.walking}}
-function updateOther(msg){if(!msg.id||msg.id===myId)return;let p=others.get(msg.id)||{x:390,y:300,name:'ผู้เล่น',face:0,color:color(msg.id),text:'',until:0};if(Number.isFinite(msg.x))p.x=Math.max(40,Math.min(740,msg.x));if(Number.isFinite(msg.y))p.y=Math.max(40,Math.min(510,msg.y));if(Number.isFinite(msg.face))p.face=msg.face;if(msg.name!==undefined)p.name=cleanName(msg.name);if(['stand','sit','sleep'].includes(msg.pose))p.pose=msg.pose;if(typeof msg.walking==='boolean')p.walking=msg.walking;if(msg.talking!==undefined){p.talking=!!msg.talking;p.voiceSeen=Date.now()}if(msg.text!==undefined){p.text=String(msg.text).slice(0,120);p.until=Number(msg.until)||0}others.set(msg.id,p);status()}
+
+// MINE WORLD: Each new rock tile removed permanently expands the walkable cave.
+const MINE={cols:40,rows:28,tile:40,entryX:19,entryY:13};
+const TOOLS=[
+ {name:'อีเต้อเริ่มต้น',icon:'⛏️',unlock:1,power:1,speed:1},
+ {name:'ค้อนเหล็ก',icon:'🔨',unlock:3,power:2,speed:1.06},
+ {name:'สว่านขุดแร่',icon:'⚙️',unlock:6,power:3,speed:1.65}
+];
+let scene='room',roomPosition={x:me.x,y:me.y},minePosition={x:(MINE.entryX+.5)*MINE.tile,y:(MINE.entryY+.5)*MINE.tile};
+let miningLevel=1,miningXp=0,minedCount=0,hitCount=0,selectedTool=0,lastMineSwing=0,rockSwingUntil=0,rockSwingAt=0;
+let mineBroken=new Set(),mineDamage=new Map(),mineEffects=[],mineView={scale:1,cx:0,cy:0};
+const mineIndex=(x,y)=>y*MINE.cols+x;
+const rockCell=id=>({x:id%MINE.cols,y:Math.floor(id/MINE.cols)});
+function inMineBounds(x,y){return x>=1&&y>=1&&x<MINE.cols-1&&y<MINE.rows-1}
+function startingGap(x,y){return x>=17&&x<=21&&y>=11&&y<=15}
+function makeStartingGap(){for(let y=11;y<=15;y++)for(let x=17;x<=21;x++)mineBroken.add(mineIndex(x,y))}
+makeStartingGap();
+function rockVariant(x,y){return ((x*61+y*107+x*y*17)>>>0)%11}
+function rockMaxHp(x,y){return 2+(rockVariant(x,y)%3)}
+function threshold(lv){return Math.round(17+lv*11+lv*lv*2)}
+function miningSpeed(){return (1+Math.min(2.6,(miningLevel-1)*.115))*TOOLS[selectedTool].speed}
+function swingCooldown(){return Math.max(105,Math.round(660/miningSpeed()))}
+function miningPower(){return TOOLS[selectedTool].power+Math.floor((miningLevel-1)/4)}
+function loadMine(){try{let d=JSON.parse(localStorage.getItem('thai2d_mine_v3')||'{}');
+ miningLevel=Math.max(1,Math.min(99,Number(d.level)||1));miningXp=Math.max(0,Number(d.xp)||0);
+ minedCount=Math.max(0,Number(d.mined)||0);hitCount=Math.max(0,Number(d.hits)||0);
+ for(const id of (Array.isArray(d.broken)?d.broken:[]).slice(0,1100)){
+  const i=Number(id),p=rockCell(i);if(Number.isInteger(i)&&inMineBounds(p.x,p.y))mineBroken.add(i)
+ }
+ selectedTool=TOOLS[Number(d.tool)]?.unlock<=miningLevel?Number(d.tool):0;
+ }catch(e){} }
+function saveMine(){try{const broken=[...mineBroken].filter(i=>{const p=rockCell(i);return !startingGap(p.x,p.y)});
+ localStorage.setItem('thai2d_mine_v3',JSON.stringify({level:miningLevel,xp:miningXp,mined:minedCount,hits:hitCount,broken,tool:selectedTool}));
+ }catch(e){} }
+function miningHud(){const max=threshold(miningLevel);$('mineLevel').textContent='⛏️ Lv. '+miningLevel;
+ $('mineSpeed').textContent=miningSpeed().toFixed(1)+'×';$('mineXpBar').style.width=Math.min(100,100*miningXp/max)+'%';
+ $('mineXpLabel').textContent='EXP '+miningXp+' / '+max+' • ทุบ '+hitCount+' ครั้ง';
+ $('mineOre').textContent='🪨 หิน '+minedCount;$('mineHps').textContent='⚡ '+miningPower()+' / ครั้ง';
+ $('mineToolName').textContent='ถือ: '+TOOLS[selectedTool].icon+' '+TOOLS[selectedTool].name;
+ for(const button of document.querySelectorAll('[data-tool]')){const i=Number(button.dataset.tool);
+  button.classList.toggle('equipped',selectedTool===i);button.classList.toggle('locked',miningLevel<TOOLS[i].unlock);
+  button.querySelector('small').textContent=miningLevel<TOOLS[i].unlock?'Lv.'+TOOLS[i].unlock:String(i+1);
+ }
+}
+function switchTool(i){if(!Number.isInteger(i)||!TOOLS[i])return;
+ if(miningLevel<TOOLS[i].unlock)return toast('🔒 '+TOOLS[i].name+' ปลดล็อกที่เลเวล '+TOOLS[i].unlock);
+ selectedTool=i;miningHud();saveMine();toast('ถืออาวุธ: '+TOOLS[i].icon+' '+TOOLS[i].name)}
+function addMineExp(n){miningXp+=n;while(miningLevel<99&&miningXp>=threshold(miningLevel)){
+ miningXp-=threshold(miningLevel);miningLevel++;
+ mineEffects.push({x:me.x,y:me.y-38,stamp:performance.now(),text:'LEVEL UP! '+miningLevel,col:'#ffe681',big:true});
+ toast('🎉 เลเวล '+miningLevel+'! ขุดเร็วขึ้น • พลัง '+miningPower());}
+ miningHud()}
+function mineSolidAt(x,y){const pad=14,t=MINE.tile;
+ for(const px of [x-pad,x+pad])for(const py of [y-pad,y+pad]){
+ const tx=Math.floor(px/t),ty=Math.floor(py/t);
+ if(!inMineBounds(tx,ty)||!mineBroken.has(mineIndex(tx,ty)))return true;
+ }return false}
+function mineEnter(){if(scene==='mine')return;if(me.pose!=='stand')rise();roomPosition={x:me.x,y:me.y,scene};
+ scene='mine';me.x=minePosition.x;me.y=minePosition.y;me.pose='stand';me.face=0;me.walking=false;
+ document.body.classList.add('mine-mode');$('mineToggle').textContent='↩️ ออกจากเหมือง';
+ miningHud();broadcast(snapshot());toast('⛏️ เลือกช่อง 1 แล้วหันเข้าหาหิน กด Space หรือ 💥 เพื่อขุด!')}
+function mineExit(){if(scene!=='mine')return;stopMineHold();clearInterval(mineSpaceInterval);minePosition={x:me.x,y:me.y};scene=roomPosition.scene;
+ me.x=roomPosition.x;me.y=roomPosition.y;me.face=0;me.walking=false;me.pose='stand';
+ document.body.classList.remove('mine-mode');$('mineToggle').textContent='⛏️ ไปเหมือง';
+ broadcast(snapshot());toast('ออกจากเหมืองแล้ว บันทึกความคืบหน้าเรียบร้อย')}
+$('mineToggle').addEventListener('click',()=>{if(lifeDialog.open)return;if(scene==='mine')mineExit();else mineEnter();lifeHud()});
+for(const b of document.querySelectorAll('[data-tool]'))b.addEventListener('click',()=>switchTool(Number(b.dataset.tool)));
+function makeMineEffect(x,y,text,col='#c5e9ff'){mineEffects.push({x,y,stamp:performance.now(),text,col,big:false});if(mineEffects.length>45)mineEffects.shift()}
+function applyRemoteMineHit(id,amount){if(mineBroken.has(id))return;const p=rockCell(id);if(!inMineBounds(p.x,p.y))return;
+ mineDamage.set(id,Math.min(rockMaxHp(p.x,p.y), (mineDamage.get(id)||0)+Math.max(0,Math.min(10,Number(amount)||0))));
+ rockSwingAt=id;rockSwingUntil=performance.now()+180}
+function mineBreak(id,notify=true){const p=rockCell(id);if(!inMineBounds(p.x,p.y)||mineBroken.has(id))return false;
+ mineBroken.add(id);mineDamage.delete(id);
+ makeMineEffect((p.x+.5)*MINE.tile,(p.y+.5)*MINE.tile,'✦','#ffe59f');
+ if(notify)broadcast({type:'minebreak',idx:id});saveMine();return true}
+function mineTarget(){const x=Math.floor(me.x/MINE.tile),y=Math.floor(me.y/MINE.tile);const fx=Math.cos(me.face),fy=Math.sin(me.face);
+ const tx=x+(Math.abs(fx)>=Math.abs(fy)?Math.sign(fx)||1:0),ty=y+(Math.abs(fy)>Math.abs(fx)?Math.sign(fy)||1:0);
+ return {tx,ty}}
+function mineStrike(tx,ty){if(scene!=='mine')return;const now=performance.now();if(now-lastMineSwing<swingCooldown())return;
+ if(!Number.isInteger(tx)||!Number.isInteger(ty))return;
+ if(!inMineBounds(tx,ty))return toast('สุดขอบเหมืองแล้ว');
+ const myx=Math.floor(me.x/MINE.tile),myy=Math.floor(me.y/MINE.tile);
+ if(Math.abs(tx-myx)+Math.abs(ty-myy)!==1)return toast('เดินเข้าไปใกล้หินก่อน');
+ const id=mineIndex(tx,ty);if(mineBroken.has(id))return toast('ช่องนี้ขุดแล้ว หันไปทางก้อนหิน');
+ me.face=Math.atan2(ty-myy,tx-myx);lastMineSwing=now;rockSwingUntil=now+230;rockSwingAt=id;hitCount++;
+ const amount=miningPower(),hp=rockMaxHp(tx,ty),damage=Math.min(hp,(mineDamage.get(id)||0)+amount);
+ mineDamage.set(id,damage);broadcast({type:'minehit',idx:id,amount});
+ makeMineEffect((tx+.5)*MINE.tile,(ty+.5)*MINE.tile,'-'+amount,'#fff1a3');
+ addMineExp(4);
+ if(damage>=hp){mineBreak(id);minedCount++;addMineExp(9+rockVariant(tx,ty)%5);toast('💥 หินแตก! พื้นที่เหมืองขยายออก • +EXP')}
+ miningHud();saveMine()}
+function doMineStrike(){const t=mineTarget();mineStrike(t.tx,t.ty)}
+let mineHolding=false,mineHoldTimer=0;
+function stopMineHold(){mineHolding=false;clearInterval(mineHoldTimer)}
+$('mineHit').addEventListener('pointerdown',e=>{e.preventDefault();$('mineHit').setPointerCapture(e.pointerId);mineHolding=true;doMineStrike();clearInterval(mineHoldTimer);mineHoldTimer=setInterval(()=>{if(mineHolding)doMineStrike()},55)});
+['pointerup','pointercancel','lostpointercapture'].forEach(type=>$('mineHit').addEventListener(type,stopMineHold));
+addEventListener('keydown',e=>{if(scene!=='mine'||lifeDialog.open||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||document.activeElement?.isContentEditable)return;
+ if(['1','2','3'].includes(e.key)){switchTool(Number(e.key)-1);e.preventDefault()}
+ if(e.code==='Space'){e.preventDefault();if(!e.repeat){doMineStrike();clearInterval(mineSpaceInterval);mineSpaceInterval=setInterval(()=>{if(scene==='mine')doMineStrike();else clearInterval(mineSpaceInterval)},60)}}});
+let mineSpaceInterval=0;addEventListener('keyup',e=>{if(e.code==='Space'){clearInterval(mineSpaceInterval);mineSpaceInterval=0}});addEventListener('blur',()=>{clearInterval(mineSpaceInterval);mineSpaceInterval=0});
+loadMine();miningHud();
+function sendTo(id,msg){const c=connections.get(id);if(c?.open)try{c.send(msg)}catch(e){}}function broadcast(msg){for(const id of connections.keys())sendTo(id,msg)}function snapshot(){return {type:'state',id:myId,x:Math.round(me.x),y:Math.round(me.y),face:me.face,name:me.name,text:me.text,until:me.until,talking:voiceActive,pose:me.pose,walking:me.walking,scene,tool:selectedTool,swing:performance.now()<rockSwingUntil}}
+function updateOther(msg){if(!msg.id||msg.id===myId)return;let p=others.get(msg.id)||{x:390,y:300,name:'ผู้เล่น',face:0,color:color(msg.id),text:'',until:0};if(['mine','room','outside'].includes(msg.scene))p.scene=msg.scene;const bound=p.scene==='mine'?MINE.cols*MINE.tile-40:740,maxY=p.scene==='mine'?MINE.rows*MINE.tile-40:510;if(Number.isFinite(msg.x))p.x=Math.max(40,Math.min(bound,msg.x));if(Number.isFinite(msg.y))p.y=Math.max(40,Math.min(maxY,msg.y));if(Number.isFinite(msg.face))p.face=msg.face;if(msg.name!==undefined)p.name=cleanName(msg.name);if(['stand','sit','sleep'].includes(msg.pose))p.pose=msg.pose;if(typeof msg.walking==='boolean')p.walking=msg.walking;if(Number.isInteger(msg.tool)&&msg.tool>=0&&msg.tool<3)p.tool=msg.tool;if(typeof msg.swing==='boolean')p.swing=msg.swing;if(msg.talking!==undefined){p.talking=!!msg.talking;p.voiceSeen=Date.now()}if(msg.text!==undefined){p.text=String(msg.text).slice(0,120);p.until=Number(msg.until)||0}others.set(msg.id,p);status()}
 function connectTo(id){if(!peer||!id||id===myId||connections.has(id))return;attach(peer.connect(id,{reliable:true}))}
-function attach(c){if(connections.has(c.peer))return;connections.set(c.peer,c);c.on('open',()=>{sendTo(c.peer,snapshot());if(isHost){sendTo(c.peer,{type:'roster',ids:[...connections.keys()].filter(id=>id!==c.peer)})}if(localStream)callPeer(c.peer)});c.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='state'){m.id=c.peer;updateOther(m)}else if(m.type==='caption'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.text=String(m.text||'').slice(0,120);p.until=Date.now()+5000;others.set(c.peer,p)}else if(m.type==='voice'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.talking=!!m.active;p.voiceSeen=Date.now();others.set(c.peer,p)}else if(m.type==='roster'&&Array.isArray(m.ids)){m.ids.slice(0,16).forEach(connectTo)}else if(m.type==='hello'&&isHost){broadcast({type:'roster',ids:[...connections.keys()]})}});c.on('close',()=>removePeer(c.peer));c.on('error',()=>removePeer(c.peer))}
-function removePeer(id){connections.delete(id);others.delete(id);calls.get(id)?.close();calls.delete(id);audios.get(id)?.remove();audios.delete(id);status();if(id===hostId&&!isHost)toast('เจ้าของห้องออกแล้ว ผู้เล่นที่เชื่อมต่อกันอาจยังคุยต่อได้')}function closeAll(){for(const c of connections.values())c.close();connections.clear();for(const c of calls.values())c.close();calls.clear();for(const a of audios.values())a.remove();audios.clear();others.clear();if(peer){peer.destroy();peer=null}hostId='';roomCode='';isHost=false;status()}
-function initPeer(requested,host){closeAll();isHost=host;peer=new Peer(requested||undefined,{debug:0});peer.on('open',id=>{myId=id;if(host){hostId=id;roomCode=requested.replace('thai2droom-','');history.replaceState(null,'',location.pathname+'?room='+encodeURIComponent(roomCode));toast('ห้องพร้อมแล้ว! กดคัดลอกลิงก์เพื่อชวนเพื่อน')}else{roomCode=code($('room').value);hostId=idForRoom(roomCode);connectTo(hostId);toast('กำลังเข้าห้อง '+roomCode)}status()});peer.on('connection',c=>{attach(c);if(isHost){setTimeout(()=>broadcast({type:'roster',ids:[...connections.keys()]}),700)}});peer.on('call',call=>{calls.get(call.peer)?.close();calls.set(call.peer,call);try{call.answer(localStream||undefined)}catch(e){toast('รับสายเสียงไม่สำเร็จ')}wireCall(call)});peer.on('error',e=>{toast('เชื่อมต่อไม่สำเร็จ: '+(e.type==='unavailable-id'?'รหัสห้องถูกใช้แล้ว':e.type));if(e.type==='peer-unavailable')toast('ไม่พบห้องนี้ ตรวจสอบรหัสหรือให้เจ้าของห้องออนไลน์')});peer.on('disconnected',()=>toast('การเชื่อมต่อขาดชั่วคราว กำลังลองเชื่อมใหม่'));}
-$('leaveRoom').onclick=()=>{closeAll();history.replaceState(null,'',location.pathname);toast('ออกจากห้องออนไลน์แล้ว — กดสร้างห้องเพื่อเริ่มใหม่');};$('create').onclick=()=>{const c=rand();$('room').value=c;initPeer(idForRoom(c),true)};$('join').onclick=()=>{const c=code($('room').value);if(!c)return toast('กรอกรหัสห้องก่อน');$('room').value=c;initPeer(null,false)};$('copy').onclick=async()=>{if(!roomCode)return toast('สร้างหรือเข้าห้องก่อน');const url=location.origin+location.pathname+'?room='+encodeURIComponent(roomCode);try{await navigator.clipboard.writeText(url);toast('คัดลอกลิงก์ห้องแล้ว')}catch(e){prompt('คัดลอกลิงก์นี้',url)}};$('rename').onclick=()=>{me.name=cleanName($('name').value);broadcast(snapshot())};$('name').value='ผู้เล่น'+rand().slice(0,3);me.name=$('name').value;
+function attach(c){if(connections.has(c.peer)){c.close();return}const earlier=[...connections.keys()];connections.set(c.peer,c);c.on('open',()=>{sendTo(c.peer,snapshot());if(isHost){sendTo(c.peer,{type:'roster',ids:earlier.filter(id=>connections.has(id))});sendTo(c.peer,{type:'minesync',broken:[...mineBroken]})}toast('✅ เชื่อมต่อผู้เล่น '+c.peer.slice(-6)+' แล้ว');status();if(localStream)callPeer(c.peer)});c.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='state'){m.id=c.peer;updateOther(m)}else if(m.type==='caption'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.text=String(m.text||'').slice(0,120);p.until=Date.now()+5000;others.set(c.peer,p)}else if(m.type==='voice'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.talking=!!m.active;p.voiceSeen=Date.now();others.set(c.peer,p)}else if(m.type==='roster'&&c.peer===hostId&&Array.isArray(m.ids)){m.ids.slice(0,16).forEach(connectTo)}else if(m.type==='minehit'){applyRemoteMineHit(Number(m.idx),m.amount)}else if(m.type==='minebreak'){mineBreak(Number(m.idx),false)}else if(m.type==='minesync'&&Array.isArray(m.broken)){for(const v of m.broken.slice(0,1100)){const i=Number(v),p=rockCell(i);if(Number.isInteger(i)&&inMineBounds(p.x,p.y))mineBroken.add(i)}saveMine()}});c.on('close',()=>removePeer(c.peer));c.on('error',()=>removePeer(c.peer))}
+function removePeer(id){connections.delete(id);others.delete(id);calls.get(id)?.close();calls.delete(id);incomingCalls.get(id)?.close();incomingCalls.delete(id);audios.get(id)?.remove();audios.delete(id);status();if(id===hostId&&!isHost)toast('เจ้าของห้องออกแล้ว ผู้เล่นที่เชื่อมต่อกันอาจยังคุยต่อได้')}function closeAll(){for(const c of connections.values())c.close();connections.clear();for(const c of calls.values())c.close();calls.clear();for(const c of incomingCalls.values())c.close();incomingCalls.clear();for(const a of audios.values())a.remove();audios.clear();others.clear();if(peer){peer.destroy();peer=null}hostId='';roomCode='';isHost=false;status()}
+function updateRoomUrl(value){
+ const url=new URL(location.href);
+ if(value)url.searchParams.set('room',value);else url.searchParams.delete('room');
+ try{history.replaceState(null,'',url.href)}catch{}
+}
+function initPeer(requested,host){if(typeof Peer!=='function')return toast('โหลดระบบออนไลน์ไม่ได้ ลองเชื่อมต่ออินเทอร์เน็ตแล้วเปิดเกมใหม่');closeAll();isHost=host;peer=new Peer(requested||undefined,{debug:0});peer.on('open',id=>{myId=id;if(host){hostId=id;roomCode=requested.replace('thai2droom-','');updateRoomUrl(roomCode);toast('ห้องพร้อมแล้ว! กดคัดลอกลิงก์เพื่อชวนเพื่อน')}else{roomCode=code($('room').value);hostId=idForRoom(roomCode);connectTo(hostId);toast('กำลังเข้าห้อง '+roomCode)}status()});peer.on('connection',attach);peer.on('call',call=>{
+ if(!connections.has(call.peer)){call.close();return}
+ incomingCalls.get(call.peer)?.close();
+ incomingCalls.set(call.peer,call);
+ wireCall(call);
+ try{call.answer()}catch(e){incomingCalls.delete(call.peer);call.close();toast('รับสายเสียงไม่สำเร็จ')}
+});peer.on('error',e=>{toast('เชื่อมต่อไม่สำเร็จ: '+(e.type==='unavailable-id'?'รหัสห้องถูกใช้แล้ว':e.type));if(e.type==='peer-unavailable')toast('ไม่พบห้องนี้ ตรวจสอบรหัสหรือให้เจ้าของห้องออนไลน์')});peer.on('disconnected',()=>toast('การเชื่อมต่อขาดชั่วคราว กำลังลองเชื่อมใหม่'));}
+$('leaveRoom').onclick=()=>{closeAll();updateRoomUrl('');toast('ออกจากห้องออนไลน์แล้ว — กดสร้างห้องเพื่อเริ่มใหม่');};$('create').onclick=()=>{const c=rand();$('room').value=c;initPeer(idForRoom(c),true)};$('join').onclick=()=>{const c=code($('room').value);if(!c)return toast('กรอกรหัสห้องก่อน');$('room').value=c;initPeer(null,false)};$('copy').onclick=async()=>{if(!roomCode)return toast('สร้างหรือเข้าห้องก่อน');const url=new URL(location.href);url.searchParams.set('room',roomCode);try{await navigator.clipboard.writeText(url.href);toast('คัดลอกลิงก์ห้องแล้ว')}catch(e){prompt('คัดลอกลิงก์นี้',url.href)}};$('rename').onclick=()=>{me.name=cleanName($('name').value);broadcast(snapshot())};$('name').value='ผู้เล่น'+rand().slice(0,3);me.name=$('name').value;
 const initial=code(new URLSearchParams(location.search).get('room'));if(initial){$('room').value=initial;initPeer(null,false)}else{status();toast('กดสร้างห้อง แล้วแชร์ลิงก์ให้เพื่อน')}
 function say(t,final=true){t=String(t||'').trim().slice(0,120);if(!t)return;me.text=t;me.until=Date.now()+5000;broadcast({type:'caption',text:t});if(final)toast('💬 '+t)}$('chat').onsubmit=e=>{e.preventDefault();say($('input').value);$('input').value='';$('input').blur()};
 const joy=$('joy'),stick=$('stick');function moveJoy(e){const r=joy.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,lim=(r.width-62)/2,len=Math.hypot(dx,dy)||1,k=Math.min(1,lim/len);vx=dx*k/lim;vy=dy*k/lim;stick.style.transform=`translate(${dx*k}px,${dy*k}px)`}joy.addEventListener('pointerdown',e=>{if(joyPointer!==null)return;joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);moveJoy(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===joyPointer)moveJoy(e)});for(const type of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(type,e=>{if(e.pointerId===joyPointer){joyPointer=null;vx=vy=0;stick.style.transform=''}});const keys=new Set();const movementKeys=new Set(['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);function movementKey(e){return e.key.startsWith('Arrow')?e.key:e.key.toLowerCase()}addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||document.activeElement?.isContentEditable)return;const k=movementKey(e);if(movementKeys.has(k)){keys.add(k);e.preventDefault()}});addEventListener('keyup',e=>{const k=movementKey(e);if(movementKeys.has(k)){keys.delete(k);e.preventDefault()}});addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear()});const activatables=new Set(['bed','sofa','chair']);
 let reentryUntil=0;
-function objectAt(x,y){return objects.find(o=>x+15>o.x&&x-15<o.x+o.w&&y+15>o.y&&y-15<o.y+o.h)}
+function objectAt(x,y){return (scene==='outside'?outsideBlocks:objects).find(o=>x+15>o.x&&x-15<o.x+o.w&&y+15>o.y&&y-15<o.y+o.h)}
 function hit(x,y){return x<40||y<40||x>740||y>510||!!objectAt(x,y)}
 function setRiseButton(){const active=me.pose!=='stand';$('rise').classList.toggle('show',active);$('rise').textContent=me.pose==='sleep'?'🛏️ ลุกจากเตียง (E)':'🪑 ลุกจากเก้าอี้ (E)'}
 function useFurniture(o){
@@ -46,7 +212,7 @@ function rise(){
  reentryUntil=performance.now()+1200;setRiseButton();broadcast(snapshot());toast('ลุกขึ้นแล้ว เดินต่อได้เลย');
 }
 $('rise').addEventListener('click',rise);
-addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;if(e.key.toLowerCase()==='e'||e.key==='Escape'){if(me.pose!=='stand'){rise();e.preventDefault()}}});
+addEventListener('keydown',e=>{if(lifeDialog.open||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;if(e.key.toLowerCase()==='e'||e.key==='Escape'){if(me.pose!=='stand'){rise();e.preventDefault()}}});
 function rect(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
 function circle(x,y,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
 function avatar(p){
@@ -73,7 +239,7 @@ function avatar(p){
    rect(-16,-9+walk,32,24,11,p.color);
    circle(0,-13+walk,12,'#f6cda7');
    circle(-5,-16+walk,1.9,'#26313e');circle(5,-16+walk,1.9,'#26313e');
-   if(speaking){circle(0,-7+walk,3+Math.abs(Math.sin(now/85))*2,'#aa4660')}
+   if(p===me?scene==='mine':p.scene==='mine'){ctx.save();ctx.translate(17,-1+walk);ctx.rotate((p===me?performance.now()<rockSwingUntil:p.swing)?Math.sin(now/75)*.85:0);ctx.strokeStyle='#ad7649';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,10);ctx.lineTo(6,-15);ctx.stroke();ctx.textAlign='center';ctx.font='17px system-ui';ctx.fillText(TOOLS[p.tool||0].icon,6,-14);ctx.restore()}if(speaking){circle(0,-7+walk,3+Math.abs(Math.sin(now/85))*2,'#aa4660')}
    else{ctx.strokeStyle='#98485a';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(-3,-7+walk);ctx.quadraticCurveTo(0,-5+walk,3,-7+walk);ctx.stroke()}
  }
  ctx.restore();
@@ -146,18 +312,66 @@ function drawCat(now){
  circle(-4,-1,1.5,'#584c45');circle(4,-1,1.5,'#584c45');circle(0,4,2,'#a35b64');
  ctx.strokeStyle='#db976b';ctx.lineWidth=4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(9,8);ctx.quadraticCurveTo(22+Math.sin(t*3)*6,14,18,0);ctx.stroke();ctx.restore();
 }
+
+function drawMine(now){
+ const tile=MINE.tile;
+ const scale=Math.max(.82,Math.min(1.28,Math.min(W/530,H/600)*1.08));
+ const vw=W/scale,vh=H/scale;
+ const camX=Math.max(0,Math.min(MINE.cols*tile-vw,me.x-vw/2));
+ const camY=Math.max(0,Math.min(MINE.rows*tile-vh,me.y-vh/2));
+ mineView={scale,cx:camX,cy:camY};
+ ctx.clearRect(0,0,W,H);ctx.fillStyle='#0b111d';ctx.fillRect(0,0,W,H);
+ ctx.save();ctx.scale(scale,scale);ctx.translate(-camX,-camY);
+ const minC=Math.max(0,Math.floor(camX/tile)-1),maxC=Math.min(MINE.cols-1,Math.ceil((camX+vw)/tile)+1);
+ const minR=Math.max(0,Math.floor(camY/tile)-1),maxR=Math.min(MINE.rows-1,Math.ceil((camY+vh)/tile)+1);
+ for(let y=minR;y<=maxR;y++)for(let x=minC;x<=maxC;x++){
+   const bx=x*tile,by=y*tile,id=mineIndex(x,y),v=rockVariant(x,y);
+   if(mineBroken.has(id)){
+     rect(bx,by,tile+.5,tile+.5,0,(x+y)%2===0?'#263345':'#2b3948');
+     ctx.strokeStyle='#364559';ctx.lineWidth=.8;ctx.strokeRect(bx+1,by+1,tile-2,tile-2);
+     circle(bx+13+v,by+10+(v%7),2,'#59707b');circle(bx+30,by+30,1.5,'#596f75');
+     if((x*13+y*7)%13===0)circle(bx+30,by+9,2,'#90c6bf');
+     continue;
+   }
+   const border=x===0||y===0||x===MINE.cols-1||y===MINE.rows-1;
+   rect(bx,by,tile+.3,tile+.3,1,border?'#1b2333':v%3===0?'#627082':v%3===1?'#536273':'#58687a');
+   rect(bx+3,by+3,tile-6,tile-7,5,border?'#283346':v%2?'#657686':'#6f7f8d');
+   ctx.strokeStyle='#354756';ctx.lineWidth=1.3;ctx.beginPath();ctx.moveTo(bx+9,by+11);ctx.lineTo(bx+18,by+15);ctx.lineTo(bx+15,by+24);ctx.moveTo(bx+22,by+27);ctx.lineTo(bx+30,by+19);ctx.stroke();
+   if(v===1||v===7){ctx.fillStyle=v===7?'#e4b76d':'#9ce1d0';ctx.beginPath();ctx.moveTo(bx+27,by+10);ctx.lineTo(bx+33,by+17);ctx.lineTo(bx+28,by+25);ctx.lineTo(bx+22,by+17);ctx.fill()}
+   const taken=mineDamage.get(id)||0;if(taken>0){
+     const pct=Math.min(1,taken/rockMaxHp(x,y));ctx.strokeStyle='#201f28';ctx.lineWidth=1.6+pct*1.4;ctx.beginPath();ctx.moveTo(bx+7,by+6);ctx.lineTo(bx+19,by+20);ctx.lineTo(bx+10,by+32);if(pct>.4){ctx.moveTo(bx+19,by+20);ctx.lineTo(bx+35,by+12)}if(pct>.7){ctx.moveTo(bx+19,by+20);ctx.lineTo(bx+30,by+36)}ctx.stroke();
+   }
+   if(rockSwingAt===id&&now<rockSwingUntil){rect(bx+3,by+3,tile-6,tile-6,4,'#fff8d055')}
+ }
+ // Mining lights follow players, but rocks remain visible around them.
+ for(const p of others.values())if(p.scene==='mine')avatar(p);
+ avatar(me);
+ for(const e of mineEffects){const age=(now-e.stamp)/1000;if(age>1.1)continue;
+   ctx.save();ctx.globalAlpha=Math.max(0,1-age/.95);ctx.textAlign='center';ctx.font=e.big?'bold 23px system-ui':'bold 18px system-ui';ctx.fillStyle=e.col;ctx.fillText(e.text,e.x,e.y-age*47);ctx.restore();
+ }
+ mineEffects=mineEffects.filter(e=>now-e.stamp<1100);
+ // Subtle light spilling from the entrance.
+ const lx=(MINE.entryX+.5)*tile,ly=(MINE.entryY+.5)*tile;
+ circle(lx-55,ly-60,11,'#e5b668');circle(lx-55,ly-60,5,'#ffeaa6');
+ ctx.restore();
+ // An always-visible cave heading.
+ ctx.fillStyle='#fff3ce';ctx.textAlign='center';ctx.font='bold 14px system-ui';if(W>760)ctx.fillText('⛏️ เหมืองหิน • ขุดเปิดทางได้รอบทิศ',W/2,30);
+}
 function drawRoom(now){
  ctx.clearRect(0,0,W,H);ctx.fillStyle='#122036';ctx.fillRect(0,0,W,H);
- const scale=Math.min((W-16)/world.w,(H-16)/world.h,1.25),ox=(W-world.w*scale)/2,oy=(H-world.h*scale)/2;
- ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+ ctx.save();mapTransform();
  rect(0,0,780,550,18,'#a8bec5');rect(24,24,732,502,10,'#d9c6a7');
  ctx.strokeStyle='#bda98a';ctx.lineWidth=1;
  for(let x=40;x<740;x+=40){ctx.beginPath();ctx.moveTo(x,26);ctx.lineTo(x,524);ctx.stroke()}
  for(let y=40;y<510;y+=40){ctx.beginPath();ctx.moveTo(26,y);ctx.lineTo(754,y);ctx.stroke()}
  drawDecor(now);
- for(const o of objects)drawFurniture(o,now);
+ for(const o of objects){
+   if(o.t==='fridge'||o.t==='stove')drawKitchen(o);
+   else drawFurniture(o,now);
+ }
+ drawDoor(390,513);mapLabel('ไปละแวกบ้าน',390,503);
  drawCat(now);
- for(const p of others.values())avatar(p);
+ for(const p of others.values())if(p.scene==='room'||!p.scene)avatar(p);
  avatar(me);
  ctx.restore();
 }
@@ -168,27 +382,308 @@ function render(now){
  if(keys.size){dx=Number(keys.has('d')||keys.has('ArrowRight'))-Number(keys.has('a')||keys.has('ArrowLeft'));dy=Number(keys.has('s')||keys.has('ArrowDown'))-Number(keys.has('w')||keys.has('ArrowUp'))}
  const length=Math.hypot(dx,dy);if(length>1){dx/=length;dy/=length}
  me.walking=false;
- if(length>.08&&me.pose==='stand'){
+ if(length>.08&&me.pose==='stand'&&!lifeDialog.open){
    me.face=Math.atan2(dy,dx);const nx=me.x+dx*175*dt,ny=me.y+dy*175*dt;
-   const colliding=objectAt(nx,ny);
-   if(colliding&&useFurniture(colliding)){
-     // Interaction starts by bumping into the bed/sofa/chair.
-   }else{
-     const px=me.x,py=me.y;
-     if(!hit(nx,me.y))me.x=nx;
-     if(!hit(me.x,ny))me.y=ny;
+   if(scene==='mine'){
+     const px=me.x,py=me.y;if(!mineSolidAt(nx,me.y))me.x=nx;if(!mineSolidAt(me.x,ny))me.y=ny;
      me.walking=Math.hypot(me.x-px,me.y-py)>.1;
+   }else{
+     const colliding=objectAt(nx,ny);
+     if(colliding&&useFurniture(colliding)){
+       // Interaction starts by bumping into the bed/sofa/chair.
+     }else{
+       const px=me.x,py=me.y;
+       if(!hit(nx,me.y))me.x=nx;
+       if(!hit(me.x,ny))me.y=ny;
+       me.walking=Math.hypot(me.x-px,me.y-py)>.1;
+     }
    }
  }
  if(now-lastSend>90&&roomCode){broadcast(snapshot());lastSend=now}
- drawRoom(now);requestAnimationFrame(render);
+ lifeTick(now,dt);
+ if(scene==='mine')drawMine(now);else if(scene==='outside')drawOutside();else drawRoom(now);requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
-function wireCall(call){call.on('stream',s=>{let a=audios.get(call.peer);if(!a){a=document.createElement('audio');a.autoplay=true;a.playsInline=true;document.body.appendChild(a);audios.set(call.peer,a)}a.srcObject=s;a.muted=!speakerOn;a.play().catch(()=>toast('แตะ 🔊 เพื่ออนุญาตเล่นเสียง'))});call.on('close',()=>{calls.delete(call.peer);audios.get(call.peer)?.remove();audios.delete(call.peer)});call.on('error',()=>toast('เสียงบางคนเชื่อมต่อไม่ได้'))}function callPeer(id){if(!localStream||!connections.get(id)?.open||!peer)return;calls.get(id)?.close();const c=peer.call(id,localStream);if(c){calls.set(id,c);wireCall(c)}}
-$('speaker').onclick=()=>{speakerOn=!speakerOn;$('speaker').textContent=speakerOn?'🔊':'🔇';for(const a of audios.values()){a.muted=!speakerOn;if(speakerOn)a.play().catch(()=>{})}};
+canvas.addEventListener('pointerdown',e=>{
+ if(scene!=='mine'||lifeDialog.open)return;
+ const rect=canvas.getBoundingClientRect();
+ const tx=Math.floor(((e.clientX-rect.left)/mineView.scale+mineView.cx)/MINE.tile);
+ const ty=Math.floor(((e.clientY-rect.top)/mineView.scale+mineView.cy)/MINE.tile);
+ if(inMineBounds(tx,ty)){me.face=Math.atan2((ty+.5)*MINE.tile-me.y,(tx+.5)*MINE.tile-me.x);mineStrike(tx,ty)}
+});
+function wireCall(call){call.on('stream',s=>{let a=audios.get(call.peer);if(!a){a=document.createElement('audio');a.autoplay=true;a.playsInline=true;document.body.appendChild(a);audios.set(call.peer,a)}a.srcObject=s;a.muted=!speakerOn;a.play().catch(()=>toast('แตะ 🔊 เพื่ออนุญาตเล่นเสียง'))});call.on('close',()=>{if(incomingCalls.get(call.peer)!==call)return;incomingCalls.delete(call.peer);audios.get(call.peer)?.remove();audios.delete(call.peer)});call.on('error',()=>toast('เสียงบางคนเชื่อมต่อไม่ได้'))}function callPeer(id){if(!localStream||!connections.get(id)?.open||!peer||calls.has(id))return;
+ const c=peer.call(id,localStream,{metadata:{voice:4}});
+ if(c){
+   calls.set(id,c);
+   const forget=()=>{if(calls.get(id)===c)calls.delete(id)};
+   c.on('close',forget);
+   c.on('error',()=>{forget();toast('ส่งเสียงไปยังผู้เล่นบางคนไม่ได้')});
+ }}
+$('speaker').onclick=()=>{speakerOn=!speakerOn;$('speaker').textContent=speakerOn?'🔊':'🔇';for(const a of audios.values()){a.muted=!speakerOn;a.play().catch(()=>{})}};
 const bars=Array.from({length:9},()=>{const b=document.createElement('i');$('wave').appendChild(b);return b});function drawWave(){if(!localStream||!analyser)return;const data=new Uint8Array(analyser.fftSize);analyser.getByteTimeDomainData(data);let v=0;for(const n of data)v+=((n-128)/128)**2;const amp=Math.sqrt(v/data.length);const active=amp>0.035;if(active!==voiceActive){voiceActive=active;broadcast({type:'voice',active})}if(performance.now()-lastVoiceSignal>700){broadcast({type:'voice',active:voiceActive});lastVoiceSignal=performance.now()}bars.forEach((b,i)=>b.style.height=Math.max(5,Math.min(23,5+amp*180*(.5+.5*Math.sin(i+performance.now()/160))))+'px');frame=requestAnimationFrame(drawWave)}
 function startRecognition(){if(!SpeechRecognition){toast('เบราว์เซอร์นี้ไม่รองรับแปลงเสียงเป็นข้อความ แต่ยังพูดคุยได้');return}recStop=false;const rec=new SpeechRecognition();recognition=rec;rec.lang='th-TH';rec.continuous=true;rec.interimResults=true;let lastCaption='';rec.onresult=e=>{let interim='',final='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)final+=t;else interim+=t}const t=(final||interim).trim();if(t&&t!==lastCaption){lastCaption=t;say(t,false)}};rec.onend=()=>{if(localStream&&!recStop&&recognition===rec)try{rec.start()}catch(e){}};rec.onerror=e=>{if(e.error==='not-allowed'||e.error==='service-not-allowed')toast('ระบบแปลงเสียงไม่ได้รับอนุญาต แต่ไมค์ยังส่งเสียงได้')};try{rec.start()}catch(e){toast('แปลงเสียงไม่พร้อม แต่ไมค์ยังทำงาน')}}
 async function stopMic(){recStop=true;try{recognition?.stop()}catch(e){}recognition=null;cancelAnimationFrame(frame);for(const c of calls.values())c.close();calls.clear();if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(audioCtx){audioCtx.close().catch(()=>{});audioCtx=null}analyser=null;voiceActive=false;broadcast({type:'voice',active:false});$('mic').classList.remove('on');$('mic').textContent='🎤';bars.forEach(b=>b.style.height='5px');toast('ปิดไมค์แล้ว')}
 $('mic').onclick=async()=>{if(localStream){await stopMic();return}try{if(!window.isSecureContext)throw Error('ต้องเปิดผ่าน HTTPS');localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});$('mic').classList.add('on');$('mic').textContent='🔴';audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(localStream);analyser=audioCtx.createAnalyser();analyser.fftSize=512;source.connect(analyser);drawWave();for(const id of connections.keys())callPeer(id);startRecognition();toast('เปิดไมค์แล้ว • เพื่อนจะได้ยินเสียงและเห็นข้อความ')}catch(e){toast('เปิดไมค์ไม่ได้: '+(e.message||e.name))}};
+const foods = {
+ egg:['🥚','ไข่'], bread:['🍞','ขนมปัง',12], tomato:['🍅','มะเขือเทศ',8],
+ cheese:['🧀','ชีส',10], toast:['🍳','ขนมปังไข่',38], sandwich:['🥪','แซนด์วิชชีส',48]
+};
+const recipes = {
+ toast:{egg:1,bread:1}, sandwich:{bread:1,tomato:1,cheese:1}
+};
+const staples = {egg:4,bread:6,tomato:4,cheese:4};
+const life = {
+ fridge:{...staples}, bag:{}, needs:{fullness:78,energy:84,mood:72}, friends:{}
+};
+const neighbors = [
+ {name:'มะลิ',color:'#d87c92',x:220,y:195,walking:true,homeX:220,homeY:195,
+  lines:['วันนี้อากาศดีจัง ไปเดินเล่นในสวนกันไหม','ขนมปังไข่จากครัวบ้านเธอหอมไปถึงหน้าบ้านเลย']},
+ {name:'ต้น',color:'#488d85',x:562,y:385,walking:true,homeX:562,homeY:385,
+  lines:['ยินดีที่ได้รู้จัก! ปกติฉันมาเดินเล่นแถวสวน','ขุดเจอหินสวย ๆ บ้างไหม เอามาเล่าให้ฟังนะ']}
+];
+const kitchen = [
+ {x:603,y:240,w:67,h:62,t:'fridge',label:'ตู้เย็น'},
+ {x:600,y:147,w:74,h:53,t:'stove',label:'เตา'}
+];
+objects.push(...kitchen);
+const houses = [
+ {x:304,y:53,w:172,h:102,roof:'#aa5946',wall:'#ffe1ad',label:'บ้านของเรา'},
+ {x:78,y:64,w:157,h:89,roof:'#b76b8c',wall:'#ffdec5',label:'บ้านมะลิ'},
+ {x:547,y:63,w:154,h:91,roof:'#548d8b',wall:'#e4ebbe',label:'บ้านต้น'}
+];
+const outsideBlocks = [...houses,{x:86,y:361,w:155,h:90}];
+const lifeDialog = $('lifeDialog');
+let lifeMode = '', lifeTarget = null, lastLifeUpdate = 0, lifeSaveTime = 0;
+
+function loadLife(){
+ try{
+   const save=JSON.parse(localStorage.getItem('thai2d_life_v4')||'{}');
+   for(const group of Object.keys(life)){
+     const allowed=group==='bag'?Object.keys(foods):group==='friends'?neighbors.map(p=>p.name):Object.keys(life[group]);
+     for(const key of allowed){
+       const n=save[group]?.[key];
+       if(Number.isFinite(n)&&n>=0)life[group][key]=Math.min(group==='needs'?100:999,n);
+     }
+   }
+ }catch{}
+}
+function saveLife(){
+ try{localStorage.setItem('thai2d_life_v4',JSON.stringify(life))}catch{}
+}
+function changeNeed(key,amount){
+ life.needs[key]=Math.max(0,Math.min(100,life.needs[key]+amount));
+}
+function lifeHud(){
+ for(const [key,n] of Object.entries(life.needs)){
+   $(key).value=Math.round(n);
+   $(key+'Value').textContent=Math.round(n)+'%';
+ }
+ $('place').textContent={room:'บ้านของเรา',outside:'ละแวกบ้าน',mine:'เหมือง'}[scene];
+}
+function itemName(key){return foods[key].slice(0,2).join(' ')}
+function lifeRow(label,actions=[]){
+ const row=document.createElement('div');
+ row.className='life-row';
+ const name=document.createElement('span');
+ name.textContent=label;
+ row.append(name);
+ for(const [text,fn,disabled] of actions){
+   const button=document.createElement('button');
+   button.textContent=text;
+   button.disabled=!!disabled;
+   button.onclick=()=>{fn();saveLife();lifeHud();drawLifeDialog()};
+   row.append(button);
+ }
+ $('lifeRows').append(row);
+}
+function transfer(from,to,key){
+ if(!(from[key]>0))return;
+ from[key]--;to[key]=(to[key]||0)+1;
+}
+function cook(key){
+ const ingredients=Object.entries(recipes[key]);
+ if(ingredients.some(([item,count])=>(life.bag[item]||0)<count))return;
+ for(const [item,count] of ingredients)life.bag[item]-=count;
+ life.bag[key]=(life.bag[key]||0)+1;
+ toast('ทำ'+foods[key][1]+'เสร็จแล้ว เปิดกระเป๋าเพื่อกิน');
+}
+function drawLifeDialog(){
+ $('lifeRows').replaceChildren();
+ $('lifeTitle').textContent={fridge:'🧊 ตู้เย็น',stove:'🍳 ทำอาหาร',bag:'🎒 กระเป๋า',neighbor:lifeTarget?.name}[lifeMode];
+ if(lifeMode==='fridge'){
+   for(const key of Object.keys(staples)){
+     lifeRow(itemName(key)+' ×'+life.fridge[key],[
+       ['หยิบ',()=>transfer(life.fridge,life.bag,key),!life.fridge[key]],
+       ['เก็บคืน',()=>transfer(life.bag,life.fridge,key),!life.bag[key]]
+     ]);
+   }
+   lifeRow('เติมวัตถุดิบ',[['เติมของ',()=>{
+     for(const [key,count] of Object.entries(staples))life.fridge[key]=Math.max(life.fridge[key],count);
+   },Object.keys(staples).every(key=>life.fridge[key]>=staples[key])]]);
+ }else if(lifeMode==='stove'){
+   lifeRow('หยิบวัตถุดิบจากตู้เย็นก่อนเริ่มทำอาหาร');
+   for(const [key,ingredients] of Object.entries(recipes)){
+     const entries=Object.entries(ingredients);
+     lifeRow(itemName(key)+' · '+entries.map(([item,n])=>foods[item][1]+' '+n).join(' + '),
+       [['ทำอาหาร',()=>cook(key),entries.some(([item,n])=>(life.bag[item]||0)<n)]]);
+   }
+ }else if(lifeMode==='bag'){
+   lifeRow('🪨 หิน ×'+minedCount);
+   for(const [i,tool] of TOOLS.entries()){
+     if(miningLevel>=tool.unlock)lifeRow(tool.icon+' '+tool.name+(i===selectedTool?' · ถืออยู่':''),
+       [['ถือ',()=>switchTool(i),i===selectedTool]]);
+   }
+   for(const [key,count] of Object.entries(life.bag)){
+     if(count>0)lifeRow(itemName(key)+' ×'+count,foods[key][2]?
+       [['กิน',()=>{life.bag[key]--;changeNeed('fullness',foods[key][2])}]]:[]);
+   }
+ }else if(lifeMode==='neighbor'){
+   const npc=lifeTarget;
+   const friendship=life.friends[npc.name]||0;
+   lifeRow(npc.text||'สวัสดี ยินดีที่ได้เจอนะ!');
+   lifeRow('ความสนิท '+friendship,[['คุยเล่น',()=>socialize(npc,false)]]);
+   for(const key of Object.keys(recipes)){
+     if(life.bag[key]>0)lifeRow(itemName(key),[['แบ่งให้',()=>{life.bag[key]--;socialize(npc,true)}]]);
+   }
+ }
+}
+function openLife(mode,target=null){
+ lifeMode=mode;lifeTarget=target;
+ keys.clear();stopMineHold();clearInterval(mineSpaceInterval);
+ drawLifeDialog();
+ if(!lifeDialog.open)lifeDialog.showModal();
+}
+function socialize(npc,gift){
+ const previous=life.friends[npc.name]||0;
+ npc.text=gift?'ขอบคุณสำหรับอาหารนะ!':npc.lines[previous%npc.lines.length];
+ npc.until=Date.now()+6000;
+ life.friends[npc.name]=Math.min(999,previous+(gift?3:1));
+ changeNeed('mood',gift?15:8);
+ saveLife();lifeHud();
+}
+function setLifeScene(next,x,y){
+ scene=next;me.x=x;me.y=y;me.walking=false;me.face=next==='room'?-Math.PI/2:Math.PI/2;
+ lifeHud();broadcast(snapshot());
+}
+function nearLife(){
+ if(me.pose!=='stand')return;
+ if(scene==='room'){
+   for(const item of kitchen){
+     const dx=me.x-Math.max(item.x,Math.min(me.x,item.x+item.w));
+     const dy=me.y-Math.max(item.y,Math.min(me.y,item.y+item.h));
+     if(Math.hypot(dx,dy)<39)return {
+       label:item.t==='fridge'?'เปิดตู้เย็น':'ใช้เตาทำอาหาร',
+       run:()=>openLife(item.t)
+     };
+   }
+   if(Math.abs(me.x-390)<47&&me.y>463)return {
+     label:'ออกไปละแวกบ้าน',run:()=>setLifeScene('outside',390,183)
+   };
+ }else if(scene==='outside'){
+   if(Math.abs(me.x-390)<47&&me.y<202)return {
+     label:'เข้าบ้าน',run:()=>setLifeScene('room',390,479)
+   };
+   const npc=neighbors.find(p=>Math.hypot(me.x-p.x,me.y-p.y)<64);
+   if(npc)return {label:'ทักทาย'+npc.name,run:()=>{socialize(npc,false);openLife('neighbor',npc)}};
+ }
+}
+function lifeInteract(){if(!lifeDialog.open)nearLife()?.run()}
+function lifeTick(now,dt){
+ if(scene==='room'&&me.pose==='stand'&&Math.abs(me.x-390)<35&&me.y>499&&me.face>0.35&&me.face<2.8){
+   setLifeScene('outside',390,183);
+ }
+ if(scene==='outside'){
+   if(Math.abs(me.x-390)<34&&me.y<176&&me.face<-.35&&me.face>-2.8)setLifeScene('room',390,479);
+   neighbors.forEach((npc,i)=>{
+     npc.walking=npc!==lifeTarget||!lifeDialog.open;
+     if(!npc.walking)return;
+     npc.x=npc.homeX+Math.sin(now/4600+i)*41;
+     npc.y=npc.homeY+Math.cos(now/5200+i)*16;
+   });
+ }
+ changeNeed('fullness',-dt*(scene==='mine'?.12:.05));
+ changeNeed('energy',dt*(me.pose==='sleep'?5:me.pose==='sit'?.65:scene==='mine'?-.15:-.06));
+ changeNeed('mood',-dt*(life.needs.fullness<25?.24:.045));
+ if(now-lastLifeUpdate>350){
+   lastLifeUpdate=now;lifeHud();
+ }
+ const action=nearLife();
+ $('interact').hidden=!action;
+ if(action)$('interact').textContent=action.label+' (E)';
+ if(now-lifeSaveTime>5000){lifeSaveTime=now;saveLife()}
+}
+function drawKitchen(o){
+ const fridge=o.t==='fridge';
+ rect(o.x,o.y,o.w,o.h,10,fridge?'#c9e4e1':'#415461');
+ rect(o.x+5,o.y+5,o.w-10,o.h-10,7,fridge?'#e7f3ee':'#586b75');
+ if(fridge){
+   rect(o.x+4,o.y+21,o.w-8,2,1,'#89a6a4');
+   rect(o.x+13,o.y+26,4,19,2,'#699393');
+ }else{
+   for(const x of [o.x+21,o.x+53]){
+     circle(x,o.y+22,10,'#273746');circle(x,o.y+22,6,'#b57259');
+     circle(x,o.y+42,3,'#d4cdbd');
+   }
+ }
+ mapLabel(o.label,o.x+o.w/2,o.y+o.h+13);
+}
+function mapLabel(text,x,y,fill='#263831'){
+ ctx.fillStyle=fill;ctx.font='bold 14px system-ui';ctx.textAlign='center';ctx.fillText(text,x,y);
+}
+function drawDoor(x,y){
+ rect(x-33,y,66,24,5,'#9f603e');
+ rect(x-27,y+3,54,17,3,'#c18550');
+ circle(x+19,y+10,3,'#f4ce78');
+}
+function drawOutside(){
+ ctx.clearRect(0,0,W,H);ctx.fillStyle='#182d28';ctx.fillRect(0,0,W,H);
+ ctx.save();mapTransform();
+ rect(0,0,780,550,18,'#7da966');
+ rect(17,15,746,519,17,'#a9ca83');
+ rect(17,232,746,80,0,'#53636b');
+ rect(17,223,746,10,0,'#e1ce9e');rect(17,311,746,10,0,'#e1ce9e');
+ for(let x=35;x<750;x+=49)rect(x,269,24,3,1,'#eac685');
+ for(const [x,w] of [[145,24],[365,50],[606,24]])rect(x,147,w,76,4,'#d9c49b');
+ rect(345,310,90,165,16,'#d9c49b');
+ rect(86,361,155,90,34,'#559488');
+ rect(94,369,139,74,30,'#72b3b3');
+ for(let i=0;i<8;i++)rect(111+i*14,386+i%3*15,11,2,1,'#ade2d7');
+ mapLabel('สวนชุมชน',390,463);
+ for(const [x,y] of [[67,195],[270,163],[712,186],[60,469],[300,426],[468,453],[672,440],[718,371]]){
+   circle(x+3,y+8,21,'#6d9a65');rect(x-4,y,8,21,3,'#896846');
+   circle(x,y-7,20,'#4b875b');circle(x-7,y-14,13,'#6ba86a');
+ }
+ for(const h of houses){
+   rect(h.x+5,h.y+9,h.w,h.h,10,'#678955');
+   rect(h.x,h.y+27,h.w,h.h-27,7,h.wall);
+   rect(h.x-7,h.y,h.w+14,38,9,h.roof);
+   for(const dx of [22,h.w-49]){
+     rect(h.x+dx,h.y+51,27,19,3,'#58919c');
+     rect(h.x+dx+12,h.y+51,2,19,0,'#fff1d2');
+   }
+   drawDoor(h.x+h.w/2,h.y+h.h-24);
+   mapLabel(h.label,h.x+h.w/2,h.y+24,'#fff9e9');
+ }
+ const people=[me,...neighbors,...[...others.values()].filter(p=>p.scene==='outside')];
+ people.sort((a,b)=>a.y-b.y).forEach(avatar);
+ ctx.restore();
+}
+function mapTransform(){
+ const scale=Math.min((W-16)/world.w,(H-16)/world.h,1.25);
+ ctx.translate((W-world.w*scale)/2,(H-world.h*scale)/2);ctx.scale(scale,scale);
+}
+loadLife();lifeHud();
+$('bag').onclick=()=>openLife('bag');
+$('lifeClose').onclick=()=>lifeDialog.close();
+$('interact').onclick=lifeInteract;
+lifeDialog.addEventListener('close',()=>{lifeMode='';lifeTarget=null;keys.clear()});
+addEventListener('keydown',e=>{
+ if(e.repeat||lifeDialog.open||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;
+ const key=e.key.toLowerCase();
+ if(key==='e'&&me.pose==='stand'&&!e.defaultPrevented){lifeInteract();e.preventDefault()}
+ if(key==='i'){openLife('bag');e.preventDefault()}
+});
+addEventListener('pagehide',saveLife);
+
 addEventListener('pagehide',()=>{if(localStream)stopMic();peer?.destroy()});
 </script></body></html>
