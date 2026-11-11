@@ -1,4 +1,4 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>บ้านและเหมือง V6 · เกม 2D Multiplayer</title><script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><style>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>บ้านและเหมือง V7 · เกม 2D Multiplayer</title><script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><style>
 *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#101a2b;color:#fff;font:14px system-ui,'Noto Sans Thai',sans-serif;touch-action:none}canvas{display:block;width:100vw;height:100dvh}.panel{position:fixed;top:10px;left:10px;background:#14263de8;border:1px solid #ffffff30;border-radius:13px;padding:10px;max-width:min(78vw,350px);z-index:3}.panel small{color:#b9d0e9}.panel button,.panel input,.chat button{border:0;border-radius:8px;padding:8px;background:#5ec7bc;color:#102232;font-weight:700}.panel input{background:#fff;color:#111;width:110px}.row{display:flex;gap:5px;align-items:center;margin-top:6px;flex-wrap:wrap}.joy{position:fixed;bottom:26px;left:20px;width:145px;height:145px;border-radius:100%;border:2px solid #ffffff60;background:#ffffff20;display:grid;place-items:center}.stick{height:62px;width:62px;background:#63c7ff;border:3px solid #d8f8ff;border-radius:100%;pointer-events:none}.controls{position:fixed;bottom:24px;right:15px;display:flex;align-items:center;gap:8px}.controls button{height:64px;min-width:64px;border-radius:40px;border:2px solid #ffffff80;background:#294a70;color:white;font-size:26px}.controls button.on{background:#b93554}.chat{position:fixed;bottom:180px;left:50%;transform:translateX(-50%);display:flex;gap:5px;width:min(75vw,310px)}.chat input{width:100%;min-width:0;background:#152e49;color:white;border:1px solid #ffffff70;border-radius:10px;padding:10px;touch-action:manipulation;user-select:text}.chat button{min-width:46px}.toast{position:fixed;top:10px;right:10px;max-width:42vw;text-align:right;color:#d7f3ff;text-shadow:0 2px 5px #000;pointer-events:none}.wave{height:24px;display:flex;gap:3px;align-items:center;justify-content:center}.wave i{width:4px;height:5px;border-radius:4px;background:#8ceee3}@media(max-width:450px){.panel{font-size:12px;max-width:80vw}.toast{top:145px;max-width:75vw}.chat{bottom:185px}}
 
 /* Living room v2 UI */
@@ -58,6 +58,8 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
 .mine-reset:disabled{opacity:.52;cursor:default}
 .life-row:first-child{border-top:0}.life-row button:hover:not(:disabled),.life-top button:hover{background:#f4e6b5}
 .room-help{max-width:72vw}
+.town-clock{white-space:nowrap;color:#fff2c9;font-size:11px}.life-top button{white-space:nowrap}.life-top button:disabled{opacity:.52;cursor:default}
+@media(max-width:490px){.life-top{max-width:190px;gap:4px}.life-top .pose-button{padding:4px 7px}.life-top .town-clock{font-size:10px}}
 .workout-status{position:fixed;bottom:225px;left:50%;transform:translateX(-50%);z-index:4;min-width:142px;border-radius:12px;padding:8px 14px;background:#162c2cf0;color:#ffebaf;text-align:center;pointer-events:none}
 .workout-status progress{display:block;width:100%;height:7px;margin-top:4px;accent-color:#8cd3b1}
 @media(max-width:700px){.workout-status{bottom:179px}}
@@ -66,13 +68,13 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
 </style></head><body><canvas id="game"></canvas><section class="panel"><details><summary>👥 ห้องออนไลน์</summary><div id="state"></div><div class="row"><input id="name" maxlength="14" placeholder="ชื่อผู้เล่น"><button id="rename">ตั้งชื่อ</button></div><div class="row"><button id="create">สร้างห้อง</button><button id="copy">คัดลอกลิงก์</button></div><div class="row"><input id="room" placeholder="รหัสห้อง"><button id="join">เข้าห้อง</button></div><div class="row"><button id="leaveRoom" class="room-exit" title="ออกจากห้องออนไลน์">🚪 ออกจากห้อง</button></div><small id="count">ออนไลน์ 1 คน</small></details></section><button class="mine-nav" id="mineToggle">⛏️ ไปเหมือง</button>
 
 <section class="life-top" aria-label="สถานะตัวละคร">
- <strong id="place"></strong>
+ <strong id="place"></strong><span id="townClock" class="town-clock"></span>
  <div class="needs">
   <label>อิ่ม <span id="fullnessValue"></span><meter id="fullness" min="0" max="100" low="25" high="75" optimum="100"></meter></label>
   <label>พลัง <span id="energyValue"></span><meter id="energy" min="0" max="100" low="25" high="75" optimum="100"></meter></label>
   <label>สุข <span id="moodValue"></span><meter id="mood" min="0" max="100" low="25" high="75" optimum="100"></meter></label>
  </div>
- <button id="bag" title="เปิดกระเป๋า (I)">🎒 กระเป๋า</button>
+ <button id="poseMenu" class="pose-button" title="ท่าทาง (G)">ท่าทาง</button><button id="bag" title="เปิดกระเป๋า (I)">🎒 กระเป๋า</button>
 </section>
 <button id="interact" class="interact" hidden></button>
 <div id="workoutStatus" class="workout-status" hidden><strong id="workoutLabel"></strong><progress id="workoutProgress" max="1" value="0" aria-label="ความคืบหน้าการออกกำลังกาย"></progress></div>
@@ -85,7 +87,7 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
  <div class="xp-track"><div class="xp-fill" id="mineXpBar"></div></div>
  <small id="mineXpLabel">EXP 0 / 28</small>
  <div class="mine-row"><span id="mineOre">🪨 หิน 0</span><span id="mineHps">⚡ 1 / ครั้ง</span></div>
- <small id="mineToolName">ถือ: ⛏️ อีเต้อเริ่มต้น</small><button id="mineReset" class="mine-reset">↻ รีเซ็ตเหมือง</button>
+ <small id="mineToolName">ถือ: ⛏️ อีเต้อเริ่มต้น</small><button id="mineReset" class="mine-reset">↻ รีเซ็ตเหมือง</button><small id="mineCountdown"></small>
 </section>
 <div class="mine-ui mine-tools" id="mineTools" aria-label="เลือกอาวุธในมือ">
  <button type="button" class="mine-tool equipped" data-tool="0" title="ช่อง 1 - อีเต้อ">⛏️<small>1</small></button>
@@ -98,9 +100,9 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
 <script>
 'use strict';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');let W=0,H=0,last=performance.now(),vx=0,vy=0,joyPointer=null;function resize(){W=innerWidth;H=innerHeight;const d=Math.min(devicePixelRatio||1,2);canvas.width=W*d;canvas.height=H*d;ctx.setTransform(d,0,0,d,0,0)}addEventListener('resize',resize);resize();
-const world={w:780,h:550},objects=[{x:125,y:95,w:130,h:68,t:'sofa'},{x:310,y:120,w:140,h:80,t:'table'},{x:89,y:239,w:76,h:76,t:'plant'},{x:120,y:370,w:120,h:75,t:'bed'},{x:555,y:370,w:115,h:70,t:'cabinet'},{x:475,y:120,w:65,h:65,t:'chair'}];const me={x:390,y:310,face:0,name:'ผู้เล่น',text:'',until:0,color:'#527bea',pose:'stand',furniture:null,walking:false,scene:'room',tool:0};const others=new Map(),connections=new Map(),calls=new Map(),incomingCalls=new Map(),audios=new Map();let peer=null,myId='',hostId='',roomCode='',isHost=false,localStream=null,recognition=null,recStop=false,speakerOn=true,analyser=null,audioCtx=null,frame=0,lastVoiceSignal=0,voiceActive=false;const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+const world={w:780,h:550},objects=[{x:125,y:95,w:130,h:68,t:'sofa'},{x:310,y:120,w:140,h:80,t:'table'},{x:89,y:239,w:76,h:76,t:'plant'},{x:120,y:370,w:120,h:75,t:'bed'},{x:555,y:370,w:115,h:70,t:'cabinet'},{x:475,y:120,w:65,h:65,t:'chair'}];const me={x:390,y:310,face:0,name:'ผู้เล่น',text:'',until:0,color:'#527bea',pose:'stand',furniture:null,walking:false,swimming:false,onBed:false,scene:'room',tool:0};const others=new Map(),connections=new Map(),calls=new Map(),incomingCalls=new Map(),audios=new Map();let peer=null,myId='',hostId='',roomCode='',isHost=false,localStream=null,recognition=null,recStop=false,speakerOn=true,analyser=null,audioCtx=null,frame=0,lastVoiceSignal=0,voiceActive=false;const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
 function toast(t){$('toast').textContent=t}function status(){updateMineResetButton();const n=1+others.size;$('count').textContent=roomCode?'ในห้อง '+n+' คน':'เล่นคนเดียว';$('state').textContent=roomCode?'ห้อง '+roomCode+(isHost?' (เจ้าของห้อง)':[...connections.values()].some(c=>c.open)?' • เชื่อมต่อแล้ว':' • กำลังเชื่อมต่อ...'):'ยังไม่ได้เข้าห้อง'}function color(id){let n=0;for(const c of id)n=(n*31+c.charCodeAt(0))>>>0;return ['#527bea','#e27a89','#6fbd84','#c49a55','#aa80d6','#61b7c2'][n%6]}
-function cleanName(t){return String(t||'ผู้เล่น').trim().slice(0,14)||'ผู้เล่น'}function code(t){return String(t||'').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24)}function idForRoom(c){return 'thai2droom-v5-'+c}function rand(){return Math.random().toString(36).slice(2,8)}
+function cleanName(t){return String(t||'ผู้เล่น').trim().slice(0,14)||'ผู้เล่น'}function code(t){return String(t||'').toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,24)}function idForRoom(c){return 'thai2droom-v7-'+c}function rand(){return Math.random().toString(36).slice(2,8)}
 
 // MINE WORLD: Each new rock tile removed permanently expands the walkable cave.
 const MINE={cols:40,rows:28,tile:40,entryX:19,entryY:13};
@@ -110,6 +112,8 @@ const TOOLS=[
  {name:'สว่านขุดแร่',icon:'⚙️',unlock:6,power:3,speed:1.65}
 ];
 let scene='room',roomPosition={x:me.x,y:me.y},minePosition={x:(MINE.entryX+.5)*MINE.tile,y:(MINE.entryY+.5)*MINE.tile};
+const mineResetInterval=20*60*1000;
+let soloMineResetAt=Date.now()+mineResetInterval;
 let miningLevel=1,miningXp=0,minedCount=0,hitCount=0,selectedTool=0,lastMineSwing=0,rockSwingUntil=0,rockSwingAt=0;
 let mineBroken=new Set(),mineDamage=new Map(),mineEffects=[],mineView={scale:1,cx:0,cy:0};
 const mineIndex=(x,y)=>y*MINE.cols+x;
@@ -125,6 +129,7 @@ function miningSpeed(){return (1+Math.min(2.6,(miningLevel-1)*.115))*TOOLS[selec
 function swingCooldown(){return Math.max(105,Math.round(660/miningSpeed()))}
 function miningPower(){return TOOLS[selectedTool].power+Math.floor((miningLevel-1)/4)}
 function loadMine(){try{let d=JSON.parse(localStorage.getItem('thai2d_mine_v3')||'{}');
+ if(Number.isSafeInteger(d.resetAt)&&d.resetAt>0&&d.resetAt<=Date.now()+mineResetInterval)soloMineResetAt=d.resetAt;
  miningLevel=Math.max(1,Math.min(99,Number(d.level)||1));miningXp=Math.max(0,Number(d.xp)||0);
  minedCount=Math.max(0,Number(d.mined)||0);hitCount=Math.max(0,Number(d.hits)||0);
  for(const id of (Array.isArray(d.broken)?d.broken:[]).slice(0,1100)){
@@ -133,7 +138,7 @@ function loadMine(){try{let d=JSON.parse(localStorage.getItem('thai2d_mine_v3')|
  selectedTool=TOOLS[Number(d.tool)]?.unlock<=miningLevel?Number(d.tool):0;
  }catch(e){} }
 function saveMine(){try{const broken=[...(soloMine||mineBroken)].filter(i=>{const p=rockCell(i);return !startingGap(p.x,p.y)});
- localStorage.setItem('thai2d_mine_v3',JSON.stringify({level:miningLevel,xp:miningXp,mined:minedCount,hits:hitCount,broken,tool:selectedTool}));
+ localStorage.setItem('thai2d_mine_v3',JSON.stringify({level:miningLevel,xp:miningXp,mined:minedCount,hits:hitCount,broken,tool:selectedTool,resetAt:soloMineResetAt}));
  }catch(e){} }
 function miningHud(){const max=threshold(miningLevel);$('mineLevel').textContent='⛏️ Lv. '+miningLevel;
  $('mineSpeed').textContent=miningSpeed().toFixed(1)+'×';$('mineXpBar').style.width=Math.min(100,100*miningXp/max)+'%';
@@ -166,7 +171,7 @@ function mineExit(){if(scene!=='mine')return;stopMineHold();clearInterval(mineSp
  me.x=roomPosition.x;me.y=roomPosition.y;me.face=0;me.walking=false;me.pose='stand';
  document.body.classList.remove('mine-mode');$('mineToggle').textContent='⛏️ ไปเหมือง';
  broadcast(snapshot());toast('ออกจากเหมืองแล้ว บันทึกความคืบหน้าเรียบร้อย')}
-$('mineToggle').addEventListener('click',()=>{if(lifeDialog.open||characterDialog.open||me.action)return;if(scene==='mine')mineExit();else mineEnter();lifeHud()});
+$('mineToggle').addEventListener('click',()=>{if(lifeDialog.open||characterDialog.open||me.action||swimAtPlayer())return;if(scene==='mine')mineExit();else mineEnter();lifeHud()});
 for(const b of document.querySelectorAll('[data-tool]'))b.addEventListener('click',()=>switchTool(Number(b.dataset.tool)));
 function makeMineEffect(x,y,text,col='#c5e9ff'){mineEffects.push({x,y,stamp:performance.now(),text,col,big:false});if(mineEffects.length>45)mineEffects.shift()}
 function applyRemoteMineHit(id,amount){if(mineBroken.has(id))return;const p=rockCell(id);if(!inMineBounds(p.x,p.y))return;
@@ -202,8 +207,8 @@ addEventListener('keydown',e=>{if(scene!=='mine'||lifeDialog.open||characterDial
  if(e.code==='Space'){e.preventDefault();if(!e.repeat){doMineStrike();clearInterval(mineSpaceInterval);mineSpaceInterval=setInterval(()=>{if(scene==='mine')doMineStrike();else clearInterval(mineSpaceInterval)},60)}}});
 let mineSpaceInterval=0;addEventListener('keyup',e=>{if(e.code==='Space'){clearInterval(mineSpaceInterval);mineSpaceInterval=0}});addEventListener('blur',()=>{clearInterval(mineSpaceInterval);mineSpaceInterval=0});
 loadMine();miningHud();
-function sendTo(id,msg){const c=connections.get(id);if(c?.open)try{c.send(msg)}catch(e){}}function broadcast(msg){for(const id of connections.keys())sendTo(id,msg)}function snapshot(){return {type:'state',id:myId,x:Math.round(me.x),y:Math.round(me.y),face:me.face,name:me.name,text:me.text,until:me.until,talking:voiceActive,pose:me.pose,poseMotion:poseMotionPacket(),walking:me.walking,scene,tool:selectedTool,appearance:me.appearance,activity:activitySnapshot(),swing:performance.now()<rockSwingUntil}}
-function updateOther(msg){if(!msg.id||msg.id===myId)return;let p=others.get(msg.id)||{x:390,y:300,name:'ผู้เล่น',face:0,color:color(msg.id),text:'',until:0};if(['mine','room','outside'].includes(msg.scene))p.scene=msg.scene;const bound=p.scene==='mine'?MINE.cols*MINE.tile-40:p.scene==='outside'?TOWN.w-24:740,maxY=p.scene==='mine'?MINE.rows*MINE.tile-40:p.scene==='outside'?TOWN.h-24:510;if(Number.isFinite(msg.x))p.x=Math.max(p.scene==='outside'?24:40,Math.min(bound,msg.x));if(Number.isFinite(msg.y))p.y=Math.max(p.scene==='outside'?24:40,Math.min(maxY,msg.y));if(Number.isFinite(msg.face))p.face=msg.face;if(msg.name!==undefined)p.name=cleanName(msg.name);if(['stand','sit','sleep'].includes(msg.pose))p.pose=msg.pose;if(typeof msg.walking==='boolean')p.walking=msg.walking;if(Number.isInteger(msg.tool)&&msg.tool>=0&&msg.tool<3)p.tool=msg.tool;if(typeof msg.swing==='boolean')p.swing=msg.swing;if(msg.talking!==undefined){p.talking=!!msg.talking;p.voiceSeen=Date.now()}if(msg.text!==undefined){p.text=String(msg.text).slice(0,120);p.until=Number(msg.until)||0}if(msg.appearance)p.appearance=cleanAppearance(msg.appearance);readPoseMotion(p,msg.poseMotion);readActivity(p,msg.activity);others.set(msg.id,p);status()}
+function sendTo(id,msg){const c=connections.get(id);if(c?.open)try{c.send(msg)}catch(e){}}function broadcast(msg){for(const id of connections.keys())sendTo(id,msg)}function snapshot(){return {type:'state',id:myId,x:Math.round(me.x),y:Math.round(me.y),face:me.face,name:me.name,text:me.text,until:me.until,talking:voiceActive,pose:me.pose,poseMotion:poseMotionPacket(),walking:me.walking,swimming:!!me.swimming,onBed:!!me.onBed,scene,tool:selectedTool,appearance:me.appearance,activity:activitySnapshot(),swing:performance.now()<rockSwingUntil}}
+function updateOther(msg){if(!msg.id||msg.id===myId)return;let p=others.get(msg.id)||{x:390,y:300,name:'ผู้เล่น',face:0,color:color(msg.id),text:'',until:0};if(['mine','room','outside'].includes(msg.scene))p.scene=msg.scene;const bound=p.scene==='mine'?MINE.cols*MINE.tile-40:p.scene==='outside'?TOWN.w-24:740,maxY=p.scene==='mine'?MINE.rows*MINE.tile-40:p.scene==='outside'?TOWN.h-24:510;if(Number.isFinite(msg.x))p.x=Math.max(p.scene==='outside'?24:40,Math.min(bound,msg.x));if(Number.isFinite(msg.y))p.y=Math.max(p.scene==='outside'?24:40,Math.min(maxY,msg.y));if(Number.isFinite(msg.face))p.face=msg.face;if(msg.name!==undefined)p.name=cleanName(msg.name);if(['stand','sit','sleep'].includes(msg.pose))p.pose=msg.pose;if(typeof msg.walking==='boolean')p.walking=msg.walking;if(Number.isInteger(msg.tool)&&msg.tool>=0&&msg.tool<3)p.tool=msg.tool;if(typeof msg.swing==='boolean')p.swing=msg.swing;if(msg.talking!==undefined){p.talking=!!msg.talking;p.voiceSeen=Date.now()}if(msg.text!==undefined){p.text=String(msg.text).slice(0,120);p.until=Number(msg.until)||0}p.swimming=p.scene==='outside'&&msg.swimming===true&&!!waterAt(p.x,p.y);p.onBed=p.pose==='sleep'&&msg.onBed===true;if(msg.appearance)p.appearance=cleanAppearance(msg.appearance);readPoseMotion(p,msg.poseMotion);readActivity(p,msg.activity);others.set(msg.id,p);status()}
 function connectTo(id){if(!peer||!id||id===myId||connections.has(id))return;attach(peer.connect(id,{reliable:true}))}
 function attach(c){if(connections.has(c.peer)){c.close();return}const earlier=[...connections.keys()];connections.set(c.peer,c);c.on('open',()=>{sendTo(c.peer,snapshot());if(isHost){sendTo(c.peer,{type:'roster',ids:earlier.filter(id=>connections.has(id))});sendTo(c.peer,mineWorldPacket())}toast('✅ เชื่อมต่อผู้เล่น '+c.peer.slice(-6)+' แล้ว');status();if(localStream)callPeer(c.peer)});c.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='state'){m.id=c.peer;updateOther(m)}else if(m.type==='caption'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.text=String(m.text||'').slice(0,120);p.until=Date.now()+5000;others.set(c.peer,p)}else if(m.type==='voice'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.talking=!!m.active;p.voiceSeen=Date.now();others.set(c.peer,p)}else if(m.type==='roster'&&c.peer===hostId&&Array.isArray(m.ids)){m.ids.slice(0,16).forEach(connectTo)}else if(m.type==='minehit'&&isCurrentMineChange(m)){applyRemoteMineHit(Number(m.idx),m.amount)}else if(m.type==='minebreak'&&isCurrentMineChange(m)){mineBreak(Number(m.idx),false)}else if(m.type==='minesync'){acceptMineWorld(c.peer,m)}});const remove=()=>{if(connections.get(c.peer)===c)removePeer(c.peer)};c.on('close',remove);c.on('error',remove)}
 function removePeer(id){connections.delete(id);others.delete(id);calls.get(id)?.close();calls.delete(id);incomingCalls.get(id)?.close();incomingCalls.delete(id);audios.get(id)?.remove();audios.delete(id);status();if(id===hostId&&!isHost)toast('เจ้าของห้องออกแล้ว ผู้เล่นที่เชื่อมต่อกันอาจยังคุยต่อได้')}function closeAll(){for(const c of connections.values())c.close();connections.clear();for(const c of calls.values())c.close();calls.clear();for(const c of incomingCalls.values())c.close();incomingCalls.clear();for(const a of audios.values())a.remove();audios.clear();others.clear();if(peer){peer.destroy();peer=null}endRoomMine();hostId='';roomCode='';isHost=false;status()}
@@ -212,7 +217,7 @@ function updateRoomUrl(value){
  if(value)url.searchParams.set('room',value);else url.searchParams.delete('room');
  try{history.replaceState(null,'',url.href)}catch{}
 }
-function initPeer(requested,host){if(typeof Peer!=='function')return toast('โหลดระบบออนไลน์ไม่ได้ ลองเชื่อมต่ออินเทอร์เน็ตแล้วเปิดเกมใหม่');closeAll();isHost=host;peer=new Peer(requested||undefined,{debug:0});peer.on('open',id=>{myId=id;if(host){hostId=id;roomCode=requested.replace('thai2droom-v5-','');beginHostedMine();updateRoomUrl(roomCode);toast('ห้องพร้อมแล้ว! กดคัดลอกลิงก์เพื่อชวนเพื่อน')}else{roomCode=code($('room').value);hostId=idForRoom(roomCode);connectTo(hostId);toast('กำลังเข้าห้อง '+roomCode)}status()});peer.on('connection',attach);peer.on('call',call=>{
+function initPeer(requested,host){if(typeof Peer!=='function')return toast('โหลดระบบออนไลน์ไม่ได้ ลองเชื่อมต่ออินเทอร์เน็ตแล้วเปิดเกมใหม่');closeAll();isHost=host;peer=new Peer(requested||undefined,{debug:0});peer.on('open',id=>{myId=id;if(host){hostId=id;roomCode=requested.replace('thai2droom-v7-','');beginHostedMine();updateRoomUrl(roomCode);toast('ห้องพร้อมแล้ว! กดคัดลอกลิงก์เพื่อชวนเพื่อน')}else{roomCode=code($('room').value);hostId=idForRoom(roomCode);connectTo(hostId);toast('กำลังเข้าห้อง '+roomCode)}status()});peer.on('connection',attach);peer.on('call',call=>{
  if(!connections.has(call.peer)){call.close();return}
  incomingCalls.get(call.peer)?.close();
  incomingCalls.set(call.peer,call);
@@ -373,7 +378,7 @@ function render(now){
  dx=walkX;dy=walkY;
  me.walking=false;
  if(canWalk&&Math.hypot(dx,dy)>.08){
-   me.face=Math.atan2(dy,dx);const nx=me.x+dx*175*dt,ny=me.y+dy*175*dt;
+   me.face=Math.atan2(dy,dx);const speed=swimAtPlayer()?105:175;const nx=me.x+dx*speed*dt,ny=me.y+dy*speed*dt;
    if(scene==='mine'){
      const px=me.x,py=me.y;if(!mineSolidAt(nx,me.y))me.x=nx;if(!mineSolidAt(me.x,ny))me.y=ny;
      me.walking=Math.hypot(me.x-px,me.y-py)>.1;
@@ -384,9 +389,10 @@ function render(now){
      me.walking=Math.hypot(me.x-px,me.y-py)>.1;
    }
  }
+ tickWater(now,dt);tickMineClock();
  if(now-lastSend>90&&roomCode){broadcast(snapshot());lastSend=now}
  lifeTick(now,dt);
- if(scene==='mine')drawMine(now);else if(scene==='outside')drawOutside(now);else drawRoom(now);requestAnimationFrame(render);
+ if(scene==='mine')drawMine(now);else if(scene==='outside')drawOutside(now);else drawRoom(now);drawShopIncomeHud(now);requestAnimationFrame(render);
 }
 requestAnimationFrame(render);
 canvas.addEventListener('pointerdown',e=>{
@@ -410,6 +416,7 @@ function startRecognition(){if(!SpeechRecognition){toast('เบราว์เ�
 async function stopMic(){recStop=true;try{recognition?.stop()}catch(e){}recognition=null;cancelAnimationFrame(frame);for(const c of calls.values())c.close();calls.clear();if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null}if(audioCtx){audioCtx.close().catch(()=>{});audioCtx=null}analyser=null;voiceActive=false;broadcast({type:'voice',active:false});$('mic').classList.remove('on');$('mic').textContent='🎤';bars.forEach(b=>b.style.height='5px');toast('ปิดไมค์แล้ว')}
 $('mic').onclick=async()=>{if(localStream){await stopMic();return}try{if(!window.isSecureContext)throw Error('ต้องเปิดผ่าน HTTPS');localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});$('mic').classList.add('on');$('mic').textContent='🔴';audioCtx=new (window.AudioContext||window.webkitAudioContext)();const source=audioCtx.createMediaStreamSource(localStream);analyser=audioCtx.createAnalyser();analyser.fftSize=512;source.connect(analyser);drawWave();for(const id of connections.keys())callPeer(id);startRecognition();toast('เปิดไมค์แล้ว • เพื่อนจะได้ยินเสียงและเห็นข้อความ')}catch(e){toast('เปิดไมค์ไม่ได้: '+(e.message||e.name))}};
 let soloMine=null, roomMineGeneration=null;
+let roomMineResetAt=0;
 const mineStart=()=>({x:(MINE.entryX+.5)*MINE.tile,y:(MINE.entryY+.5)*MINE.tile});
 function updateMineResetButton(){
  const button=$('mineReset');
@@ -436,22 +443,26 @@ function beginHostedMine(){
  // A room starts from its host's saved tunnels and owns its subsequent changes.
  mineBroken=new Set(soloMine);
  roomMineGeneration=0;
+ roomMineResetAt=Date.now()+mineResetInterval;
  updateMineResetButton();
 }
 function endRoomMine(){
  if(soloMine)swapMineMap([...soloMine]);
- soloMine=null;roomMineGeneration=null;
+ soloMine=null;roomMineGeneration=null;roomMineResetAt=0;hostedTownOrigin=null;
 }
 function mineWorldPacket(){
- return {type:'minesync',generation:roomMineGeneration,broken:[...mineBroken]};
+ return {type:'minesync',generation:roomMineGeneration,remaining:Math.max(0,roomMineResetAt-Date.now()),townHour:townHour(),broken:[...mineBroken]};
 }
 function acceptMineWorld(peerId,packet){
  if(isHost||peerId!==hostId||!Array.isArray(packet.broken))return;
  if(!Number.isSafeInteger(packet.generation)||packet.generation<0)return;
+ if(!Number.isFinite(packet.remaining)||packet.remaining<0||packet.remaining>mineResetInterval)return;
  if(roomMineGeneration!==null&&packet.generation<=roomMineGeneration)return;
  const reset=roomMineGeneration!==null;
  if(!soloMine)soloMine=mineBroken;
  roomMineGeneration=packet.generation;
+ roomMineResetAt=Date.now()+packet.remaining;
+ syncTownHour(packet.townHour);
  swapMineMap(packet.broken);
  if(reset)toast('เจ้าของห้องรีเซ็ตเหมืองแล้ว');
 }
@@ -461,16 +472,39 @@ function sendMineChange(packet){
 function isCurrentMineChange(packet){
  return roomMineGeneration!==null&&packet.generation===roomMineGeneration;
 }
-function resetMineWorld(){
- if(scene!=='mine'||(roomCode&&!isHost))return;
+function applyMineReset(){
  swapMineMap();
  if(roomMineGeneration!==null){
+   roomMineResetAt=Date.now()+mineResetInterval;
    roomMineGeneration++;
    broadcast(mineWorldPacket());
- }
+ }else soloMineResetAt=Date.now()+mineResetInterval;
  saveMine();
+}
+function resetMineWorld(){
+ if(scene!=='mine'||(roomCode&&!isHost))return;
+ applyMineReset();
  lifeDialog.close();
  toast('รีเซ็ตเหมืองแล้ว • พร้อมขุดหินรอบใหม่');
+}
+let lastMineClock=0;
+function tickMineClock(){
+ const now=Date.now();
+ if(now-lastMineClock<200)return;
+ lastMineClock=now;
+ if(roomMineGeneration===null&&now>=soloMineResetAt){
+   applyMineReset();
+   if(scene==='mine')toast('เหมืองรีเซ็ตอัตโนมัติ • พร้อมขุดรอบใหม่');
+ }
+ if(isHost&&roomMineGeneration!==null&&now>=roomMineResetAt){
+   applyMineReset();
+   if(scene==='mine')toast('เหมืองของห้องรีเซ็ตอัตโนมัติ');
+ }
+ if(scene!=='mine')return;
+ const hud=$('mineCountdown');
+ if(roomCode&&!isHost&&roomMineGeneration===null){hud.textContent='รอเวลาเหมืองจากเจ้าของห้อง';return}
+ const seconds=Math.max(0,Math.ceil(((roomMineGeneration===null?soloMineResetAt:roomMineResetAt)-now)/1000));
+ hud.textContent='รีเซ็ตใน '+Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
 }
 function drawMineReset(){
  lifeRow('หินจะกลับมาเต็มเหมืองและคนที่อยู่ในเหมืองจะกลับจุดเริ่มต้น เลเวล อุปกรณ์ หินในกระเป๋า และเงินยังอยู่');
@@ -480,7 +514,7 @@ function drawMineReset(){
 $('mineReset').onclick=()=>{if(scene==='mine'&&!$('mineReset').disabled)openLife('mineReset')};
 
 const marketStock = [
- ['tomatoSeed',3],['egg',4],['bread',4],['tomato',4],['cheese',5],['toast',11],['sandwich',13]
+ ['waterBottle',2],['tomatoSeed',3],['egg',4],['bread',4],['tomato',4],['cheese',5],['toast',11],['sandwich',13]
 ];
 function awardCoins(amount){
  life.wallet.coins=Math.min(99999,life.wallet.coins+amount);
@@ -497,10 +531,214 @@ function drawShop(){
  for(const [key,price] of marketStock){
    lifeRow(itemName(key),[['ซื้อ '+price+' 🪙',()=>buyItem(key,price),life.wallet.coins<price]]);
  }
- lifeRow('มะเขือเทศจากกระเป๋า ×'+(life.bag.tomato||0),[['ขาย 2 🪙',()=>{
-   if(!life.bag.tomato)return;
-   life.bag.tomato--;awardCoins(2);
- },!life.bag.tomato]]);
+
+}
+
+const stallCounterBlock={x:1012,y:188,w:70,h:24};
+const stallPosition={x:1047,y:207};
+const stallProducts=[
+ {key:'waterBottle',price:5},
+ {key:'tomato',price:6},
+ {key:'fish',price:8}
+];
+const stallClerkFee=12;
+const stallClerk={
+ x:1047,y:181,name:'ขิม · คนขาย',face:Math.PI/2,walking:false,
+ appearance:{gender:1,skin:2,hair:0,style:3,outfit:2,accessory:0}
+};
+const shoppers=[
+ ['แตงโม',1,2,3,3],['กล้า',0,1,1,4],['เดือน',1,3,1,5],
+ ['ข้าวปั้น',2,4,2,1],['พลอย',1,2,0,0],['ดล',0,3,2,2],['น้ำหวาน',1,1,1,3]
+];
+const stallLine=[];
+const stallDepartures=[];
+let shopperId=0,stallArrivalDelay=.55,stallServiceTime=0,lastStallSale=null;
+
+function makeShopSave(){
+ return {waterBottle:0,tomato:0,fish:0,hired:0,open:0,sales:0,revenue:0};
+}
+function stallAvailable(){
+ return stallProducts.filter(({key})=>life.shop[key]>=1);
+}
+function stallStockCount(){
+ return stallProducts.reduce((sum,{key})=>sum+Math.floor(life.shop[key]),0);
+}
+function stallOwnerPresent(){
+ return scene==='outside'&&Math.hypot(me.x-stallPosition.x,me.y-stallPosition.y)<133;
+}
+function nearShopStall(){
+ if(Math.hypot(me.x-stallPosition.x,me.y-stallPosition.y)>53)return;
+ return {label:'จัดการแผงหน้าร้าน',run:()=>openLife('stall')};
+}
+function changeStallStock(key,amount){
+ if(amount>0){
+   const inBag=Math.floor(life.bag[key]||0);
+   const added=Math.min(amount,inBag,99-Math.floor(life.shop[key]));
+   if(added<=0)return;
+   life.bag[key]-=added;
+   life.shop[key]+=added;
+ }else{
+   if(life.shop[key]<1)return;
+   life.shop[key]--;
+   life.bag[key]=(life.bag[key]||0)+1;
+ }
+}
+function hireStallClerk(){
+ if(life.shop.hired||life.wallet.coins<stallClerkFee)return;
+ life.wallet.coins-=stallClerkFee;
+ life.shop.hired=1;
+ toast('ขิมเริ่มงานแล้ว เปิดแผงและเติมสต๊อกเพื่อให้ขิมขายแทน');
+}
+function drawStallMenu(){
+ lifeRow('🪙 เงิน '+life.wallet.coins+' เหรียญ · ขายแล้ว '+life.shop.sales+' ชิ้น');
+ for(const {key,price} of stallProducts){
+   const inBag=life.bag[key]||0;
+   const inStock=life.shop[key];
+   lifeRow(itemName(key)+' · ขาย '+price+' 🪙 · สต๊อก '+inStock+'/99 · กระเป๋า '+inBag,[
+     ['เติม +1',()=>changeStallStock(key,1),!inBag||inStock>=99],
+     ['เติม +5',()=>changeStallStock(key,5),inBag<5||inStock>94],
+     ['นำคืน',()=>changeStallStock(key,-1),!inStock]
+   ]);
+ }
+ if(life.shop.hired){
+   lifeRow('ขิมประจำแผง · ขายแทนได้ระหว่างที่คุณไปทำอย่างอื่น');
+ }else{
+   lifeRow('เฝ้าแผงเองหรือจ้างขิมมาช่วยขาย',[
+     ['จ้าง 12 🪙',hireStallClerk,life.wallet.coins<stallClerkFee]
+   ]);
+ }
+ const open=!!life.shop.open;
+ lifeRow(open?'เปิดขาย · ลูกค้าในแถว '+stallLine.length:'แผงปิดอยู่',[
+   [open?'ปิดแผง':'เปิดขาย',()=>{
+     life.shop.open=Number(!open);
+     toast(open?'ปิดแผงแล้ว':'เปิดแผงแล้ว ลูกค้าจะเดินมาต่อคิว');
+   },!open&&!stallStockCount()]
+ ]);
+ if(!stallStockCount())lifeRow('ซื้อน้ำที่ร้านชำ หรือเก็บมะเขือเทศจากแปลงผักมาเติมสต๊อก');
+}
+function makeStallCustomer(){
+ const [name,gender,skin,style,outfit]=shoppers[shopperId%shoppers.length];
+ shopperId++;
+ return {x:1315,y:214,name,walking:true,face:Math.PI,
+   appearance:{gender,skin,hair:shopperId%5,style,outfit,accessory:0}};
+}
+function moveStallCustomer(customer,x,y,dt){
+ const dx=x-customer.x,dy=y-customer.y;
+ const distance=Math.hypot(dx,dy);
+ const stride=Math.min(distance,105*dt);
+ customer.walking=distance>2;
+ if(distance){
+   customer.x+=dx*stride/distance;
+   customer.y+=dy*stride/distance;
+ }
+ customer.face=customer.walking?Math.atan2(dy,dx):Math.PI;
+ return distance<=2;
+}
+function sendStallCustomerAway(customer){
+ stallDepartures.push(customer);
+}
+function completeStallSale(now,customer){
+ const available=stallAvailable();
+ if(!available.length)return;
+ const {key,price}=available[Math.floor(Math.random()*available.length)];
+ life.shop[key]--;
+ life.shop.sales=Math.min(99999,life.shop.sales+1);
+ life.shop.revenue=Math.min(99999,life.shop.revenue+price);
+ awardCoins(price);
+ lastStallSale={price,stamp:now};
+ customer.text='ขอบคุณนะ!';
+ customer.until=Date.now()+2200;
+ if(lifeMode==='stall'&&lifeDialog.open)drawLifeDialog();
+}
+function shopTick(now,dt,night=false){
+ for(let i=stallDepartures.length-1;i>=0;i--){
+   const npc=stallDepartures[i];
+   if(moveStallCustomer(npc,1330,226,dt))stallDepartures.splice(i,1);
+ }
+ const staffed=life.shop.hired||stallOwnerPresent();
+ const stock=stallStockCount();
+ if(!life.shop.open||!staffed||!stock){
+   while(stallLine.length)sendStallCustomerAway(stallLine.shift());
+   stallArrivalDelay=.55;
+   stallServiceTime=0;
+   return;
+ }
+ stallArrivalDelay=Math.max(0,stallArrivalDelay-dt);
+ const cap=Math.min(night?1:4,stock);
+ if(stallLine.length<cap&&stallArrivalDelay===0){
+   stallLine.push(makeStallCustomer());
+   stallArrivalDelay=night?5.5+Math.random()*3:1.1+Math.random()*.65;
+ }
+ let firstReady=false;
+ stallLine.forEach((customer,i)=>{
+   const arrived=moveStallCustomer(customer,1098+i*59,206,dt);
+   if(i===0)firstReady=arrived;
+ });
+ stallServiceTime=firstReady?stallServiceTime+dt:0;
+ if(stallServiceTime>=2.05){
+   const customer=stallLine.shift();
+   completeStallSale(now,customer);
+   sendStallCustomerAway(customer);
+   stallServiceTime=0;
+ }
+}
+function drawStallCounter(){
+ const {x,y}=stallPosition;
+ rect(x-43,y+2,86,15,5,'#3d514656');
+ rect(x-35,y-11,70,22,4,'#805c49');
+ rect(x-35,y-14,70,10,4,'#e7c799');
+ rect(x-28,y-5,56,12,3,'#a77754');
+ rect(x-35,y-61,4,49,1,'#755c50');
+ rect(x+30,y-61,4,49,1,'#755c50');
+ if(life.shop.waterBottle){
+   for(let i=0;i<Math.min(3,life.shop.waterBottle);i++){
+     const bx=x-25+i*9;
+     rect(bx,y-26,6,13,2,'#73c3d8');
+     rect(bx+1,y-28,4,3,1,'#d5edeb');
+   }
+ }
+ if(life.shop.tomato){
+   rect(x+7,y-21,23,7,2,'#b98850');
+   for(let i=0;i<Math.min(4,life.shop.tomato);i++)circle(x+11+i*5,y-21,3,'#d65c57');
+ }
+ if(life.shop.fish){
+   rect(x-6,y-23,16,8,3,'#dbe7df');
+   rect(x-4,y-23,10,5,3,'#8c9fa8');
+   circle(x+4,y-21,1,'#354d5c');
+ }
+ rect(x-38,y-62,76,11,3,'#724b49');
+ for(let i=0;i<8;i++)rect(x-36+i*9,y-60,7,11,2,i%2?'#e8bd84':'#bb7471');
+ mapLabel('แผงน้ำและผัก',x,y+6,'#fff2cc');
+ mapLabel(!life.shop.open?'ปิดแผง':stallStockCount()?'เปิดขาย':'ของหมด',x,y+26,'#3c5147');
+}
+function queueStallDrawing(drawList,visible,now){
+ const {x,y}=stallPosition;
+ if(visible(x,y,125)){
+   if(life.shop.hired)drawList.push([stallClerk.y,()=>avatar(stallClerk)]);
+   drawList.push([y+12,drawStallCounter]);
+   const age=lastStallSale?now-lastStallSale.stamp:Infinity;
+   if(age<1700){
+     drawList.push([y+60,()=>{
+       ctx.save();
+       ctx.globalAlpha=1-age/1700;
+       mapLabel('+'+lastStallSale.price+' 🪙',x+38,y-41-age*.025,'#654623');
+       ctx.restore();
+     }]);
+   }
+ }
+ for(const npc of [...stallLine,...stallDepartures]){
+   if(visible(npc.x,npc.y))drawList.push([npc.y,()=>avatar(npc)]);
+ }
+}
+function drawShopIncomeHud(now){
+ const age=lastStallSale?now-lastStallSale.stamp:Infinity;
+ if(age>1800||scene==='outside'&&stallOwnerPresent())return;
+ const y=(W<920?161:81)-age*.011;
+ ctx.save();
+ ctx.globalAlpha=Math.min(1,(1800-age)/450);
+ rect(W/2-72,y-16,144,30,8,'#273c2de6');
+ mapLabel('ขายได้ +'+lastStallSale.price+' 🪙',W/2,y+4,'#ffe6a8');
+ ctx.restore();
 }
 
 const TOWN={w:2680,h:1780};
@@ -525,7 +763,7 @@ const townLakes=[
  {x:1838,y:952,w:628,h:217,r:84},
  {x:166,y:1194,w:237,h:145,r:54}
 ];
-const outsideBlocks=[...townBuildings,...townLakes];
+const outsideBlocks=[...townBuildings,stallCounterBlock];
 const townPaths=[
  [16,213,2648,18],[16,314,2648,19],
  [144,155,32,66],[367,155,46,65],[610,156,30,65],[889,162,61,60],
@@ -579,7 +817,7 @@ const townSpeeds=[38,45,50,42];
 const townGreetings=['สวัสดี!','วันนี้เป็นยังไงบ้าง','สวัสดีจ้ะ','เดินเล่นอยู่เหรอ'];
 
 function makeTownResidents(){
- return townPedestrians.map(([name,color,gender,route,lines],index)=>({
+ return [...townPedestrians,...addTownResidents()].map(([name,color,gender,route,lines],index)=>({
    name,color,x:route[0][0],y:route[0][1],route,lines,
    appearance:{gender,skin:index%5,hair:(index*3)%5,style:index%4,outfit:index%6},
    face:0,walking:true,target:1,inRange:false,greetAfter:0,
@@ -588,7 +826,7 @@ function makeTownResidents(){
 }
 function townNeighborNear(){
  let closest=null, distance=66;
- for(const npc of neighbors){
+ for(const npc of townResidentsNow()){
    if(npc.personality==='quiet')continue;
    const gap=Math.hypot(npc.x-me.x,npc.y-me.y);
    if(gap<distance){closest=npc;distance=gap}
@@ -607,7 +845,7 @@ function townRegion(x,y){
 }
 function townTick(now,dt){
  const players=[me,...[...others.values()].filter(p=>p.scene==='outside')];
- neighbors.forEach((npc,index)=>{
+ townResidentsNow().forEach((npc,index)=>{
    const conversing=lifeTarget===npc&&lifeDialog.open;
    const [x,y]=npc.route[npc.target];
    const dx=x-npc.x,dy=y-npc.y,distance=Math.hypot(dx,dy);
@@ -702,6 +940,7 @@ function townDrawLake(lake,now){
    const xx=x+35+(i*59)%(w-60);
    townEllipse(xx,y+h-13,6,3,'#597d52');
  }
+ drawFishingShore(lake,now);
 }
 function townDrawHouse(h){
  const {x,y,w}=h,depth=h.h;
@@ -721,7 +960,7 @@ function townDrawHouse(h){
  }
  for(const xx of [x+19,x+w-52]){
    rect(xx-3,y+50,39,27,4,'#b69775');
-   rect(xx,y+52,33,21,3,'#577884');rect(xx+1,y+53,32,7,3,'#a1bcc2');
+   rect(xx,y+52,33,21,3,townDarkness()>.5?'#ffd98b':'#577884');rect(xx+1,y+53,32,7,3,townDarkness()>.5?'#fff2bd':'#a1bcc2');
    rect(xx+15,y+52,2,20,0,'#fff1cd');rect(xx,y+62,33,1,0,'#fff1cd');
  }
  drawDoor(x+w/2,y+depth-24);
@@ -802,7 +1041,7 @@ function drawOutside(now){
  const visible=(x,y,pad=100)=>x>=cam.x-pad&&y>=cam.y-pad&&x<=cam.x+cam.vw+pad&&y<=cam.y+cam.vh+pad;
  ctx.clearRect(0,0,W,H);
  ctx.save();ctx.scale(cam.scale,cam.scale);ctx.translate(-cam.x,-cam.y);
- townDrawGround(cam);
+ townDrawGround(cam);drawStreetPosts(cam);
  for(const lake of townLakes)if(visible(lake.x+lake.w/2,lake.y+lake.h/2,lake.w/2+25))townDrawLake(lake,now);
  townDrawFlowerBeds();
  rect(954,417,252,114,19,'#c2a77e');
@@ -821,15 +1060,79 @@ function drawOutside(now){
    const x=((now/1000*car.speed+car.offset)%(TOWN.w+220))-110;
    if(visible(car.direction===1?x:TOWN.w-x,car.y))drawList.push([car.y+8,()=>townDrawCar({...car,x})]);
  }
- const people=[me,...neighbors,...[...others.values()].filter(p=>p.scene==='outside')];
- for(const p of people)if(visible(p.x,p.y))drawList.push([p.y,()=>avatar(p)]);
+ const people=[me,...townResidentsNow(),...[...others.values()].filter(p=>p.scene==='outside')];
+ for(const p of people)if(visible(p.x,p.y))drawList.push([p.y,()=>{drawFishingLine(p,now);avatar(p)}]);
+ queueStallDrawing(drawList,visible,now);
  drawList.sort((a,b)=>a[0]-b[0]);
  for(const [,draw] of drawList)draw();
  ctx.restore();
+ drawNightOverTown(cam);
  townDrawMinimap(cam);
 }
 
-const activityTimes = {cook:3000,eat:2200,plant:1100,water:1550,harvest:1000,exercise:6000};
+const townDayLength=8*60*1000;
+let hostedTownOrigin=null;
+function townHour(at=Date.now()){
+ const elapsed=Math.max(0,at-(hostedTownOrigin??life.clock.origin));
+ return (9+elapsed*24/townDayLength)%24;
+}
+function syncTownHour(hour){
+ if(!Number.isFinite(hour)||hour<0||hour>=24)return;
+ hostedTownOrigin=Date.now()-((hour+15)%24)*townDayLength/24;
+}
+function isTownNight(hour=townHour()){return hour>=20||hour<6}
+function townDarkness(hour=townHour()){
+ if(hour>=20||hour<5)return 1;
+ if(hour<7)return (7-hour)/2;
+ return hour<18?0:(hour-18)/2;
+}
+function timeReadout(){
+ const minutes=Math.floor(townHour()*60);
+ const hour=Math.floor(minutes/60);
+ return (isTownNight(hour)?'☾ ':'☀ ')+String(hour).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0');
+}
+const moreResidentNames=['นุ่น','มีนา','เก้า','อิง','ฟ้า','ภูมิ','ดาว','มุก','เจ','ฝน','ตาล','ใบหม่อน','วา','นที'];
+function addTownResidents(){
+ return townPedestrians.map(([name,color,gender,route,lines],index)=>{
+   const offset=2%route.length;
+   const shifted=[...route.slice(offset),...route.slice(0,offset)].map(([x,y])=>[x+6,y+5]);
+   return [moreResidentNames[index],color,(gender+1)%3,shifted,lines];
+ });
+}
+const nightResidents=new Set(['มะลิ','ต้น','ข้าวหอม','เมฆ','ริน','ปั้น']);
+function townResidentsNow(){
+ return isTownNight()?neighbors.filter(p=>nightResidents.has(p.name)):neighbors;
+}
+const streetLights=[{x:152,y:221},{x:366,y:221},{x:635,y:221},{x:901,y:222},
+ {x:1110,y:321},{x:1370,y:226},{x:1612,y:322},{x:1850,y:223},{x:2160,y:321},{x:2490,y:222}];
+function drawStreetPosts(cam){
+ for(const {x,y} of streetLights){
+   if(x<cam.x-20||x>cam.x+cam.vw+20||y<cam.y-45||y>cam.y+cam.vh+35)continue;
+   rect(x-4,y,11,4,2,'#52645d65');
+   rect(x-1,y-26,3,27,2,'#4c5e5b');
+   rect(x-5,y-30,11,7,2,'#536562');
+   rect(x-3,y-28,7,4,1,'#ecd3a2');
+ }
+}
+function drawNightOverTown(cam){
+ const dark=townDarkness();
+ if(!dark)return;
+ ctx.save();
+ ctx.fillStyle='rgba(20,34,78,'+dark*.63+')';ctx.fillRect(0,0,W,H);
+ ctx.scale(cam.scale,cam.scale);ctx.translate(-cam.x,-cam.y);
+ ctx.globalCompositeOperation='screen';
+ ctx.globalAlpha=dark;
+ for(const {x,y} of streetLights){
+   if(x<cam.x-90||x>cam.x+cam.vw+90||y<cam.y-90||y>cam.y+cam.vh+90)continue;
+   const glow=ctx.createRadialGradient(x,y-18,3,x,y-18,64);
+   glow.addColorStop(0,'#ffdb956f');glow.addColorStop(1,'#ffca6800');
+   ctx.fillStyle=glow;ctx.fillRect(x-64,y-82,128,128);
+   circle(x+1,y-26,4,'#ffd891');
+ }
+ ctx.restore();
+}
+
+const activityTimes = {cook:3000,eat:2200,plant:1100,water:1550,harvest:1000,exercise:6000,fish:5600,dance:8000,read:12000};
 const gardenPlots = [
  {id:'west',x:438,y:384},
  {id:'center',x:490,y:384},
@@ -839,7 +1142,7 @@ const growTime = 16000;
 let completeActivity = null;
 
 function beginActivity(kind,item,message,finish,face){
- if(me.action||me.pose!=='stand'||poseIsChanging())return;
+ if(me.action||me.pose!=='stand'||poseIsChanging()||swimAtPlayer())return;
  me.action={kind,item,started:performance.now(),duration:activityTimes[kind]};
  if(Number.isFinite(face))me.face=face;
  completeActivity=finish;
@@ -858,6 +1161,7 @@ function tickActivity(now){
  const finish=completeActivity;
  completeActivity=null;
  me.action=null;
+ setRiseButton();
  finish();
  saveLife();
  lifeHud();
@@ -871,7 +1175,7 @@ function activitySnapshot(){
 }
 
 function readActivity(player,data){
- if(!data||!Object.hasOwn(activityTimes,data.kind)||(data.kind==='exercise'?data.item!=='exercise':!Object.hasOwn(foods,data.item))){
+ if(!data||!Object.hasOwn(activityTimes,data.kind)||(['exercise','fish','dance','read'].includes(data.kind)?data.item!==data.kind:!Object.hasOwn(foods,data.item))){
    player.action=null;
    return;
  }
@@ -992,8 +1296,8 @@ function poseIsChanging(now=performance.now()){
 }
 function setRiseButton(){
  const button=$('rise');
- button.classList.toggle('show',me.pose!=='stand');
- button.textContent=me.pose==='sleep'?'🛏️ ลุกจากเตียง (E)':'🧍 ลุกยืน (E)';
+ button.classList.toggle('show',me.pose!=='stand'||gestureActive());
+ button.textContent=gestureActive()?'หยุด (E)':me.pose==='sleep'&&me.onBed?'🛏️ ลุกจากเตียง (E)':'🧍 ลุกยืน (E)';
 }
 function setPose(next,x,y,animate){
  me.poseMotion=animate?{
@@ -1007,6 +1311,7 @@ function setPose(next,x,y,animate){
 function useFurniture(furniture){
  if(!furniture||!activatables.has(furniture.t)||scene!=='room'||me.pose!=='stand'||me.action||poseIsChanging())return false;
  const bed=furniture.t==='bed';
+ me.onBed=bed;
  me.furniture={x:me.x,y:me.y};
  me.face=Math.PI/2;
  const seatX=furniture.t==='sofa'?Math.max(furniture.x+25,Math.min(furniture.x+furniture.w-25,me.x)):furniture.x+furniture.w/2;
@@ -1018,7 +1323,7 @@ function rise(animate=true){
  if(me.pose==='stand')return;
  const from=me.pose;
  const {x,y}=me.furniture;
- me.furniture=null;
+ me.furniture=null;me.onBed=false;
  setPose('stand',x,y,animate&&from==='sit');
  toast('ลุกยืนแล้ว');
 }
@@ -1028,7 +1333,7 @@ function poseMotionPacket(){
  return {kind,remaining:Math.round(started+duration-performance.now()),fromX,fromY};
 }
 function readPoseMotion(p,data){
- if(p.scene!=='room'||!data||!['stand','sit'].includes(data.kind)||data.kind!==p.pose||
+ if((p.scene!=='room'&&p.scene!=='outside')||!data||!['stand','sit'].includes(data.kind)||data.kind!==p.pose||
    !Number.isFinite(data.remaining)||data.remaining<=0||data.remaining>seatedMotionTime||
    !Number.isFinite(data.fromX)||!Number.isFinite(data.fromY)||
    Math.hypot(data.fromX-p.x,data.fromY-p.y)>145){
@@ -1079,16 +1384,184 @@ function updateWorkoutHud(now){
  $('workoutLabel').textContent='สควอต '+repetition+' / 4';
  $('workoutProgress').value=elapsed/me.action.duration;
 }
-$('rise').addEventListener('click',()=>rise());
+$('rise').addEventListener('click',endCurrentPose);
 addEventListener('keydown',event=>{
  if(event.repeat||lifeDialog.open||characterDialog.open||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
- if((event.code==='KeyE'||event.key.toLowerCase()==='e'||event.key==='Escape')&&me.pose!=='stand'){
-   rise();
+ if((event.code==='KeyE'||event.key.toLowerCase()==='e'||event.key==='Escape')&&(me.pose!=='stand'||gestureActive())){
+   endCurrentPose();
    event.preventDefault();
  }
 });
 
+function shoreDistance(x,y,lake){
+ const dx=Math.abs(x-lake.x-lake.w/2)-lake.w/2+lake.r;
+ const dy=Math.abs(y-lake.y-lake.h/2)-lake.h/2+lake.r;
+ return Math.hypot(Math.max(0,dx),Math.max(0,dy))+Math.min(0,Math.max(dx,dy))-lake.r;
+}
+
+function waterAt(x,y){
+ return townLakes.find(lake=>shoreDistance(x,y,lake)<0&&!onFishingPier(x,y,lake));
+}
+
+function onFishingPier(x,y,lake){
+ const edge=lake.x+lake.w,center=lake.y+lake.h*.55;
+ return x>=edge-21&&x<=edge+22&&y>=center-13&&y<=center+11;
+}
+
+function swimAtPlayer(){
+ return scene==='outside'&&!!waterAt(me.x,me.y);
+}
+
+function tickWater(now,dt){
+ const swimming=swimAtPlayer();
+ if(swimming!==!!me.swimming){
+   me.swimming=swimming;
+   if(scene==='outside'){
+     toast(swimming?'กำลังว่ายน้ำ · ใช้ปุ่มเดินเพื่อว่ายไปที่ฝั่ง':'ขึ้นจากน้ำแล้ว · ตกปลาได้ใกล้ริมฝั่ง');
+   }
+ }
+ if(swimming)changeNeed('energy',-dt*.23);
+}
+
+function fishingBank(x,y){
+ let closest=null,distance=34;
+ for(const lake of townLakes){
+   const gap=onFishingPier(x,y,lake)?0:shoreDistance(x,y,lake);
+   if(gap>=0&&gap<distance){closest=lake;distance=gap}
+ }
+ return closest;
+}
+
+function nearFishing(){
+ if(scene!=='outside'||swimAtPlayer())return;
+ const lake=fishingBank(me.x,me.y);
+ if(!lake)return;
+ return {label:'ตกปลา',run:()=>{
+   if(life.bag.fish>=99999)return toast('กระเป๋าใส่ปลาเต็มแล้ว');
+   const angle=Math.atan2(lake.y+lake.h/2-me.y,lake.x+lake.w/2-me.x);
+   beginActivity('fish','fish','กำลังเหวี่ยงเบ็ดลงน้ำ…',()=>{
+     life.bag.fish=(life.bag.fish||0)+1;
+     toast('ตกได้ปลาน้ำจืด 1 ตัว · เก็บไว้ในกระเป๋า');
+   },angle);
+ }};
+}
+
+function drawFishingShore(lake,now){
+ const x=lake.x+lake.w;
+ const y=lake.y+lake.h*.55;
+ // A narrow pier runs from the east bank into the water.
+ rect(x-18,y-8,40,25,5,'#31595c45');
+ rect(x-21,y-13,43,24,4,'#8b6a4d');
+ for(let i=0;i<7;i++)rect(x-19+i*6,y-11,5,20,1,i%2?'#c5a47a':'#b99268');
+ for(const xx of [x-20,x+18]){
+   rect(xx,y-14,4,6,1,'#71553d');
+   rect(xx,y+8,4,6,1,'#71553d');
+ }
+ circle(x+28,y+2,8,'#2d6572');
+ ctx.font='10px system-ui';ctx.textAlign='center';ctx.fillStyle='#f9fcff';
+ ctx.fillText('🎣',x+28,y+5);
+
+ for(let i=0;i<3;i++){
+   const t=(now/4200+i/3)%1;
+   const cx=lake.x+lake.w*(.25+i*.22);
+   const cy=lake.y+lake.h*(.35+(i%2)*.32);
+   ctx.save();
+   ctx.globalAlpha=(1-t)*.4;
+   ctx.strokeStyle='#e1f6ed';
+   ctx.lineWidth=1.35;
+   ctx.beginPath();ctx.ellipse(cx,cy,2+t*15,1+t*7,0,0,Math.PI*2);ctx.stroke();
+   ctx.restore();
+ }
+}
+
+function drawFishingLine(p,now){
+ if(p.action?.kind!=='fish')return;
+ const lake=fishingBank(p.x,p.y);
+ if(!lake)return;
+ const elapsed=Math.max(0,now-p.action.started);
+ const fraction=Math.min(1,elapsed/p.action.duration);
+ if(fraction<.11||fraction>=1)return;
+ const cx=lake.x+lake.w/2,cy=lake.y+lake.h/2;
+ const angle=Math.atan2(cy-p.y,cx-p.x);
+ const cast=Math.min(1,(fraction-.11)/.12);
+ const reel=Math.max(0,(fraction-.80)/.20);
+ const distance=Math.min(84,Math.hypot(cx-p.x,cy-p.y))*cast*(1-reel);
+ const lineX=p.x+Math.cos(angle)*distance;
+ const lineY=p.y+Math.sin(angle)*distance;
+ const rodX=p.x+(Math.cos(p.face)<0?-16:16);
+ const rodY=p.y-25;
+ const bobY=lineY-(cast<1?Math.sin(cast*Math.PI)*24:Math.sin(now/165)*1.5);
+ ctx.save();
+ ctx.strokeStyle='#e8f7f4de';ctx.lineWidth=1.1;
+ ctx.beginPath();ctx.moveTo(rodX,rodY);
+ ctx.quadraticCurveTo((rodX+lineX)/2,Math.min(rodY,bobY)-6,lineX,bobY);
+ ctx.stroke();
+ if(cast===1&&reel<.65){
+   const pulse=(now/(fraction>.68?350:920))%1;
+   ctx.globalAlpha=.68*(1-pulse);
+   ctx.strokeStyle='#f3fdef';
+   ctx.beginPath();ctx.ellipse(lineX,bobY+2,4+pulse*10,2+pulse*5,0,0,Math.PI*2);ctx.stroke();
+   ctx.globalAlpha=1;
+ }
+ circle(lineX,bobY,3.25,'#fff6d7');circle(lineX,bobY+1.4,2.4,'#d86560');
+ if(reel>.65){
+   ctx.font='14px system-ui';ctx.textAlign='center';ctx.fillText('🐟',lineX,bobY+14);
+ }
+ ctx.restore();
+}
+
+const freeGestures={dance:'เต้น',read:'อ่านหนังสือ'};
+function gestureActive(){return !!me.action&&Object.hasOwn(freeGestures,me.action.kind)}
+function stopGesture(){
+ if(!gestureActive())return;
+ me.action=null;completeActivity=null;
+ setRiseButton();
+ broadcast(snapshot());
+}
+function endCurrentPose(){
+ if(gestureActive()){
+   stopGesture();toast('กลับสู่ท่ายืน');
+ }else if(me.pose!=='stand')rise();
+}
+function canChoosePose(){
+ return scene!=='mine'&&!swimAtPlayer()&&(!me.action||gestureActive());
+}
+function choosePose(next){
+ if(!canChoosePose()||poseIsChanging())return;
+ lifeDialog.close();
+ stopGesture();
+ if(next==='stand'){endCurrentPose();return}
+ if(me.pose!=='stand')rise(false);
+ if(next==='sit'||next==='sleep'){
+   me.furniture={x:me.x,y:me.y};
+   me.onBed=false;me.face=Math.PI/2;
+   setPose(next,me.x,me.y,next==='sit');
+   toast(next==='sleep'?'กำลังนอนพัก · E เพื่อลุก':'กำลังนั่งพัก · E เพื่อลุก');
+   return;
+ }
+ beginActivity(next,next,'กำลัง'+freeGestures[next]+'…',()=>{
+   changeNeed('mood',next==='dance'?8:6);
+   toast(next==='dance'?'เต้นเสร็จแล้ว':'อ่านหนังสือเสร็จแล้ว');
+ },Math.PI/2);
+ setRiseButton();
+}
+function drawPoseMenu(){
+ const choices=[['stand','🧍 ท่าเริ่มต้น / ยืน'],['sit','🪑 นั่ง'],['sleep','💤 นอน'],
+   ['dance','♫ เต้น'],['read','📖 อ่านหนังสือ']];
+ for(const [key,label] of choices)lifeRow(label,[['เลือก',()=>choosePose(key),(me.action?.kind||me.pose)===key]]);
+}
+function openPoseMenu(){
+ if(lifeDialog.open||characterDialog.open||!canChoosePose())return;
+ openLife('poses');
+}
+$('poseMenu').onclick=openPoseMenu;
+addEventListener('keydown',event=>{
+ if(event.repeat||event.defaultPrevented||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+ if(event.code==='KeyG'||event.key.toLowerCase()==='g'){openPoseMenu();event.preventDefault()}
+});
+
 const foods = {
+ fish:['🐟','ปลาน้ำจืด'],waterBottle:['💧','น้ำดื่ม',7],
  egg:['🥚','ไข่'], bread:['🍞','ขนมปัง',12], tomato:['🍅','มะเขือเทศ',8],
  cheese:['🧀','ชีส',10], toast:['🍳','ขนมปังไข่',38], sandwich:['🥪','แซนด์วิชชีส',48],
  tomatoSeed:['🌱','เมล็ดมะเขือเทศ']
@@ -1118,7 +1591,7 @@ function loadLife(){
      for(const key of allowed){
        const n=save[group]?.[key];
        if(Number.isFinite(n)&&n>=0){
-         const limit=group==='needs'?100:group==='garden'?Number.MAX_SAFE_INTEGER:99999;
+         const limit=group==='needs'?100:['garden','clock'].includes(group)?Number.MAX_SAFE_INTEGER:99999;
          life[group][key]=Math.min(limit,n);
        }
      }
@@ -1136,6 +1609,8 @@ function lifeHud(){
    $(key).value=Math.round(n);
    $(key+'Value').textContent=Math.round(n)+'%';
  }
+ $('townClock').textContent=timeReadout();
+ $('poseMenu').disabled=!canChoosePose();
  $('place').textContent=scene==='outside'?townRegion(me.x,me.y):scene==='mine'?'เหมือง':'บ้านของเรา';
 }
 function itemName(key){return foods[key].slice(0,2).join(' ')}
@@ -1171,7 +1646,7 @@ function cook(key){
 }
 function drawLifeDialog(){
  $('lifeRows').replaceChildren();
- $('lifeTitle').textContent={fridge:'🧊 ตู้เย็น',stove:'🍳 ทำอาหาร',bag:'🎒 กระเป๋า',mineReset:'รีเซ็ตเหมือง',shop:'🛒 ร้านค้าชุมชน',neighbor:lifeTarget?.name}[lifeMode];
+ $('lifeTitle').textContent={fridge:'🧊 ตู้เย็น',stove:'🍳 ทำอาหาร',bag:'🎒 กระเป๋า',mineReset:'รีเซ็ตเหมือง',stall:'แผงขายหน้าร้าน',poses:'ท่าทาง',shop:'🛒 ร้านค้าชุมชน',neighbor:lifeTarget?.name}[lifeMode];
  if(lifeMode==='fridge'){
    for(const key of Object.keys(staples)){
      lifeRow(itemName(key)+' ×'+life.fridge[key],[
@@ -1189,6 +1664,10 @@ function drawLifeDialog(){
      lifeRow(itemName(key)+' · '+entries.map(([item,n])=>foods[item][1]+' '+n).join(' + '),
        [['ทำอาหาร',()=>cook(key),entries.some(([item,n])=>(life.bag[item]||0)<n)]]);
    }
+ }else if(lifeMode==='poses'){
+   drawPoseMenu();
+ }else if(lifeMode==='stall'){
+   drawStallMenu();
  }else if(lifeMode==='mineReset'){
    drawMineReset();
  }else if(lifeMode==='bag'){
@@ -1215,7 +1694,7 @@ function drawLifeDialog(){
  }
 }
 function openLife(mode,target=null){
- if(me.action||characterDialog.open)return;
+ if(characterDialog.open||(me.action&&!(mode==='poses'&&gestureActive())))return;
  lifeMode=mode;lifeTarget=target;
  keys.clear();stopMineHold();clearInterval(mineSpaceInterval);
  drawLifeDialog();
@@ -1256,6 +1735,11 @@ function nearLife(){
    if(Math.abs(me.x-390)<47&&me.y>154&&me.y<202)return {
      label:'เข้าบ้าน',run:()=>setLifeScene('room',390,479)
    };
+   if(swimAtPlayer())return;
+   const stall=nearShopStall();
+   if(stall)return stall;
+   const fishing=nearFishing();
+   if(fishing)return fishing;
    if(nearTownShop())return {label:'เข้าร้านค้า',run:()=>openLife('shop')};
    const workout=nearWorkout();
    if(workout)return workout;
@@ -1270,6 +1754,7 @@ function lifeTick(now,dt){
  tickActivity(now);
  updateWorkoutHud(now);
  if(characterDialog.open)return;
+ shopTick(now,dt,isTownNight());
  if(scene==='room'&&!lifeDialog.open&&me.walking&&!me.action&&me.pose==='stand'&&Math.abs(me.x-390)<35&&me.y>499&&me.face>0.35&&me.face<2.8){
    setLifeScene('outside',390,183);
  }
@@ -1316,7 +1801,7 @@ function mapTransform(){
  const scale=Math.min((W-16)/world.w,(H-16)/world.h,1.25);
  ctx.translate((W-world.w*scale)/2,(H-world.h*scale)/2);ctx.scale(scale,scale);
 }
-life.wallet={coins:36};loadLife();lifeHud();
+life.wallet={coins:36};life.shop=makeShopSave();life.clock={origin:Date.now()};loadLife();lifeHud();
 $('bag').onclick=()=>openLife('bag');
 $('lifeClose').onclick=()=>lifeDialog.close();
 $('interact').onclick=lifeInteract;
@@ -1397,6 +1882,7 @@ function activityPose(action,now){
  const beat=Math.sin(phase*Math.PI*(action.kind==='cook'?8:4));
  return {kind:action.kind,item:action.item,phase,beat};
 }
+function smoothstep(from,to,value){return ease((value-from)/(to-from))}
 function ease(value){
  const fraction=Math.max(0,Math.min(1,value));
  return fraction*fraction*(3-2*fraction);
@@ -1416,7 +1902,7 @@ function movingCharacter(p,now){
  const face=Number.isFinite(p.face)?p.face:Math.PI/2;
  let motion=avatarMotion.get(p);
  if(!motion){
-   motion={face,body:face,phase:0,blend:0,now,x:p.x,y:p.y};
+   motion={face,body:face,phase:0,blend:0,sleep:p.pose==='sleep'?1:0,now,x:p.x,y:p.y};
    avatarMotion.set(p,motion);
  }
  const elapsed=Math.max(0,Math.min(60,now-motion.now));
@@ -1427,29 +1913,53 @@ function movingCharacter(p,now){
  motion.face=turn(motion.face,face);
  motion.body=turn(motion.body,heading);
  motion.blend+=(Number(walking)-motion.blend)*Math.min(1,elapsed/95);
+ motion.sleep=Math.max(0,Math.min(1,motion.sleep+(p.pose==='sleep'?1:-1)*elapsed/480));
+ if(p.pose==='sleep')motion.onBed=p.onBed;
  if(walking||motion.blend>.01)motion.phase=(motion.phase+elapsed*(p.route?0.0062:0.0086))%(2*Math.PI);
  Object.assign(motion,{now,x:p.x,y:p.y});
  return motion;
 }
-function drawSleeper(c,skin,hair,shirt,now){
+function drawSleeper(c,a,skin,hair,shirt,now,onBed,progress){
  c.save();c.rotate(-.035);
- const breath=Math.sin(now/560);
- shapeEllipse(c,0,12,29,8,'#171b3435');
- shapeRound(c,-9,-12,43+breath,24,9,lightGradient(c,0,-12,0,12,['#b5e3cd','#6aa99c','#497d81']));
- shapeRound(c,18,-11,3,22,1,'#e3f0ca80');
- shapeRound(c,26,-9,2,18,1,'#e3f0ca64');
- shapeRound(c,-17,-12,14,24,6,shirt[1]);
- shapeEllipse(c,-23,-1,13,11,hair[2],-.12);
+ const breath=Math.sin(now/640);
+ if(onBed){
+   shapeRound(c,-38,-13,32,25,8,'#b9bdce');
+   shapeRound(c,-39,-15,32,25,8,'#f9f2ed');
+   shapeLine(c,[[-35,5],[-14,5]],'#d8ced3',1.2);
+   shapeRound(c,-9,-12-breath*.75,43,24+breath*.75,9,lightGradient(c,0,-12,0,12,['#b5e3cd','#6aa99c','#497d81']));
+   shapeRound(c,18,-10,3,21,1,'#e3f0ca80');
+   shapeRound(c,26,-9,2,18,1,'#e3f0ca64');
+ }else{
+   shapeEllipse(c,1,12,32,7,'#171b3435');
+   shapeRound(c,-7,-10-breath*.5,26,21,9,lightGradient(c,0,-10,0,11,shirt));
+   shapeLine(c,[[13,3],[25,-5],[27,6]],'#465975',8);
+   shapeLine(c,[[12,8],[24,4],[31,8]],'#33455e',7);
+   shapeRound(c,24,4,11,7,3,'#2e3b51');
+   shapeLine(c,[[-12,5],[-4,9],[2,6]],skin[1],4);
+ }
+ shapeRound(c,-16,-11,14,22,6,shirt[1]);
+ if(a.style===1||a.style===3)shapeEllipse(c,-24,4,15,12,hair[2],-.2);
+ shapeEllipse(c,-23,-1,13,11,lightGradient(c,-30,-9,-18,8,hair),-.12);
  shapeEllipse(c,-20,0,10,10,lightGradient(c,-26,-6,-15,8,skin));
  shapeLine(c,[[-25,-2],[-23,-1],[-21,-2]],hair[2],1.2);
  shapeLine(c,[[-18,-1],[-16,0],[-14,-1]],hair[2],1.2);
  shapeEllipse(c,-19,3,2.8,1.4,'#b2655966');
- c.fillStyle='#315473';c.font='bold 18px system-ui';c.textAlign='center';
- c.fillText('z',24,-20+breath*2);c.font='bold 12px system-ui';c.fillText('z',15,-16+breath*2);
+ if(progress>.85){
+   const alpha=c.globalAlpha;
+   c.fillStyle='#466e89';c.textAlign='center';
+   for(let i=0;i<3;i++){
+     const drift=(now/2300+i/3)%1;
+     c.globalAlpha=alpha*Math.sin(drift*Math.PI)*.83;
+     c.font='bold '+Math.round(9+drift*9)+'px system-ui';
+     c.fillText('z',-23+drift*28+Math.sin(drift*5)*3,-18-drift*26);
+   }
+   c.globalAlpha=alpha;
+ }
  c.restore();
 }
 function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
- const back=lookY<-.65, side=Math.abs(lookX);
+ const side=Math.abs(lookX),turn=side*side,direction=Math.sign(lookX)||1;
+ const away=smoothstep(.22,.92,-lookY),back=away>.75;
  const profile=bodyProfiles[a.gender];
  const headX=lookX*2, headY=profile.headY;
  c.save();c.translate(headX,headY);
@@ -1458,46 +1968,63 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
    shapeEllipse(c,a.style===1?0:-7,-1,a.style===1?15:8,a.style===1?19:11,hair[2],.28);
    shapeEllipse(c,-9,4,3,9,hair[1],.22);
  }
- const width=profile.headWidth,jaw=profile.jaw;
- shapeEllipse(c,-width+1,1,3.1,4,skin[2]);shapeEllipse(c,width-1,1,3.1,4,skin[1]);
+ const width=profile.headWidth-turn*2.5,jaw=profile.jaw-turn*2;
+ const frontWeight=turn*(1-away), nose=frontWeight*4.8;
+ const contour=(x,y)=>[x*direction,y];
+ const earBack=-width+1+turn*4;
+ shapeEllipse(c,...contour(earBack,1),3.1,4,skin[2]);
+ if(turn<.9){
+   c.save();c.globalAlpha*=1-turn;
+   shapeEllipse(c,...contour(width-1,1),3.1,4,skin[1]);
+   c.restore();
+ }
  c.beginPath();
- c.moveTo(-width,1);c.bezierCurveTo(-width-2,-21,width+2,-21,width,1);
- c.quadraticCurveTo(width,8,jaw,10.1);
- c.quadraticCurveTo(0,a.gender===1?17.6:15,-jaw,10.1);
- c.quadraticCurveTo(-width,8,-width,1);
+ c.moveTo(...contour(-width,1));
+ c.bezierCurveTo(...contour(-width-2,-21),...contour(width+2,-21),...contour(width-frontWeight*1.4,-1.4));
+ c.quadraticCurveTo(...contour(width-frontWeight*.4,1.2),...contour(width+nose*.84,2.8));
+ c.quadraticCurveTo(...contour(width+nose,3.7),...contour(width-frontWeight*.55,5));
+ c.quadraticCurveTo(...contour(width+frontWeight*.8,8.6),...contour(jaw+frontWeight*3.5,10.1));
+ c.quadraticCurveTo(...contour(frontWeight*2.9,a.gender===1?17.6:15),...contour(-jaw,10.1));
+ c.quadraticCurveTo(...contour(-width,8),...contour(-width,1));
  c.fillStyle=back?hairFill:lightGradient(c,-10,-11,9,11,skin);c.fill();
- if(!back){
-   shapeEllipse(c,-7,6,3.4,1.8,'#d17a6b46');shapeEllipse(c,7,6,3.4,1.8,'#d17a6b46');
-   const gazeX=lookX*4, gazeY=lookY*.9;
+ if(away<.92){
+   c.save();c.globalAlpha*=1-away;
+   shapeEllipse(c,...contour(5.4+turn*.6,6),3.4,1.8,'#d17a6b46');
+   if(turn<.5)shapeEllipse(c,...contour(-7,6),3.4*(1-turn),1.8,'#d17a6b46');
+   const gazeX=lookX*5.7, gazeY=lookY*.9+(motion?.kind==='read'?1.4:0);
    const blink=(now+(a.hair+1)*413)%3900>3770;
    for(const offset of [-5.4,5.4]){
-     if(side>.8&&Math.sign(offset)!==Math.sign(lookX))continue;
-     const ex=gazeX+offset;
-     shapeLine(c,[[ex-2,-3.4+gazeY],[ex+.6,-4.1+gazeY],[ex+2.1,-3.4+gazeY]],hair[1],a.gender===0?1.55:1.05);
-     if(blink)shapeLine(c,[[ex-1.6,.3+gazeY],[ex+1.6,.3+gazeY]],hair[2],1.35);
+     const far=Math.sign(offset)!==direction;
+     const alpha=far?1-smoothstep(.45,.85,side):1;
+     if(alpha<=.01)continue;
+     c.save();c.globalAlpha*=alpha;
+     const ex=gazeX+offset*(1-.7*turn),eyeWidth=1-.37*turn;
+     shapeLine(c,[[ex-2*eyeWidth,-3.4+gazeY],[ex+.6,-4.1+gazeY],[ex+2.1*eyeWidth,-3.4+gazeY]],hair[1],a.gender===0?1.55:1.05);
+     if(blink)shapeLine(c,[[ex-1.6*eyeWidth,.3+gazeY],[ex+1.6*eyeWidth,.3+gazeY]],hair[2],1.35);
      else{
-       shapeEllipse(c,ex,.2+gazeY,2.1,2.4,'#fff9ee');
-       shapeEllipse(c,ex+lookX*.75,.2+gazeY,1.27,1.83,'#263349');
+       shapeEllipse(c,ex,.2+gazeY,2.1*eyeWidth,2.4,'#fff9ee');
+       shapeEllipse(c,ex+lookX*.55,.2+gazeY,1.27*eyeWidth,1.83,'#263349');
        shapeEllipse(c,ex+lookX*.75-.2,-.6+gazeY,.46,.57,'#fff');
        if(a.gender===1){
          const outer=Math.sign(offset);
          shapeLine(c,[[ex+outer*1.3,-1.5+gazeY],[ex+outer*2.7,-2.35+gazeY]],hair[2],1.05);
        }
      }
-   }
-   shapeEllipse(c,gazeX+lookX,3.8,1.7,1.1,skin[2]);
-   const chewing=motion?.kind==='eat'&&motion.phase>.26;
-   if(speaking||chewing)shapeEllipse(c,gazeX,7.5,2.1+Math.abs(Math.sin(now/83)),1.3+Math.abs(Math.sin(now/75))*1.2,'#91485a');
-   else shapeLine(c,[[gazeX-2,7],[gazeX,8],[gazeX+2,7]],'#975d5b',1.25);
-   if(a.accessory===1){
-     for(const offset of [-5,5]){
-       if(side>.8&&Math.sign(offset)!==Math.sign(lookX))continue;
-       c.beginPath();c.roundRect(gazeX+offset-4,-2,8,6,2);
+     if(a.accessory===1){
+       c.beginPath();c.roundRect(ex-4*eyeWidth,-2,8*eyeWidth,6,2);
        c.strokeStyle='#3f5063';c.lineWidth=1.3;c.stroke();
      }
-     if(side<.8)shapeLine(c,[[gazeX-1,0],[gazeX+1,0]],'#3f5063',1.1);
+     c.restore();
    }
+   if(turn<.65)shapeEllipse(c,gazeX+lookX,3.8,1.7*(1-turn),1.1,skin[2]);
+   const chewing=motion?.kind==='eat'&&motion.phase>.26;
+   const mouthX=gazeX+lookX*2.6,mouthWidth=2-turn*.75;
+   if(speaking||chewing)shapeEllipse(c,mouthX,7.5,mouthWidth+Math.abs(Math.sin(now/83)),1.3+Math.abs(Math.sin(now/75))*1.2,'#91485a');
+   else shapeLine(c,[[mouthX-mouthWidth,7],[mouthX,8-turn],[mouthX+mouthWidth,7]],'#975d5b',1.25);
+   if(a.accessory===1&&side<.8)shapeLine(c,[[gazeX-1,0],[gazeX+1,0]],'#3f5063',1.1);
+   c.restore();
  }
+ c.save();c.translate(-lookX*1.65,0);c.scale(1-turn*.16,1);
  if(a.style===2){
    for(let i=0;i<9;i++){
      const theta=Math.PI+i*Math.PI/8;
@@ -1533,8 +2060,12 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
    shapeEllipse(c,-1.5,-19,2.2,1.2,shirt[0]);
  }
  c.restore();
+ c.restore();
 }
-function drawHeldProp(c,motion,x,y,now){
+function fishCast(phase){
+ return smoothstep(.035,.15,phase)-smoothstep(.15,.28,phase);
+}
+function drawHeldProp(c,motion,x,y,now,lookX){
  if(motion.kind==='cook'){
    shapeEllipse(c,x+1,y+1,11,5,'#263f46');
    shapeEllipse(c,x+1,y,9.6,4,'#586e6e');
@@ -1567,6 +2098,30 @@ function drawHeldProp(c,motion,x,y,now){
    shapeLine(c,[[x-1,y-7],[x+4,y+1]],'#ba8a59',2.8);
    shapeEllipse(c,x+4,y+3,3.2,5.1,'#c0d8d6',-.52);
    shapeEllipse(c,x+3,y+3,1.5,2.8,'#dae9df',-.52);
+ }else if(motion.kind==='read'){
+   const cover='#74558d',page='#fff1d8',spineY=-5;
+   shapeRound(c,-12,-12,24,14,2,cover);
+   c.beginPath();c.moveTo(0,1);c.quadraticCurveTo(-6,-2,-11,0);
+   c.lineTo(-11,-11);c.quadraticCurveTo(-5,-13,0,-9);
+   c.quadraticCurveTo(5,-13,11,-11);c.lineTo(11,0);c.quadraticCurveTo(5,-2,0,1);
+   c.fillStyle=page;c.fill();
+   shapeLine(c,[[0,-9],[0,0]],'#caa88e',1);
+   for(let i=0;i<3;i++){
+     shapeLine(c,[[-8,spineY+i*2],[-3,spineY+i*2+1]],'#c9a68f',.7);
+     shapeLine(c,[[3,spineY+i*2+1],[8,spineY+i*2]],'#c9a68f',.7);
+   }
+   const pageTurn=Math.max(0,Math.sin((motion.phase*3%1)*Math.PI*2))**14;
+   if(pageTurn>.03){
+     c.beginPath();c.moveTo(0,-9);c.quadraticCurveTo(5-12*pageTurn,-18,10-20*pageTurn,-10);
+     c.lineTo(10-20*pageTurn,0);c.quadraticCurveTo(5,-3,0,1);c.fillStyle='#fff8e8';c.fill();
+   }
+ }else if(motion.kind==='fish'){
+   const direction=lookX<-.17?-1:1,cast=fishCast(motion.phase);
+   const tipX=direction*(16+cast*8),tipY=-25+cast*8;
+   shapeLine(c,[[x,y+2],[x+direction*3,y-3]],'#614938',3.7);
+   shapeLine(c,[[x,y],[x+direction*5,y-12],[tipX,tipY]],'#51493e',1.9);
+   shapeEllipse(c,x-direction*1.5,y,3,2.5,'#c8a96c');
+   shapeEllipse(c,tipX,tipY,1.2,1.2,'#ebce87');
  }
 }
 function drawShirt(c,profile,a,shirt,skin,side,back){
@@ -1593,6 +2148,37 @@ function drawShirt(c,profile,a,shirt,skin,side,back){
    shapeRound(c,3,-6,5.5,4.8,1.35,shirt[0]);
  }
 }
+function drawSwimmer(c,p,now,a,skin,hair,shirt,face,speaking,swing){
+ const headingX=Math.cos(face),headingY=Math.sin(face);
+ const kick=now/(p.walking?112:220);
+ const bob=Math.sin(kick)*1.8,bodyY=11+bob;
+ const wakeX=-headingX*12*swing,wakeY=-headingY*7*swing;
+ shapeEllipse(c,wakeX,5+wakeY,22+swing*9,7,'#a4e3ec5c');
+ shapeEllipse(c,0,4,16,6,'#467e8b6a');
+ c.save();
+ c.beginPath();c.rect(-48,-60,96,64);c.clip();
+ c.translate(headingX*bob*.5,bodyY);
+ const profile=bodyProfiles[a.gender];
+ drawShirt(c,profile,a,shirt,skin,.75,headingY<-.68);
+ for(const side of [-1,1]){
+   const phase=kick+(side===1?Math.PI:0);
+   const reach=(.5+.5*Math.sin(phase))*swing;
+   const shoulderX=side*10;
+   const handX=side*(15+8*reach)+headingX*reach*6;
+   const handY=-5-Math.max(0,Math.cos(phase))*10*reach-headingY*reach*5;
+   shapeLine(c,[[shoulderX,-12],[(handX+shoulderX)*.55,-10],[handX,handY]],skin[2],5.2);
+   shapeLine(c,[[shoulderX,-12],[(handX+shoulderX)*.55,-11],[handX,handY-1]],skin[1],3.1);
+   shapeEllipse(c,handX,handY,2.8,2.6,skin[0]);
+ }
+ drawHead(c,headingX,headingY,a,skin,hair,shirt,speaking,null,now);
+ c.restore();
+ for(let i=0;i<3;i++){
+   const wave=(now/730+i/3)%1,rx=7+wave*18;
+   const distance=(8+wave*15)*swing;
+   c.beginPath();c.ellipse(-headingX*distance,4-headingY*distance*.4,rx,2+wave*4,0,Math.PI*.08,Math.PI*.92);
+   c.strokeStyle='rgba(225,253,251,'+((1-wave)*(.35+.35*swing))+')';c.lineWidth=1.15;c.stroke();
+ }
+}
 function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1:0){
  const a=characterAppearance(p);
  const skin=skinTones[a.skin],hair=hairTones[a.hair],shirt=outfitTones[a.outfit];
@@ -1602,37 +2188,53 @@ function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1
  const body=visual?.body??face;
  const lookX=Math.cos(face),lookY=Math.sin(face);
  const walkX=Math.cos(body),walkY=Math.sin(body);
- const narrow=1-Math.abs(walkX)*.16;
+ const sideView=walkX*walkX,narrow=1-sideView*.41;
  const swing=visual?.blend??Number(!!p.walking&&!motion);
+ if(p.swimming){drawSwimmer(c,p,now,a,skin,hair,shirt,face,speaking,swing);return}
  const phase=visual?.phase??now/115;
  const squat=motion?.kind==='exercise'?(.5-.5*Math.cos(motion.phase*Math.PI*8)):0;
+ const dancing=motion?.kind==='dance',danceBeat=dancing?motion.phase*Math.PI*16:0;
+ const danceSway=dancing?Math.sin(danceBeat):0,danceHop=dancing?Math.abs(Math.sin(danceBeat))*2:0;
  const dip=seat*6+squat*8.4;
  const bob=-Math.abs(Math.sin(phase))*2.05*swing;
  const bend=motion&&['plant','harvest','water'].includes(motion.kind);
- const chestX=Math.cos(phase)*.75*swing+walkX*(seat*1.5+squat*1.1)+(bend?1.4:0);
- const chestY=dip+bob+(bend?3:0)+Math.sin(now/580)*.42*(1-swing);
- shapeEllipse(c,2,18,18+squat*2,5.8,'#13243730');
- shapeEllipse(c,1,16,12,4,'#17263d38');
- if(p.pose==='sleep'){drawSleeper(c,skin,hair,shirt,now);return}
+ const chestX=Math.cos(phase)*.75*swing+walkX*(seat*1.5+squat*1.1)+(bend?1.4:0)+danceSway*3.7;
+ const chestY=dip+bob+(bend?3:0)-danceHop+Math.sin(now/580)*.42*(1-swing);
+ const sleep=ease(visual?.sleep??Number(p.pose==='sleep'));
+ if(sleep>=.72){
+   c.save();c.translate(0,4*(1-sleep));
+   drawSleeper(c,a,skin,hair,shirt,now,visual?.onBed??p.onBed,sleep);
+   c.restore();
+   return;
+ }
+ shapeEllipse(c,2,18,18+squat*2-sideView*4,5.8,'#13243730');
+ shapeEllipse(c,1,16,12-sideView*2,4,'#17263d38');
  c.save();
+ if(sleep>0){
+   const fall=ease(sleep/.72);
+   c.translate(8*fall,3*fall);c.rotate(-Math.PI*.5*fall);
+ }
  const legOrder=walkX<-.2?[1,-1]:[-1,1];
  for(const side of legOrder){
    const stride=phase+(side===1?Math.PI:0);
    const reach=Math.sin(stride)*swing,lift=Math.max(0,Math.cos(stride))*swing;
+   const danceStep=dancing?Math.max(0,Math.sin(danceBeat)*side):0;
    const hipX=side*(profile.hips*.46)*narrow+chestX;
-   const footX=side*(5.7+squat*3.3+seat*.65)*narrow+walkX*(reach*6+seat*2.6);
-   const footY=14+walkY*(reach*5+seat*2.9)-lift*2.9;
+   const footX=side*(5.7+squat*3.3+seat*.65)*narrow+walkX*(reach*8+seat*2.6)+side*danceStep*4;
+   const footY=14+walkY*(reach*5+seat*2.9)-lift*2.9-danceStep*3;
    const kneeX=(hipX+footX)*.5+walkX*(lift*2.7+seat*2.9)+side*squat*1.7;
    const kneeY=(chestY+footY)*.5+2+walkY*(seat*2.4+squat*1.7);
-   shapeLine(c,[[hipX,chestY+5],[kneeX,kneeY],[footX,footY]],side<0?'#53647c':'#364860',7.6);
+   const farther=side===legOrder[0],legWidth=7.6-sideView*(farther?1.8:0);
+   shapeLine(c,[[hipX,chestY+5],[kneeX,kneeY],[footX,footY]],farther?'#37465e':'#52647c',legWidth);
    shapeLine(c,[[hipX-.5,chestY+7],[kneeX-.4,kneeY]],'#ffffff27',1.55);
    c.save();c.translate(footX,footY);c.rotate(walkX*.28);
-   shapeRound(c,-5,-2.25,10,5.7,2.3,'#2e3c50');
-   shapeRound(c,-4.7,1.05,9.4,1.9,1,shirt[0]);
+   shapeRound(c,-5+walkX*1.9,-2.25,10,5.7,2.3,'#2e3c50');
+   shapeRound(c,-4.7+walkX*1.9,1.05,9.4,1.9,1,shirt[0]);
    c.restore();
  }
  c.translate(chestX,chestY);
  drawShirt(c,profile,a,shirt,skin,narrow,walkY<-.65);
+ const propHand=motion?.kind==='fish'&&lookX<-.17?-1:1;
  let heldX=13,heldY=-2;
  for(const side of legOrder){
    const shoulderX=side*(profile.shoulder*narrow-1.6);
@@ -1651,15 +2253,26 @@ function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1
    }else if(motion?.kind==='exercise'){
      handX=side*(profile.shoulder+2.8-squat*3.8);
      handY=2-squat*12;
+   }else if(dancing){
+     handX=side*(17+5*Math.cos(danceBeat+side*Math.PI*.3));
+     handY=-8-13*(.5+.5*Math.sin(danceBeat+side*Math.PI*.5));
+   }else if(motion?.kind==='read'){
+     handX=side*9;
+     handY=-5;
+   }else if(motion?.kind==='fish'){
+     const cast=fishCast(motion.phase);
+     handX=side===propHand?side*(9+cast*7):side*4;
+     handY=(side===propHand?-7:-4)-cast*4;
    }
    const elbow=[(shoulderX+handX)*.5+side*1.7,(-12+handY)*.55+2.4];
-   shapeLine(c,[[shoulderX,-12],elbow,[handX,handY]],shirt[2],a.gender===0?7.4:6.7);
+   const sleeveWidth=(a.gender===0?7.4:6.7)-sideView*(side===legOrder[0]?1.5:0);
+   shapeLine(c,[[shoulderX,-12],elbow,[handX,handY]],shirt[2],sleeveWidth);
    shapeLine(c,[[shoulderX-.65,-11],[elbow[0]-.4,elbow[1]-1]],shirt[0],2.4);
    shapeEllipse(c,handX,handY,3.5,3.7,lightGradient(c,handX-2,handY-3,handX+2,handY+2,skin));
-   if(side===1){heldX=handX;heldY=handY}
+   if(side===propHand){heldX=handX;heldY=handY}
  }
  drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now);
- if(motion)drawHeldProp(c,motion,heldX,heldY,now);
+ if(motion)drawHeldProp(c,motion,heldX,heldY,now,lookX);
  else if(p.inMine){
    c.save();c.translate(heldX,heldY);c.rotate(p.swing?Math.sin(now/74)*1.1-.25:.1);
    shapeLine(c,[[0,5],[5,-14]],'#9d704c',4);
@@ -1678,11 +2291,12 @@ function avatar(p){
  ctx.textAlign='center';ctx.font='bold 12px system-ui';
  const name=cleanName(p.name);
  const width=Math.max(44,ctx.measureText(name).width+19);
- rect(x-width/2,y-64+seat*5,width,17,7,p===me?'#fff2cfea':'#fffff0ea');
- ctx.fillStyle='#33433e';ctx.fillText(name,x,y-52+seat*5);
+ const nameY=y-64+seat*5+motion.sleep*7+(p.swimming?12:0);
+ rect(x-width/2,nameY,width,17,7,p===me?'#fff2cfea':'#fffff0ea');
+ ctx.fillStyle='#33433e';ctx.fillText(name,x,nameY+12);
  if(speaking){
-   circle(x+width/2+10,y-55+seat*5,8,'#3a9f82');
-   ctx.font='10px system-ui';ctx.fillText('🎙️',x+width/2+10,y-51+seat*5);
+   circle(x+width/2+10,nameY+9,8,'#3a9f82');
+   ctx.font='10px system-ui';ctx.fillText('🎙️',x+width/2+10,nameY+13);
  }
  if(!p.text||p.until<=Date.now())return;
  ctx.font='bold 13px system-ui';
@@ -1800,6 +2414,7 @@ characterButton.onclick=()=>{if(!me.action&&!lifeDialog.open)editCharacter()};
 if(!me.appearance)editCharacter();
 
 
+tickMineClock();saveMine();
 const initial=code(new URLSearchParams(location.search).get('room'));
 if(initial){$('room').value=initial;initPeer(null,false)}
 else{status();toast('ออกประตูด้านล่างบ้านเพื่อสำรวจย่าน')}
