@@ -1,4 +1,4 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>บ้านและเหมือง V5 · เกม 2D Multiplayer</title><script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><style>
+<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>บ้านและเหมือง V6 · เกม 2D Multiplayer</title><script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script><style>
 *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#101a2b;color:#fff;font:14px system-ui,'Noto Sans Thai',sans-serif;touch-action:none}canvas{display:block;width:100vw;height:100dvh}.panel{position:fixed;top:10px;left:10px;background:#14263de8;border:1px solid #ffffff30;border-radius:13px;padding:10px;max-width:min(78vw,350px);z-index:3}.panel small{color:#b9d0e9}.panel button,.panel input,.chat button{border:0;border-radius:8px;padding:8px;background:#5ec7bc;color:#102232;font-weight:700}.panel input{background:#fff;color:#111;width:110px}.row{display:flex;gap:5px;align-items:center;margin-top:6px;flex-wrap:wrap}.joy{position:fixed;bottom:26px;left:20px;width:145px;height:145px;border-radius:100%;border:2px solid #ffffff60;background:#ffffff20;display:grid;place-items:center}.stick{height:62px;width:62px;background:#63c7ff;border:3px solid #d8f8ff;border-radius:100%;pointer-events:none}.controls{position:fixed;bottom:24px;right:15px;display:flex;align-items:center;gap:8px}.controls button{height:64px;min-width:64px;border-radius:40px;border:2px solid #ffffff80;background:#294a70;color:white;font-size:26px}.controls button.on{background:#b93554}.chat{position:fixed;bottom:180px;left:50%;transform:translateX(-50%);display:flex;gap:5px;width:min(75vw,310px)}.chat input{width:100%;min-width:0;background:#152e49;color:white;border:1px solid #ffffff70;border-radius:10px;padding:10px;touch-action:manipulation;user-select:text}.chat button{min-width:46px}.toast{position:fixed;top:10px;right:10px;max-width:42vw;text-align:right;color:#d7f3ff;text-shadow:0 2px 5px #000;pointer-events:none}.wave{height:24px;display:flex;gap:3px;align-items:center;justify-content:center}.wave i{width:4px;height:5px;border-radius:4px;background:#8ceee3}@media(max-width:450px){.panel{font-size:12px;max-width:80vw}.toast{top:145px;max-width:75vw}.chat{bottom:185px}}
 
 /* Living room v2 UI */
@@ -43,6 +43,8 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
 .character-fields fieldset{display:flex;flex-wrap:wrap;gap:6px;border:0;margin:0 0 11px;padding:0}
 .character-fields legend{font-weight:750;margin-bottom:6px}
 .character-fields fieldset label{display:flex;align-items:center;gap:4px;padding:5px 7px;background:#284741;border:1px solid #729c7c;border-radius:8px;cursor:pointer}
+.character-fields fieldset label:has(input:checked){background:#416759;border-color:#f2d68f;color:#fff4d2}
+.character-fields fieldset label:focus-within{outline:2px solid #f2d68f;outline-offset:2px}
 .character-fields input{margin:0;accent-color:#e7cc85}
 .character-options{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .character-options label{display:grid;gap:3px;min-width:0;color:#e6f0dc}
@@ -56,6 +58,9 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
 .mine-reset:disabled{opacity:.52;cursor:default}
 .life-row:first-child{border-top:0}.life-row button:hover:not(:disabled),.life-top button:hover{background:#f4e6b5}
 .room-help{max-width:72vw}
+.workout-status{position:fixed;bottom:225px;left:50%;transform:translateX(-50%);z-index:4;min-width:142px;border-radius:12px;padding:8px 14px;background:#162c2cf0;color:#ffebaf;text-align:center;pointer-events:none}
+.workout-status progress{display:block;width:100%;height:7px;margin-top:4px;accent-color:#8cd3b1}
+@media(max-width:700px){.workout-status{bottom:179px}}
 @media (min-width:921px){.mine-hud{top:64px}}
 @media (max-width:490px){.life-top{max-width:186px}.life-top button{padding:5px 7px}.mine-hud{width:153px}}
 </style></head><body><canvas id="game"></canvas><section class="panel"><details><summary>👥 ห้องออนไลน์</summary><div id="state"></div><div class="row"><input id="name" maxlength="14" placeholder="ชื่อผู้เล่น"><button id="rename">ตั้งชื่อ</button></div><div class="row"><button id="create">สร้างห้อง</button><button id="copy">คัดลอกลิงก์</button></div><div class="row"><input id="room" placeholder="รหัสห้อง"><button id="join">เข้าห้อง</button></div><div class="row"><button id="leaveRoom" class="room-exit" title="ออกจากห้องออนไลน์">🚪 ออกจากห้อง</button></div><small id="count">ออนไลน์ 1 คน</small></details></section><button class="mine-nav" id="mineToggle">⛏️ ไปเหมือง</button>
@@ -70,6 +75,7 @@ body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.min
  <button id="bag" title="เปิดกระเป๋า (I)">🎒 กระเป๋า</button>
 </section>
 <button id="interact" class="interact" hidden></button>
+<div id="workoutStatus" class="workout-status" hidden><strong id="workoutLabel"></strong><progress id="workoutProgress" max="1" value="0" aria-label="ความคืบหน้าการออกกำลังกาย"></progress></div>
 <dialog id="lifeDialog" class="life-card" aria-labelledby="lifeTitle">
  <header><h2 id="lifeTitle"></h2><button id="lifeClose" autofocus>ปิด</button></header>
  <div id="lifeRows"></div>
@@ -152,7 +158,7 @@ function mineSolidAt(x,y){const pad=14,t=MINE.tile;
  const tx=Math.floor(px/t),ty=Math.floor(py/t);
  if(!inMineBounds(tx,ty)||!mineBroken.has(mineIndex(tx,ty)))return true;
  }return false}
-function mineEnter(){if(scene==='mine')return;if(me.pose!=='stand')rise();roomPosition={x:me.x,y:me.y,scene};
+function mineEnter(){if(scene==='mine')return;if(me.pose!=='stand')rise(false);roomPosition={x:me.x,y:me.y,scene};
  scene='mine';me.x=minePosition.x;me.y=minePosition.y;me.pose='stand';me.face=0;me.walking=false;
  document.body.classList.add('mine-mode');$('mineToggle').textContent='↩️ ออกจากเหมือง';
  miningHud();broadcast(snapshot());toast('⛏️ เลือกช่อง 1 แล้วหันเข้าหาหิน กด Space หรือ 💥 เพื่อขุด!')}
@@ -196,8 +202,8 @@ addEventListener('keydown',e=>{if(scene!=='mine'||lifeDialog.open||characterDial
  if(e.code==='Space'){e.preventDefault();if(!e.repeat){doMineStrike();clearInterval(mineSpaceInterval);mineSpaceInterval=setInterval(()=>{if(scene==='mine')doMineStrike();else clearInterval(mineSpaceInterval)},60)}}});
 let mineSpaceInterval=0;addEventListener('keyup',e=>{if(e.code==='Space'){clearInterval(mineSpaceInterval);mineSpaceInterval=0}});addEventListener('blur',()=>{clearInterval(mineSpaceInterval);mineSpaceInterval=0});
 loadMine();miningHud();
-function sendTo(id,msg){const c=connections.get(id);if(c?.open)try{c.send(msg)}catch(e){}}function broadcast(msg){for(const id of connections.keys())sendTo(id,msg)}function snapshot(){return {type:'state',id:myId,x:Math.round(me.x),y:Math.round(me.y),face:me.face,name:me.name,text:me.text,until:me.until,talking:voiceActive,pose:me.pose,walking:me.walking,scene,tool:selectedTool,appearance:me.appearance,activity:activitySnapshot(),swing:performance.now()<rockSwingUntil}}
-function updateOther(msg){if(!msg.id||msg.id===myId)return;let p=others.get(msg.id)||{x:390,y:300,name:'ผู้เล่น',face:0,color:color(msg.id),text:'',until:0};if(['mine','room','outside'].includes(msg.scene))p.scene=msg.scene;const bound=p.scene==='mine'?MINE.cols*MINE.tile-40:p.scene==='outside'?TOWN.w-24:740,maxY=p.scene==='mine'?MINE.rows*MINE.tile-40:p.scene==='outside'?TOWN.h-24:510;if(Number.isFinite(msg.x))p.x=Math.max(p.scene==='outside'?24:40,Math.min(bound,msg.x));if(Number.isFinite(msg.y))p.y=Math.max(p.scene==='outside'?24:40,Math.min(maxY,msg.y));if(Number.isFinite(msg.face))p.face=msg.face;if(msg.name!==undefined)p.name=cleanName(msg.name);if(['stand','sit','sleep'].includes(msg.pose))p.pose=msg.pose;if(typeof msg.walking==='boolean')p.walking=msg.walking;if(Number.isInteger(msg.tool)&&msg.tool>=0&&msg.tool<3)p.tool=msg.tool;if(typeof msg.swing==='boolean')p.swing=msg.swing;if(msg.talking!==undefined){p.talking=!!msg.talking;p.voiceSeen=Date.now()}if(msg.text!==undefined){p.text=String(msg.text).slice(0,120);p.until=Number(msg.until)||0}if(msg.appearance)p.appearance=cleanAppearance(msg.appearance);readActivity(p,msg.activity);others.set(msg.id,p);status()}
+function sendTo(id,msg){const c=connections.get(id);if(c?.open)try{c.send(msg)}catch(e){}}function broadcast(msg){for(const id of connections.keys())sendTo(id,msg)}function snapshot(){return {type:'state',id:myId,x:Math.round(me.x),y:Math.round(me.y),face:me.face,name:me.name,text:me.text,until:me.until,talking:voiceActive,pose:me.pose,poseMotion:poseMotionPacket(),walking:me.walking,scene,tool:selectedTool,appearance:me.appearance,activity:activitySnapshot(),swing:performance.now()<rockSwingUntil}}
+function updateOther(msg){if(!msg.id||msg.id===myId)return;let p=others.get(msg.id)||{x:390,y:300,name:'ผู้เล่น',face:0,color:color(msg.id),text:'',until:0};if(['mine','room','outside'].includes(msg.scene))p.scene=msg.scene;const bound=p.scene==='mine'?MINE.cols*MINE.tile-40:p.scene==='outside'?TOWN.w-24:740,maxY=p.scene==='mine'?MINE.rows*MINE.tile-40:p.scene==='outside'?TOWN.h-24:510;if(Number.isFinite(msg.x))p.x=Math.max(p.scene==='outside'?24:40,Math.min(bound,msg.x));if(Number.isFinite(msg.y))p.y=Math.max(p.scene==='outside'?24:40,Math.min(maxY,msg.y));if(Number.isFinite(msg.face))p.face=msg.face;if(msg.name!==undefined)p.name=cleanName(msg.name);if(['stand','sit','sleep'].includes(msg.pose))p.pose=msg.pose;if(typeof msg.walking==='boolean')p.walking=msg.walking;if(Number.isInteger(msg.tool)&&msg.tool>=0&&msg.tool<3)p.tool=msg.tool;if(typeof msg.swing==='boolean')p.swing=msg.swing;if(msg.talking!==undefined){p.talking=!!msg.talking;p.voiceSeen=Date.now()}if(msg.text!==undefined){p.text=String(msg.text).slice(0,120);p.until=Number(msg.until)||0}if(msg.appearance)p.appearance=cleanAppearance(msg.appearance);readPoseMotion(p,msg.poseMotion);readActivity(p,msg.activity);others.set(msg.id,p);status()}
 function connectTo(id){if(!peer||!id||id===myId||connections.has(id))return;attach(peer.connect(id,{reliable:true}))}
 function attach(c){if(connections.has(c.peer)){c.close();return}const earlier=[...connections.keys()];connections.set(c.peer,c);c.on('open',()=>{sendTo(c.peer,snapshot());if(isHost){sendTo(c.peer,{type:'roster',ids:earlier.filter(id=>connections.has(id))});sendTo(c.peer,mineWorldPacket())}toast('✅ เชื่อมต่อผู้เล่น '+c.peer.slice(-6)+' แล้ว');status();if(localStream)callPeer(c.peer)});c.on('data',m=>{if(!m||typeof m!=='object')return;if(m.type==='state'){m.id=c.peer;updateOther(m)}else if(m.type==='caption'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.text=String(m.text||'').slice(0,120);p.until=Date.now()+5000;others.set(c.peer,p)}else if(m.type==='voice'){let p=others.get(c.peer)||{x:390,y:300,name:'ผู้เล่น',color:color(c.peer)};p.talking=!!m.active;p.voiceSeen=Date.now();others.set(c.peer,p)}else if(m.type==='roster'&&c.peer===hostId&&Array.isArray(m.ids)){m.ids.slice(0,16).forEach(connectTo)}else if(m.type==='minehit'&&isCurrentMineChange(m)){applyRemoteMineHit(Number(m.idx),m.amount)}else if(m.type==='minebreak'&&isCurrentMineChange(m)){mineBreak(Number(m.idx),false)}else if(m.type==='minesync'){acceptMineWorld(c.peer,m)}});const remove=()=>{if(connections.get(c.peer)===c)removePeer(c.peer)};c.on('close',remove);c.on('error',remove)}
 function removePeer(id){connections.delete(id);others.delete(id);calls.get(id)?.close();calls.delete(id);incomingCalls.get(id)?.close();incomingCalls.delete(id);audios.get(id)?.remove();audios.delete(id);status();if(id===hostId&&!isHost)toast('เจ้าของห้องออกแล้ว ผู้เล่นที่เชื่อมต่อกันอาจยังคุยต่อได้')}function closeAll(){for(const c of connections.values())c.close();connections.clear();for(const c of calls.values())c.close();calls.clear();for(const c of incomingCalls.values())c.close();incomingCalls.clear();for(const a of audios.values())a.remove();audios.clear();others.clear();if(peer){peer.destroy();peer=null}endRoomMine();hostId='';roomCode='';isHost=false;status()}
@@ -216,29 +222,10 @@ function initPeer(requested,host){if(typeof Peer!=='function')return toast('โ�
 $('leaveRoom').onclick=()=>{closeAll();updateRoomUrl('');toast('ออกจากห้องออนไลน์แล้ว — กดสร้างห้องเพื่อเริ่มใหม่');};$('create').onclick=()=>{const c=rand();$('room').value=c;initPeer(idForRoom(c),true)};$('join').onclick=()=>{const c=code($('room').value);if(!c)return toast('กรอกรหัสห้องก่อน');$('room').value=c;initPeer(null,false)};$('copy').onclick=async()=>{if(!roomCode)return toast('สร้างหรือเข้าห้องก่อน');const url=new URL(location.href);url.searchParams.set('room',roomCode);try{await navigator.clipboard.writeText(url.href);toast('คัดลอกลิงก์ห้องแล้ว')}catch(e){prompt('คัดลอกลิงก์นี้',url.href)}};$('rename').onclick=()=>{me.name=cleanName($('name').value);broadcast(snapshot())};$('name').value='ผู้เล่น'+rand().slice(0,3);me.name=$('name').value;
 
 function say(t,final=true){t=String(t||'').trim().slice(0,120);if(!t)return;me.text=t;me.until=Date.now()+5000;broadcast({type:'caption',text:t});if(final)toast('💬 '+t)}$('chat').onsubmit=e=>{e.preventDefault();say($('input').value);$('input').value='';$('input').blur()};
-const joy=$('joy'),stick=$('stick');function moveJoy(e){const r=joy.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,lim=(r.width-62)/2,len=Math.hypot(dx,dy)||1,k=Math.min(1,lim/len);vx=dx*k/lim;vy=dy*k/lim;stick.style.transform=`translate(${dx*k}px,${dy*k}px)`}joy.addEventListener('pointerdown',e=>{if(joyPointer!==null)return;joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);moveJoy(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===joyPointer)moveJoy(e)});for(const type of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(type,e=>{if(e.pointerId===joyPointer){joyPointer=null;vx=vy=0;stick.style.transform=''}});const keys=new Set();const movementKeys=new Set(['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);function movementKey(e){return /^Key[WASD]$/.test(e.code)?e.code[3].toLowerCase():e.key.startsWith('Arrow')?e.key:e.key.toLowerCase()}addEventListener('keydown',e=>{if(['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)||document.activeElement?.isContentEditable)return;const k=movementKey(e);if(movementKeys.has(k)){keys.add(k);e.preventDefault()}});addEventListener('keyup',e=>{const k=movementKey(e);if(movementKeys.has(k)){keys.delete(k);e.preventDefault()}});addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear()});const activatables=new Set(['bed','sofa','chair']);
-let reentryUntil=0;
+const joy=$('joy'),stick=$('stick');function moveJoy(e){const r=joy.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,lim=(r.width-62)/2,len=Math.hypot(dx,dy)||1,k=Math.min(1,lim/len);vx=dx*k/lim;vy=dy*k/lim;stick.style.transform=`translate(${dx*k}px,${dy*k}px)`}joy.addEventListener('pointerdown',e=>{if(joyPointer!==null)return;joyPointer=e.pointerId;joy.setPointerCapture(e.pointerId);moveJoy(e)});joy.addEventListener('pointermove',e=>{if(e.pointerId===joyPointer)moveJoy(e)});for(const type of ['pointerup','pointercancel','lostpointercapture'])joy.addEventListener(type,e=>{if(e.pointerId===joyPointer){joyPointer=null;vx=vy=0;stick.style.transform=''}});const keys=new Set();const movementKeys=new Set(['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);function movementKey(e){return /^Key[WASD]$/.test(e.code)?e.code[3].toLowerCase():e.key.startsWith('Arrow')?e.key:e.key.toLowerCase()}addEventListener('keydown',e=>{if(lifeDialog.open||characterDialog.open||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||document.activeElement?.isContentEditable)return;const k=movementKey(e);if(movementKeys.has(k)){keys.add(k);e.preventDefault()}});addEventListener('keyup',e=>{const k=movementKey(e);if(movementKeys.has(k)){keys.delete(k);e.preventDefault()}});addEventListener('blur',()=>keys.clear());document.addEventListener('visibilitychange',()=>{if(document.hidden)keys.clear()});const activatables=new Set(['bed','sofa','chair']);
+
 function objectAt(x,y){return (scene==='outside'?outsideBlocks:objects).find(o=>x+15>o.x&&x-15<o.x+o.w&&y+15>o.y&&y-15<o.y+o.h)}
 function hit(x,y){if(scene==='outside')return x<24||y<24||x>TOWN.w-24||y>TOWN.h-24||!!objectAt(x,y);return x<40||y<40||x>740||y>510||!!objectAt(x,y)}
-function setRiseButton(){const active=me.pose!=='stand';$('rise').classList.toggle('show',active);$('rise').textContent=me.pose==='sleep'?'🛏️ ลุกจากเตียง (E)':'🪑 ลุกจากเก้าอี้ (E)'}
-function useFurniture(o){
- if(!o||!activatables.has(o.t)||me.pose!=='stand'||performance.now()<reentryUntil)return false;
- me.furniture=o.t;me.pose=o.t==='bed'?'sleep':'sit';me.walking=false;
- // Snap the actual character ON TOP of the furniture instead of lying outside its hitbox.
- me.x=o.x+o.w/2;me.y=o.y+o.h/2+(o.t==='bed'?1:0);
- setRiseButton();broadcast(snapshot());
- toast(me.pose==='sleep'?'💤 กำลังนอนบนเตียง กด E หรือปุ่มลุกจากเตียง':'🪑 กำลังนั่งอยู่ กด E หรือปุ่มลุกขึ้น');
- return true;
-}
-function rise(){
- if(me.pose==='stand')return;
- const previous=me.furniture;
- const position=previous==='bed'?[180,466]:previous==='sofa'?[185,184]:[504,222];
- me.x=position[0];me.y=position[1];me.pose='stand';me.furniture=null;me.walking=false;
- reentryUntil=performance.now()+1200;setRiseButton();broadcast(snapshot());toast('ลุกขึ้นแล้ว เดินต่อได้เลย');
-}
-$('rise').addEventListener('click',rise);
-addEventListener('keydown',e=>{if(lifeDialog.open||characterDialog.open||me.action||['INPUT','TEXTAREA'].includes(document.activeElement?.tagName))return;if(e.code==='KeyE'||e.key.toLowerCase()==='e'||e.key==='Escape'){if(me.pose!=='stand'){rise();e.preventDefault()}}});
 function rect(x,y,w,h,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
 function circle(x,y,r,fill){ctx.fillStyle=fill;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
 function drawDecor(now){
@@ -362,6 +349,7 @@ function drawRoom(now){
  for(let x=40;x<740;x+=40){ctx.beginPath();ctx.moveTo(x,26);ctx.lineTo(x,524);ctx.stroke()}
  for(let y=40;y<510;y+=40){ctx.beginPath();ctx.moveTo(26,y);ctx.lineTo(754,y);ctx.stroke()}
  drawDecor(now);
+ drawWorkoutMat('room');
  for(const o of objects){
    if(o.t==='fridge'||o.t==='stove')drawKitchen(o);
    else drawFurniture(o,now);
@@ -378,22 +366,22 @@ function render(now){
  let dx=vx,dy=vy;
  if(keys.size){dx=Number(keys.has('d')||keys.has('ArrowRight'))-Number(keys.has('a')||keys.has('ArrowLeft'));dy=Number(keys.has('s')||keys.has('ArrowDown'))-Number(keys.has('w')||keys.has('ArrowUp'))}
  const length=Math.hypot(dx,dy);if(length>1){dx/=length;dy/=length}
+ const canWalk=me.pose==='stand'&&!lifeDialog.open&&!characterDialog.open&&!me.action&&!poseIsChanging(now);
+ const blend=Math.min(1,dt*(length>.08?20:27));
+ walkX=canWalk?walkX+(dx-walkX)*blend:0;
+ walkY=canWalk?walkY+(dy-walkY)*blend:0;
+ dx=walkX;dy=walkY;
  me.walking=false;
- if(length>.08&&me.pose==='stand'&&!lifeDialog.open&&!characterDialog.open&&!me.action){
+ if(canWalk&&Math.hypot(dx,dy)>.08){
    me.face=Math.atan2(dy,dx);const nx=me.x+dx*175*dt,ny=me.y+dy*175*dt;
    if(scene==='mine'){
      const px=me.x,py=me.y;if(!mineSolidAt(nx,me.y))me.x=nx;if(!mineSolidAt(me.x,ny))me.y=ny;
      me.walking=Math.hypot(me.x-px,me.y-py)>.1;
    }else{
-     const colliding=objectAt(nx,ny);
-     if(colliding&&useFurniture(colliding)){
-       // Interaction starts by bumping into the bed/sofa/chair.
-     }else{
-       const px=me.x,py=me.y;
-       if(!hit(nx,me.y))me.x=nx;
-       if(!hit(me.x,ny))me.y=ny;
-       me.walking=Math.hypot(me.x-px,me.y-py)>.1;
-     }
+     const px=me.x,py=me.y;
+     if(!hit(nx,me.y))me.x=nx;
+     if(!hit(me.x,ny))me.y=ny;
+     me.walking=Math.hypot(me.x-px,me.y-py)>.1;
    }
  }
  if(now-lastSend>90&&roomCode){broadcast(snapshot());lastSend=now}
@@ -825,6 +813,7 @@ function drawOutside(now){
  circle(1082,447,5,'#a9d4c6');
  for(const {label,x,y} of townDistricts)if(visible(x,y))townSign(label,x,y);
  if(visible(485,386,160))drawGarden(now);
+ if(visible(workoutMats.outside.x,workoutMats.outside.y))drawWorkoutMat('outside');
  const drawList=[];
  for(const h of townBuildings)if(visible(h.x+h.w/2,h.y+h.h/2,160))drawList.push([h.y+h.h,()=>townDrawHouse(h)]);
  for(const t of townTrees)if(visible(t.x,t.y))drawList.push([t.y,()=>townDrawTree(t,now)]);
@@ -840,7 +829,7 @@ function drawOutside(now){
  townDrawMinimap(cam);
 }
 
-const activityTimes = {cook:3000,eat:2200,plant:1100,water:1550,harvest:1000};
+const activityTimes = {cook:3000,eat:2200,plant:1100,water:1550,harvest:1000,exercise:6000};
 const gardenPlots = [
  {id:'west',x:438,y:384},
  {id:'center',x:490,y:384},
@@ -850,12 +839,12 @@ const growTime = 16000;
 let completeActivity = null;
 
 function beginActivity(kind,item,message,finish,face){
- if(me.action||me.pose!=='stand')return;
+ if(me.action||me.pose!=='stand'||poseIsChanging())return;
  me.action={kind,item,started:performance.now(),duration:activityTimes[kind]};
  if(Number.isFinite(face))me.face=face;
  completeActivity=finish;
  me.walking=false;
- keys.clear();
+ pauseWalking();
  stopMineHold();
  clearInterval(mineSpaceInterval);
  if(lifeDialog.open)lifeDialog.close();
@@ -882,7 +871,7 @@ function activitySnapshot(){
 }
 
 function readActivity(player,data){
- if(!data||!Object.hasOwn(activityTimes,data.kind)||!Object.hasOwn(foods,data.item)){
+ if(!data||!Object.hasOwn(activityTimes,data.kind)||(data.kind==='exercise'?data.item!=='exercise':!Object.hasOwn(foods,data.item))){
    player.action=null;
    return;
  }
@@ -989,6 +978,115 @@ function drawCookingFx(stove){
  }
  ctx.globalAlpha=1;
 }
+
+const workoutMats={room:{x:390,y:388},outside:{x:628,y:527}};
+const seatedMotionTime=360;
+let walkX=0,walkY=0;
+
+function pauseWalking(){
+ walkX=walkY=0;
+ keys.clear();
+}
+function poseIsChanging(now=performance.now()){
+ return !!me.poseMotion&&now-me.poseMotion.started<me.poseMotion.duration;
+}
+function setRiseButton(){
+ const button=$('rise');
+ button.classList.toggle('show',me.pose!=='stand');
+ button.textContent=me.pose==='sleep'?'🛏️ ลุกจากเตียง (E)':'🧍 ลุกยืน (E)';
+}
+function setPose(next,x,y,animate){
+ me.poseMotion=animate?{
+   kind:next,started:performance.now(),duration:seatedMotionTime,fromX:me.x,fromY:me.y
+ }:null;
+ me.pose=next;me.x=x;me.y=y;me.walking=false;
+ pauseWalking();
+ setRiseButton();
+ broadcast(snapshot());
+}
+function useFurniture(furniture){
+ if(!furniture||!activatables.has(furniture.t)||scene!=='room'||me.pose!=='stand'||me.action||poseIsChanging())return false;
+ const bed=furniture.t==='bed';
+ me.furniture={x:me.x,y:me.y};
+ me.face=Math.PI/2;
+ const seatX=furniture.t==='sofa'?Math.max(furniture.x+25,Math.min(furniture.x+furniture.w-25,me.x)):furniture.x+furniture.w/2;
+ setPose(bed?'sleep':'sit',seatX,furniture.y+furniture.h/2+(bed?1:0),!bed);
+ toast(bed?'กำลังพักบนเตียง · E เพื่อลุก':'กำลังนั่งพัก · E เพื่อลุกยืน');
+ return true;
+}
+function rise(animate=true){
+ if(me.pose==='stand')return;
+ const from=me.pose;
+ const {x,y}=me.furniture;
+ me.furniture=null;
+ setPose('stand',x,y,animate&&from==='sit');
+ toast('ลุกยืนแล้ว');
+}
+function poseMotionPacket(){
+ if(!poseIsChanging())return null;
+ const {kind,started,duration,fromX,fromY}=me.poseMotion;
+ return {kind,remaining:Math.round(started+duration-performance.now()),fromX,fromY};
+}
+function readPoseMotion(p,data){
+ if(p.scene!=='room'||!data||!['stand','sit'].includes(data.kind)||data.kind!==p.pose||
+   !Number.isFinite(data.remaining)||data.remaining<=0||data.remaining>seatedMotionTime||
+   !Number.isFinite(data.fromX)||!Number.isFinite(data.fromY)||
+   Math.hypot(data.fromX-p.x,data.fromY-p.y)>145){
+   p.poseMotion=null;
+   return;
+ }
+ if(p.poseMotion?.kind===data.kind&&p.poseMotion.fromX===data.fromX&&p.poseMotion.fromY===data.fromY&&
+   performance.now()-p.poseMotion.started<seatedMotionTime)return;
+ p.poseMotion={kind:data.kind,fromX:data.fromX,fromY:data.fromY,duration:seatedMotionTime,
+   started:performance.now()+data.remaining-seatedMotionTime};
+}
+function nearFurniture(){
+ const seat=objects.find(o=>{
+   if(!activatables.has(o.t))return false;
+   const dx=me.x-Math.max(o.x,Math.min(me.x,o.x+o.w));
+   const dy=me.y-Math.max(o.y,Math.min(me.y,o.y+o.h));
+   return Math.hypot(dx,dy)<38;
+ });
+ if(seat)return {label:seat.t==='bed'?'นอนพัก':seat.t==='sofa'?'นั่งโซฟา':'นั่งเก้าอี้',run:()=>useFurniture(seat)};
+}
+function nearWorkout(){
+ const mat=workoutMats[scene];
+ if(!mat||Math.hypot(me.x-mat.x,me.y-mat.y)>50)return;
+ return {label:'ออกกำลังกาย',run:()=>{
+   if(life.needs.energy<12)return toast('พลังงานไม่พอ ลองนั่งพักหรือนอนก่อน');
+   beginActivity('exercise','exercise','กำลังทำสควอต…',()=>{
+     changeNeed('energy',-12);
+     changeNeed('mood',16);
+     toast('ทำสควอตครบ 4 ครั้งแล้ว · ความสุขเพิ่มขึ้น');
+   },Math.PI/2);
+ }};
+}
+function drawWorkoutMat(place){
+ const {x,y}=workoutMats[place];
+ rect(x-35,y-17,70,38,10,'#293b3f36');
+ rect(x-35,y-22,70,38,10,'#365b69');
+ rect(x-31,y-19,62,29,7,'#7da6ab');
+ for(let i=-1;i<=1;i++)rect(x-25,y-6+i*6,50,2,1,'#c4dce48a');
+ mapLabel('เสื่อออกกำลังกาย',x,y+35,'#3a544b');
+}
+function updateWorkoutHud(now){
+ const panel=$('workoutStatus');
+ const exercising=me.action?.kind==='exercise';
+ panel.hidden=!exercising;
+ if(!exercising)return;
+ const elapsed=now-me.action.started;
+ const repetition=Math.min(4,1+Math.floor(elapsed/(me.action.duration/4)));
+ $('workoutLabel').textContent='สควอต '+repetition+' / 4';
+ $('workoutProgress').value=elapsed/me.action.duration;
+}
+$('rise').addEventListener('click',()=>rise());
+addEventListener('keydown',event=>{
+ if(event.repeat||lifeDialog.open||characterDialog.open||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+ if((event.code==='KeyE'||event.key.toLowerCase()==='e'||event.key==='Escape')&&me.pose!=='stand'){
+   rise();
+   event.preventDefault();
+ }
+});
 
 const foods = {
  egg:['🥚','ไข่'], bread:['🍞','ขนมปัง',12], tomato:['🍅','มะเขือเทศ',8],
@@ -1137,8 +1235,10 @@ function setLifeScene(next,x,y){
  lifeHud();broadcast(snapshot());
 }
 function nearLife(){
- if(me.pose!=='stand'||me.action)return;
+ if(me.pose!=='stand'||me.action||poseIsChanging())return;
  if(scene==='room'){
+   const seat=nearFurniture();
+   if(seat)return seat;
    for(const item of kitchen){
      const dx=me.x-Math.max(item.x,Math.min(me.x,item.x+item.w));
      const dy=me.y-Math.max(item.y,Math.min(me.y,item.y+item.h));
@@ -1147,6 +1247,8 @@ function nearLife(){
        run:()=>openLife(item.t)
      };
    }
+   const workout=nearWorkout();
+   if(workout)return workout;
    if(Math.abs(me.x-390)<47&&me.y>463)return {
      label:'ออกไปละแวกบ้าน',run:()=>setLifeScene('outside',390,183)
    };
@@ -1155,6 +1257,8 @@ function nearLife(){
      label:'เข้าบ้าน',run:()=>setLifeScene('room',390,479)
    };
    if(nearTownShop())return {label:'เข้าร้านค้า',run:()=>openLife('shop')};
+   const workout=nearWorkout();
+   if(workout)return workout;
    const garden=nearGarden();
    if(garden)return garden;
    const npc=townNeighborNear();
@@ -1164,6 +1268,7 @@ function nearLife(){
 function lifeInteract(){if(!lifeDialog.open)nearLife()?.run()}
 function lifeTick(now,dt){
  tickActivity(now);
+ updateWorkoutHud(now);
  if(characterDialog.open)return;
  if(scene==='room'&&!lifeDialog.open&&me.walking&&!me.action&&me.pose==='stand'&&Math.abs(me.x-390)<35&&me.y>499&&me.face>0.35&&me.face<2.8){
    setLifeScene('outside',390,183);
@@ -1248,6 +1353,12 @@ const outfitTones=[
  ['#d6e899','#7ca464','#436d4e'],['#d1c0f1','#9075b6','#604b83'],
  ['#ffe4a1','#cd9e46','#906632'],['#f7b7c6','#c97792','#8d4964']
 ];
+const bodyProfiles=[
+ {shoulder:16.5,waist:12.4,hips:11.2,neck:5,headY:-27,headWidth:13.5,jaw:10.4},
+ {shoulder:12.2,waist:8.5,hips:12.1,neck:3.8,headY:-25.7,headWidth:12.4,jaw:7.3},
+ {shoulder:14.2,waist:10.8,hips:11.2,neck:4.4,headY:-26,headWidth:13,jaw:8.8}
+];
+const avatarMotion=new WeakMap();
 
 function cleanAppearance(value){
  const result={...baseAppearance};
@@ -1286,6 +1397,40 @@ function activityPose(action,now){
  const beat=Math.sin(phase*Math.PI*(action.kind==='cook'?8:4));
  return {kind:action.kind,item:action.item,phase,beat};
 }
+function ease(value){
+ const fraction=Math.max(0,Math.min(1,value));
+ return fraction*fraction*(3-2*fraction);
+}
+function poseProgress(p,now){
+ const m=p.poseMotion;
+ if(!m)return {seat:p.pose==='sit'?1:0,x:p.x,y:p.y};
+ const progress=Math.max(0,Math.min(1,(now-m.started)/m.duration));
+ const sitting=m.kind==='sit';
+ const travel=ease(sitting?progress/.72:(progress-.3)/.7);
+ return {
+   seat:sitting?ease((progress-.2)/.8):1-ease(progress/.7),
+   x:m.fromX+(p.x-m.fromX)*travel,y:m.fromY+(p.y-m.fromY)*travel
+ };
+}
+function movingCharacter(p,now){
+ const face=Number.isFinite(p.face)?p.face:Math.PI/2;
+ let motion=avatarMotion.get(p);
+ if(!motion){
+   motion={face,body:face,phase:0,blend:0,now,x:p.x,y:p.y};
+   avatarMotion.set(p,motion);
+ }
+ const elapsed=Math.max(0,Math.min(60,now-motion.now));
+ const walking=p.walking&&!p.action&&(!p.pose||p.pose==='stand');
+ const dx=p.x-motion.x,dy=p.y-motion.y;
+ const heading=walking&&Math.hypot(dx,dy)>.15&&Math.hypot(dx,dy)<100?Math.atan2(dy,dx):face;
+ const turn=(previous,target)=>previous+Math.atan2(Math.sin(target-previous),Math.cos(target-previous))*Math.min(1,elapsed/85);
+ motion.face=turn(motion.face,face);
+ motion.body=turn(motion.body,heading);
+ motion.blend+=(Number(walking)-motion.blend)*Math.min(1,elapsed/95);
+ if(walking||motion.blend>.01)motion.phase=(motion.phase+elapsed*(p.route?0.0062:0.0086))%(2*Math.PI);
+ Object.assign(motion,{now,x:p.x,y:p.y});
+ return motion;
+}
 function drawSleeper(c,skin,hair,shirt,now){
  c.save();c.rotate(-.035);
  const breath=Math.sin(now/560);
@@ -1305,15 +1450,22 @@ function drawSleeper(c,skin,hair,shirt,now){
 }
 function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
  const back=lookY<-.65, side=Math.abs(lookX);
- const headX=lookX*2, headY=-26;
+ const profile=bodyProfiles[a.gender];
+ const headX=lookX*2, headY=profile.headY;
  c.save();c.translate(headX,headY);
  const hairFill=lightGradient(c,-9,-13,10,12,hair);
  if(a.style===1||a.style===3){
    shapeEllipse(c,a.style===1?0:-7,-1,a.style===1?15:8,a.style===1?19:11,hair[2],.28);
    shapeEllipse(c,-9,4,3,9,hair[1],.22);
  }
- shapeEllipse(c,-12,1,3.2,4.3,skin[2]);shapeEllipse(c,12,1,3.2,4.3,skin[1]);
- shapeEllipse(c,0,-2,13.2,14.8,back?hairFill:lightGradient(c,-10,-11,9,11,skin));
+ const width=profile.headWidth,jaw=profile.jaw;
+ shapeEllipse(c,-width+1,1,3.1,4,skin[2]);shapeEllipse(c,width-1,1,3.1,4,skin[1]);
+ c.beginPath();
+ c.moveTo(-width,1);c.bezierCurveTo(-width-2,-21,width+2,-21,width,1);
+ c.quadraticCurveTo(width,8,jaw,10.1);
+ c.quadraticCurveTo(0,a.gender===1?17.6:15,-jaw,10.1);
+ c.quadraticCurveTo(-width,8,-width,1);
+ c.fillStyle=back?hairFill:lightGradient(c,-10,-11,9,11,skin);c.fill();
  if(!back){
    shapeEllipse(c,-7,6,3.4,1.8,'#d17a6b46');shapeEllipse(c,7,6,3.4,1.8,'#d17a6b46');
    const gazeX=lookX*4, gazeY=lookY*.9;
@@ -1321,12 +1473,16 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
    for(const offset of [-5.4,5.4]){
      if(side>.8&&Math.sign(offset)!==Math.sign(lookX))continue;
      const ex=gazeX+offset;
-     shapeLine(c,[[ex-2,-3.4+gazeY],[ex+.6,-4.1+gazeY],[ex+2.1,-3.4+gazeY]],hair[1],1.15);
+     shapeLine(c,[[ex-2,-3.4+gazeY],[ex+.6,-4.1+gazeY],[ex+2.1,-3.4+gazeY]],hair[1],a.gender===0?1.55:1.05);
      if(blink)shapeLine(c,[[ex-1.6,.3+gazeY],[ex+1.6,.3+gazeY]],hair[2],1.35);
      else{
        shapeEllipse(c,ex,.2+gazeY,2.1,2.4,'#fff9ee');
        shapeEllipse(c,ex+lookX*.75,.2+gazeY,1.27,1.83,'#263349');
        shapeEllipse(c,ex+lookX*.75-.2,-.6+gazeY,.46,.57,'#fff');
+       if(a.gender===1){
+         const outer=Math.sign(offset);
+         shapeLine(c,[[ex+outer*1.3,-1.5+gazeY],[ex+outer*2.7,-2.35+gazeY]],hair[2],1.05);
+       }
      }
    }
    shapeEllipse(c,gazeX+lookX,3.8,1.7,1.1,skin[2]);
@@ -1349,6 +1505,15 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
      shapeEllipse(c,x,y,4.7,5.4,hairFill);
      shapeEllipse(c,x-.9,y-1.6,1.8,1.2,hair[0],.42);
    }
+ }else if(a.gender===1){
+   c.beginPath();c.moveTo(-12.7,2);
+   c.bezierCurveTo(-20,-14,1,-22,11,-14);
+   c.quadraticCurveTo(17,-8,12,1);
+   c.quadraticCurveTo(9,-5,7,-11);
+   c.quadraticCurveTo(-.5,-4,-12.7,2);
+   c.fillStyle=hairFill;c.fill();
+   c.beginPath();c.moveTo(-11,-7);c.quadraticCurveTo(-6,-15,4,-13);
+   c.strokeStyle=hair[0];c.lineWidth=1.6;c.stroke();
  }else{
    c.beginPath();c.moveTo(-13,-2);c.bezierCurveTo(-18,-19,13,-24,14,-6);
    c.quadraticCurveTo(12,-5,12,-1);c.quadraticCurveTo(8,-7,3,-9);
@@ -1398,43 +1563,82 @@ function drawHeldProp(c,motion,x,y,now){
      const drip=((now/390)+i/3)%1;
      shapeEllipse(c,x+14+drip*7,y+7+drip*9,1,1.5,'#b4edf3');
    }
- }else{
+ }else if(motion.kind==='plant'||motion.kind==='harvest'){
    shapeLine(c,[[x-1,y-7],[x+4,y+1]],'#ba8a59',2.8);
    shapeEllipse(c,x+4,y+3,3.2,5.1,'#c0d8d6',-.52);
    shapeEllipse(c,x+3,y+3,1.5,2.8,'#dae9df',-.52);
  }
 }
-function paintCharacter(c,p,now,speaking=false){
+function drawShirt(c,profile,a,shirt,skin,side,back){
+ const shoulder=profile.shoulder*side,waist=profile.waist*side,hips=profile.hips*side,neck=profile.neck;
+ c.beginPath();
+ c.moveTo(-neck,-17);c.quadraticCurveTo(-shoulder,-16,-shoulder,-10);
+ c.quadraticCurveTo(-shoulder,-7,-waist,1);
+ c.quadraticCurveTo(-hips,5,-hips,8);
+ c.quadraticCurveTo(0,10,hips,8);
+ c.quadraticCurveTo(hips,5,waist,1);
+ c.quadraticCurveTo(shoulder,-7,shoulder,-10);
+ c.quadraticCurveTo(shoulder,-16,neck,-17);
+ c.closePath();
+ c.fillStyle=lightGradient(c,-shoulder,-13,shoulder,8,shirt);c.fill();
+ shapeLine(c,[[-hips+2,7],[0,8],[hips-2,7]],shirt[2],1.2);
+ shapeRound(c,-neck,-20,neck*2,6.7,3,skin[2]);
+ if(back)return;
+ if(a.gender===1){
+   c.beginPath();c.moveTo(-neck-2,-15);c.quadraticCurveTo(0,-8,neck+2,-15);
+   c.strokeStyle=shirt[0];c.lineWidth=1.55;c.stroke();
+   shapeLine(c,[[-waist+1,1],[0,2],[waist-1,1]],shirt[0],1.2);
+ }else{
+   shapeLine(c,[[-neck,-15],[0,-11],[neck,-15]],shirt[0],1.45);
+   shapeRound(c,3,-6,5.5,4.8,1.35,shirt[0]);
+ }
+}
+function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1:0){
  const a=characterAppearance(p);
  const skin=skinTones[a.skin],hair=hairTones[a.hair],shirt=outfitTones[a.outfit];
+ const profile=bodyProfiles[a.gender];
  const motion=activityPose(p.action,now);
- const lookX=Math.cos(Number.isFinite(p.face)?p.face:Math.PI/2);
- const lookY=Math.sin(Number.isFinite(p.face)?p.face:Math.PI/2);
- const stride=p.walking&&!motion?Math.sin(now/96):0;
- const seated=p.pose==='sit';
- const shirtWidth=a.gender===0?31:a.gender===1?26:29;
- shapeEllipse(c,2,18,19,6,'#13243730');
+ const face=visual?.face??(Number.isFinite(p.face)?p.face:Math.PI/2);
+ const body=visual?.body??face;
+ const lookX=Math.cos(face),lookY=Math.sin(face);
+ const walkX=Math.cos(body),walkY=Math.sin(body);
+ const narrow=1-Math.abs(walkX)*.16;
+ const swing=visual?.blend??Number(!!p.walking&&!motion);
+ const phase=visual?.phase??now/115;
+ const squat=motion?.kind==='exercise'?(.5-.5*Math.cos(motion.phase*Math.PI*8)):0;
+ const dip=seat*6+squat*8.4;
+ const bob=-Math.abs(Math.sin(phase))*2.05*swing;
+ const bend=motion&&['plant','harvest','water'].includes(motion.kind);
+ const chestX=Math.cos(phase)*.75*swing+walkX*(seat*1.5+squat*1.1)+(bend?1.4:0);
+ const chestY=dip+bob+(bend?3:0)+Math.sin(now/580)*.42*(1-swing);
+ shapeEllipse(c,2,18,18+squat*2,5.8,'#13243730');
  shapeEllipse(c,1,16,12,4,'#17263d38');
  if(p.pose==='sleep'){drawSleeper(c,skin,hair,shirt,now);return}
- c.save();c.translate(0,Math.abs(stride)*-1.45+(seated?5:0));
- const bend=motion&&['plant','harvest','water'].includes(motion.kind);
- if(bend)c.translate(2+motion.beat,3);
- for(const side of [-1,1]){
-   const footX=side*6.4+side*stride*lookX*2.4, footY=13+side*stride*4.5;
-   shapeRound(c,footX-4.3,seated?3:1,8.7,seated?8:footY-1,3,side<0?'#53647c':'#34465e');
-   shapeRound(c,footX-5.3,footY-2,10.6,5.8,2.3,'#2e3c50');
-   shapeRound(c,footX-4.8,footY+.9,9.6,2,1,shirt[0]);
+ c.save();
+ const legOrder=walkX<-.2?[1,-1]:[-1,1];
+ for(const side of legOrder){
+   const stride=phase+(side===1?Math.PI:0);
+   const reach=Math.sin(stride)*swing,lift=Math.max(0,Math.cos(stride))*swing;
+   const hipX=side*(profile.hips*.46)*narrow+chestX;
+   const footX=side*(5.7+squat*3.3+seat*.65)*narrow+walkX*(reach*6+seat*2.6);
+   const footY=14+walkY*(reach*5+seat*2.9)-lift*2.9;
+   const kneeX=(hipX+footX)*.5+walkX*(lift*2.7+seat*2.9)+side*squat*1.7;
+   const kneeY=(chestY+footY)*.5+2+walkY*(seat*2.4+squat*1.7);
+   shapeLine(c,[[hipX,chestY+5],[kneeX,kneeY],[footX,footY]],side<0?'#53647c':'#364860',7.6);
+   shapeLine(c,[[hipX-.5,chestY+7],[kneeX-.4,kneeY]],'#ffffff27',1.55);
+   c.save();c.translate(footX,footY);c.rotate(walkX*.28);
+   shapeRound(c,-5,-2.25,10,5.7,2.3,'#2e3c50');
+   shapeRound(c,-4.7,1.05,9.4,1.9,1,shirt[0]);
+   c.restore();
  }
- const shirtFill=lightGradient(c,-13,-13,12,6,shirt);
- shapeRound(c,-shirtWidth/2,-16,shirtWidth,25,9,shirtFill);
- shapeLine(c,[[-shirtWidth/2+5,5],[0,6],[shirtWidth/2-5,5]],shirt[2],1.5);
- shapeRound(c,-5,-20,10,7,3,skin[2]);
- shapeLine(c,[[-5,-15],[0,-11],[5,-15]],shirt[0],1.4);
- if(lookY>-.65)shapeRound(c,3,-7,5,5,1.4,shirt[0]);
+ c.translate(chestX,chestY);
+ drawShirt(c,profile,a,shirt,skin,narrow,walkY<-.65);
  let heldX=13,heldY=-2;
- for(const side of [-1,1]){
-   const shoulderX=side*(shirtWidth/2-2);
-   let handX=side*(shirtWidth/2+1)+stride*side*2.3,handY=side*stride*3;
+ for(const side of legOrder){
+   const shoulderX=side*(profile.shoulder*narrow-1.6);
+   const armSwing=-Math.sin(phase+(side===1?Math.PI:0))*swing;
+   let handX=shoulderX+side*2.9+walkX*(armSwing*5.1+seat*2);
+   let handY=2+walkY*armSwing*3.8-seat*2;
    if(motion?.kind==='eat'&&side===1){
      const lift=Math.min(1,motion.phase*4);
      handX=14-lift*(11+motion.beat);
@@ -1444,9 +1648,13 @@ function paintCharacter(c,p,now,speaking=false){
      handY=side===1?-4:-8-motion.beat*2;
    }else if(bend&&side===1){
      handX=15+motion.beat*3;handY=5+motion.beat*2;
+   }else if(motion?.kind==='exercise'){
+     handX=side*(profile.shoulder+2.8-squat*3.8);
+     handY=2-squat*12;
    }
-   shapeLine(c,[[shoulderX,-12],[shoulderX+side*1.4,-5],[handX,handY]],shirt[2],7.5);
-   shapeLine(c,[[shoulderX-.8,-12],[shoulderX+side*.7,-6]],shirt[0],3.4);
+   const elbow=[(shoulderX+handX)*.5+side*1.7,(-12+handY)*.55+2.4];
+   shapeLine(c,[[shoulderX,-12],elbow,[handX,handY]],shirt[2],a.gender===0?7.4:6.7);
+   shapeLine(c,[[shoulderX-.65,-11],[elbow[0]-.4,elbow[1]-1]],shirt[0],2.4);
    shapeEllipse(c,handX,handY,3.5,3.7,lightGradient(c,handX-2,handY-3,handX+2,handY+2,skin));
    if(side===1){heldX=handX;heldY=handY}
  }
@@ -1463,17 +1671,18 @@ function avatar(p){
  const now=performance.now();
  const speaking=p===me?voiceActive:!!p.talking&&Date.now()-(p.voiceSeen||0)<1600;
  const inMine=(p===me?scene:p.scene)==='mine';
- ctx.save();ctx.translate(p.x,p.y);
- paintCharacter(ctx,inMine?{...p,inMine,tool:p===me?selectedTool:p.tool,swing:p===me?now<rockSwingUntil:p.swing}:p,now,speaking);
+ const {seat,x,y}=poseProgress(p,now),motion=movingCharacter(p,now);
+ ctx.save();ctx.translate(x,y);
+ paintCharacter(ctx,inMine?{...p,inMine,tool:p===me?selectedTool:p.tool,swing:p===me?now<rockSwingUntil:p.swing}:p,now,speaking,motion,seat);
  ctx.restore();
  ctx.textAlign='center';ctx.font='bold 12px system-ui';
  const name=cleanName(p.name);
  const width=Math.max(44,ctx.measureText(name).width+19);
- rect(p.x-width/2,p.y-64,width,17,7,p===me?'#fff2cfea':'#fffff0ea');
- ctx.fillStyle='#33433e';ctx.fillText(name,p.x,p.y-52);
+ rect(x-width/2,y-64+seat*5,width,17,7,p===me?'#fff2cfea':'#fffff0ea');
+ ctx.fillStyle='#33433e';ctx.fillText(name,x,y-52+seat*5);
  if(speaking){
-   circle(p.x+width/2+10,p.y-55,8,'#3a9f82');
-   ctx.font='10px system-ui';ctx.fillText('🎙️',p.x+width/2+10,p.y-51);
+   circle(x+width/2+10,y-55+seat*5,8,'#3a9f82');
+   ctx.font='10px system-ui';ctx.fillText('🎙️',x+width/2+10,y-51+seat*5);
  }
  if(!p.text||p.until<=Date.now())return;
  ctx.font='bold 13px system-ui';
@@ -1484,11 +1693,11 @@ function avatar(p){
  }
  if(line)lines.push(line);
  const visible=lines.slice(0,4),bubbleWidth=Math.max(60,...visible.map(t=>ctx.measureText(t).width+22));
- const height=visible.length*19+10,bx=p.x-bubbleWidth/2,by=p.y-75-height;
+ const height=visible.length*19+10,bx=x-bubbleWidth/2,by=y-75-height+seat*5;
  rect(bx+1,by+2,bubbleWidth,height,9,'#172a3740');
  rect(bx,by,bubbleWidth,height,9,'#fff8e9');
  ctx.fillStyle='#273b37';
- visible.forEach((t,index)=>ctx.fillText(t,p.x,by+18+index*19));
+ visible.forEach((t,index)=>ctx.fillText(t,x,by+18+index*19));
 }
 
 const characterDialog=document.createElement('dialog');
@@ -1554,7 +1763,9 @@ function updateCharacterPreview(){
  paintCharacter(preview,{face:Math.PI/2,appearance:readCharacterForm()},700);
  preview.restore();
 }
+let customizedHairStyle=false;
 function editCharacter(){
+ customizedHairStyle=false;
  const fields=characterForm.elements;
  fields.namedItem('gender').value=me.appearance?.gender??'';
  const appearance=me.appearance||baseAppearance;
@@ -1566,7 +1777,14 @@ function editCharacter(){
  characterDialog.showModal();
  updateCharacterPreview();
 }
-characterForm.addEventListener('change',updateCharacterPreview);
+characterForm.addEventListener('change',event=>{
+ const field=event.target?.name;
+ if(field==='style')customizedHairStyle=true;
+ if(field==='gender'&&!me.appearance&&!customizedHairStyle){
+   characterForm.elements.namedItem('style').value=Number(event.target.value)===1?1:0;
+ }
+ updateCharacterPreview();
+});
 characterForm.addEventListener('submit',event=>{
  event.preventDefault();
  if(!characterForm.elements.namedItem('gender').value)return;
