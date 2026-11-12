@@ -137,3 +137,19 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid
 }
 @media(max-width:380px){.hud-stats #level{display:none}.hud-stats span{font-size:9px;padding:4px}.hud-room-text{font-size:10px}.chat-form{bottom:165px}.joystick{width:116px;height:116px}.stick{width:52px;height:52px}}
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+
+/* Original V4 character creator — accessible, mobile-first */
+.avatar-customizer{border:1px solid #89a9b46b;border-radius:14px;background:#162c405e;padding:0 12px;margin:12px 0 5px}
+.avatar-customizer summary{cursor:pointer;padding:12px 0;font-weight:850;font-size:13px;color:#e9f8ff;list-style-position:inside}
+.avatar-customizer summary:hover{color:#8fe9d9}
+.customizer-hint{color:#b8d2de;font-size:10px;margin-left:6px;font-weight:500}
+.avatar-editor{display:flex;flex-direction:column;align-items:stretch;gap:10px;padding-bottom:14px}
+.avatar-model-preview{display:block;width:150px;height:146px;max-width:100%;margin:4px auto 10px;image-rendering:auto;border-radius:16px;border:1px solid #9dccb366;box-shadow:0 8px 18px #0004}
+.avatar-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end;width:100%}
+.avatar-fields label{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:12px;color:#d8eaf2;font-weight:700}
+.avatar-fields select{width:100%;min-width:0;min-height:41px;padding:8px;border:1px solid #81a6b9;border-radius:10px;background:#193447;color:#f7ffff;font:inherit;cursor:pointer}
+.avatar-fields select:focus-visible{outline:2px solid #f5d193;outline-offset:2px}
+.avatar-apply{margin-top:8px;width:100%;min-height:40px;background:#81e0cd;color:#142c3f;font-weight:850}
+.game-dialog .avatar-model-preview{margin:5px auto 12px}
+.game-dialog .avatar-fields{margin:8px 0 11px}
+@media(max-width:380px){.avatar-fields{gap:7px}.avatar-fields select{font-size:12px}.customizer-hint{display:none}}
