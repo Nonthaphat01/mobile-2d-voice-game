@@ -12,10 +12,22 @@ export const lots = Array.from({length:8}, (_,slot)=> ({
   doorX:130+(slot%4)*555+117,
   doorY:slot<4?105+425:755
 }));
+/** Original V4 customizable model, sanitized before storing online. */
+export function sanitizeAppearance(value){
+  const defaults={gender:2,skin:1,hair:1,style:0,outfit:0,accessory:0};
+  const ranges={gender:3,skin:5,hair:5,style:4,outfit:6,accessory:3};
+  const clean={...defaults};
+  if(!value||typeof value!=='object')return clean;
+  for(const [key,count] of Object.entries(ranges)){
+    const n=Number(value[key]);
+    if(Number.isInteger(n)&&n>=0&&n<count)clean[key]=n;
+  }
+  return clean;
+}
 export function starter(name='ผู้เล่น') {
   return {
     version:5, displayName:String(name).trim().slice(0,18)||'ผู้เล่น',
-    money:100, level:1,xp:0,
+    money:100, level:1,xp:0, appearance:sanitizeAppearance(),
     inventory:{hoe:1,watering_can:1,tomato_seed:3,tomato:0},
     home:{furniture:[],plots:Array.from({length:PLOT_COUNT},()=>({crop:null,plantedAt:0,watered:false}))}
   };
@@ -27,6 +39,7 @@ export function sanitizeState(s,name='ผู้เล่น') {
   o.money=Math.max(0,Math.min(1e8,Number(s.money)||0));
   o.level=Math.max(1,Math.min(99,Number(s.level)||1));
   o.xp=Math.max(0,Math.min(1e7,Number(s.xp)||0));
+  o.appearance=sanitizeAppearance(s.appearance);
   for(const key of Object.keys(o.inventory))o.inventory[key]=Math.max(0,Math.min(99999,Math.floor(Number(s.inventory?.[key])||0)));
   o.home.furniture=Array.isArray(s.home?.furniture)?s.home.furniture.filter(v=>['bed','chair'].includes(v)).slice(0,12):[];
   o.home.plots=o.home.plots.map((p,i)=>{const q=s.home?.plots?.[i];return q?.crop==='tomato'?{crop:'tomato',plantedAt:Math.max(0,Number(q.plantedAt)||0),watered:q.watered===true}:p});
