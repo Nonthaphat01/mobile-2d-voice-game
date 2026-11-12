@@ -101,7 +101,7 @@ function movingCharacter(p,now){
  if(snap){
    Object.assign(motion,{x:p.x,y:p.y,face,body:face,blend:0,phase:0,place});
  }
- const follow=p.id&&!p.poseMotion&&!p.action&&p.pose==='stand'&&!snap?1-Math.exp(-elapsed/44):1;
+ const follow=p.id&&!p.positionInterpolated&&!p.poseMotion&&!p.action&&p.pose==='stand'&&!snap?1-Math.exp(-elapsed/44):1;
  const x=motion.x+(p.x-motion.x)*follow;
  const y=motion.y+(p.y-motion.y)*follow;
  const dx=x-motion.x,dy=y-motion.y,travel=Math.hypot(dx,dy);

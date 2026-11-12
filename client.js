@@ -1,12 +1,14 @@
 import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS} from './shared/rules.js?v=v5-gameplay-1';
-import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-gameplay-1';
+import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-smooth-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
+import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
 const cfg=window.GAME_CONFIG||{};
 const remote=new Map();
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
+let sentMovement;
 let scene='outside',active=false,online=false,fbGame=null,session=null;
 let selectedRoom='002',room='002',slot=0,myId='local',ownProfile=starter(),serverRooms=[];
 let me={x:0,y:0,face:1,walking:false,text:'',until:0};
@@ -81,14 +83,24 @@ function applyAvatarAppearance(look){
   notice(active?'🎨 ใช้โมเดล V4 และบันทึกตัวละครแล้ว':'🎨 เลือกรูปลักษณ์ตัวละครแล้ว');
 }
 el('playDemo').onclick=()=>{online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
-function onJoined(){const l=lots[slot];scene='outside';renderedCamera=null;resetAvatarMotion();me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
+function onJoined(){const l=lots[slot];scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
+function trackRemote(player,now){
+ if(!Number.isFinite(player.x)||!Number.isFinite(player.y))return;
+ const motion=updateRemoteMotion(remote.get(player.id)?.motion,player,now);
+ remote.set(player.id,{...player,motion});
+}
 function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
  if(m.type==='rooms'){serverRooms=m.rooms;renderRooms()}
- else if(m.type==='players'){remote.clear();for(const p of m.players||[])remote.set(p.id,p);hud()}
+ else if(m.type==='players'){
+   const players=m.players||[],ids=new Set(players.map(p=>p.id)),now=performance.now();
+   for(const id of remote.keys())if(!ids.has(id))remote.delete(id);
+   for(const p of players)trackRemote(p,now);
+   hud()
+ }
  else if(m.type==='disconnected'){notice('Firebase ขาดการเชื่อมต่อ กรุณาเข้าห้องใหม่');leaveGame()}
- else if(m.type==='player'){remote.set(m.player.id,m.player);hud()}
+ else if(m.type==='player'){trackRemote(m.player,performance.now());hud()}
  else if(m.type==='left'){remote.delete(m.id);hud()}
- else if(m.type==='moved'){const p=remote.get(m.id);if(p)Object.assign(p,{x:m.x,y:m.y,scene:m.scene})}
+ else if(m.type==='moved'){const p=remote.get(m.id);if(p)trackRemote({...p,x:m.x,y:m.y,scene:m.scene},performance.now())}
  else if(m.type==='said'){const p=remote.get(m.id);if(p)Object.assign(p,{text:m.text,until:m.until})}
  else if(m.type==='profile'){ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();drawOpenDialog();notice(m.notice||'บันทึกข้อมูลแล้ว')}
  else if(m.type==='homeUpdate'){const p=remote.get(m.id);if(p)p.home=m.home}
@@ -252,7 +264,10 @@ function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
 function worldDraw(now){road();const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
  for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<PLOT_COUNT;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
- for(const p of remote.values())if(p.scene==='outside')avatar(p,now,false);avatar({...me,name:ownProfile.displayName},now,true)
+ for(const p of remote.values()){
+   if(p.scene==='outside')avatar({...p,...sampleRemoteMotion(p.motion,now),positionInterpolated:true},now,false);
+ }
+ avatar({...me,name:ownProfile.displayName},now,true)
 }
 function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430,.87);for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
  text('บ้านของ '+ownProfile.displayName,325,90,22,'#4b443a');if(ownProfile.home.furniture.length===0)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
@@ -297,7 +312,7 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
     me.face=Math.atan2(dy,dx);
     if(now-lastStep>210){lastStep=now;playV4Footstep()}
   }
-  if(online&&now-lastMove>185){lastMove=now;send({type:'move',x:Math.round(me.x),y:Math.round(me.y),scene,pose:me.pose||'stand'})}
+  if(online)publishMovement(now);
   playAmbient(now);
   background(now)
  }else{
@@ -307,6 +322,15 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
  requestAnimationFrame(tick)
 }
 requestAnimationFrame(tick);
+function publishMovement(now){
+ const pose=me.pose||'stand';
+ const x=Math.round(me.x),y=Math.round(me.y);
+ const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose;
+ if(!changedSceneOrPose&&(now-lastMove<MOVE_INTERVAL_MS||(x===sentMovement.x&&y===sentMovement.y)))return;
+ const movement={type:'move',x,y,scene,pose};
+ lastMove=now;sentMovement=movement;
+ send(movement);
+}
 c.addEventListener('pointerup',e=>{
  const camera=renderedCamera;
  if(!active||el('dialog').open||!camera||camera.scene!==scene||camera.w!==w||camera.h!==h)return;
