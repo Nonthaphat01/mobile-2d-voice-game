@@ -1,0 +1,9 @@
+{
+  "name": "my-little-neighborhood-v5-server",
+  "private": true,
+  "type": "module",
+  "version": "5.0.0",
+  "scripts": {"start": "node index.js", "check": "node --check index.js"},
+  "engines": {"node": ">=20"},
+  "dependencies": {"@supabase/supabase-js": "^2.58.0", "ws": "^8.18.3"}
+}

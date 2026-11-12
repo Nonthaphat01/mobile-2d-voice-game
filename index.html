@@ -1,211 +1,45 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>บ้านและเหมือง · เกม 2D Multiplayer</title>
-<link rel="icon" href="assets/images/home.png" type="image/png"><style>
-*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#101a2b;color:#fff;font:14px system-ui,'Noto Sans Thai',sans-serif;touch-action:none}canvas{display:block;width:100vw;height:100dvh}.panel{position:fixed;top:10px;left:10px;background:#14263de8;border:1px solid #ffffff30;border-radius:13px;padding:10px;max-width:min(78vw,350px);z-index:3}.panel small{color:#b9d0e9}.panel button,.panel input,.chat button{border:0;border-radius:8px;padding:8px;background:#5ec7bc;color:#102232;font-weight:700}.panel input{background:#fff;color:#111;width:110px}.row{display:flex;gap:5px;align-items:center;margin-top:6px;flex-wrap:wrap}.joy{position:fixed;bottom:26px;left:20px;width:145px;height:145px;border-radius:100%;border:2px solid #ffffff60;background:#ffffff20;display:grid;place-items:center}.stick{height:62px;width:62px;background:#63c7ff;border:3px solid #d8f8ff;border-radius:100%;pointer-events:none}.controls{position:fixed;bottom:24px;right:15px;display:flex;align-items:center;gap:8px}.controls button{height:64px;min-width:64px;border-radius:40px;border:2px solid #ffffff80;background:#294a70;color:white;font-size:26px}.controls button.on{background:#b93554}.chat{position:fixed;bottom:180px;left:50%;transform:translateX(-50%);display:flex;gap:5px;width:min(75vw,310px)}.chat input{width:100%;min-width:0;background:#152e49;color:white;border:1px solid #ffffff70;border-radius:10px;padding:10px;touch-action:manipulation;user-select:text}.chat button{min-width:46px}.toast{position:fixed;top:10px;right:10px;max-width:42vw;text-align:right;color:#d7f3ff;text-shadow:0 2px 5px #000;pointer-events:none}.wave{height:24px;display:flex;gap:3px;align-items:center;justify-content:center}.wave i{width:4px;height:5px;border-radius:4px;background:#8ceee3}@media(max-width:450px){.panel{font-size:12px;max-width:80vw}.toast{top:145px;max-width:75vw}.chat{bottom:185px}}
-
-/* Living room v2 UI */
-body{background:#0b1527}.panel{backdrop-filter:blur(15px);box-shadow:0 14px 30px #07111e66}.panel button{cursor:pointer;transition:transform .15s,filter .15s}.panel button:hover,.chat button:hover{filter:brightness(1.14)}.panel button:active,.chat button:active{transform:scale(.96)}
-.room-exit{background:#b44d6a!important;color:#fff!important}
-.action{position:fixed;right:17px;bottom:112px;z-index:6;display:none;background:linear-gradient(135deg,#ffd16b,#f5a749);color:#462c1c;border:2px solid #fff7c9;border-radius:25px;padding:12px 19px;font-weight:800;font-size:15px;box-shadow:0 8px 24px #0008;cursor:pointer;touch-action:manipulation;animation:pop .2s ease-out}
-.action.show{display:block}@keyframes pop{from{transform:scale(.85);opacity:.5}to{transform:scale(1);opacity:1}}
-.room-help{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:11px;text-align:center;background:#102138ac;border-radius:20px;padding:5px 10px;color:#e5f8ff;pointer-events:none;white-space:nowrap;max-width:55vw;overflow:hidden;text-overflow:ellipsis}
-@media(max-width:700px){.action{right:13px;bottom:110px;padding:10px 13px;font-size:13px}.room-help{bottom:4px;max-width:60vw}.controls button{height:56px;min-width:56px}.controls{bottom:22px}.chat{bottom:174px}}
-
-/* Underground mining extension, v3 */
-.mine-nav{position:fixed;right:12px;top:12px;z-index:8;border:1px solid #d9b66c;background:linear-gradient(135deg,#e9ae49,#bb7430);color:#281909;border-radius:13px;padding:10px 14px;font-weight:900;font-size:14px;box-shadow:0 6px 24px #0007;cursor:pointer;touch-action:manipulation}
-.mine-ui{display:none}body.mine-mode .mine-ui{display:flex}
-body.mine-mode .panel{max-width:215px;font-size:11px;padding:7px}body.mine-mode .panel .row{margin-top:3px}body.mine-mode .panel button,body.mine-mode .panel input{padding:5px}body.mine-mode .panel b{font-size:12px}
-.mine-hud{position:fixed;left:12px;top:224px;z-index:5;flex-direction:column;gap:6px;width:208px;padding:12px;border:1px solid #ffffff36;border-radius:13px;background:#101b2bdb;backdrop-filter:blur(12px);box-shadow:0 6px 25px #0007}
-.mine-hud .level{display:flex;align-items:center;justify-content:space-between;font-weight:900;font-size:15px}.mine-hud small{font-size:11px;color:#cfe5ff}.xp-track{height:9px;border-radius:8px;background:#33455d;overflow:hidden}.xp-fill{height:100%;width:0%;border-radius:8px;background:linear-gradient(90deg,#77ebc4,#fcd36c);transition:width .25s}.mine-row{display:flex;justify-content:space-between;gap:5px;font-size:12px;color:#dfebf9}
-.mine-tools{position:fixed;right:12px;top:65px;z-index:6;flex-direction:column;gap:7px;align-items:stretch}.mine-tool{position:relative;width:58px;min-height:57px;border-radius:12px;border:2px solid #ffffff45;background:#24374d;color:#fff;font-size:24px;cursor:pointer;box-shadow:0 4px 18px #0007;touch-action:manipulation}.mine-tool small{display:block;font-size:10px;color:#dae9ff}.mine-tool.equipped{background:#745027;border-color:#ffe59c;box-shadow:0 0 0 3px #ffcc6d33}.mine-tool.locked{opacity:.65;filter:grayscale(.7)}
-.mine-hit{position:fixed;right:17px;bottom:118px;z-index:7;border-radius:55px;border:3px solid #ffd98a;background:linear-gradient(135deg,#df8c33,#b04d28);box-shadow:0 5px 25px #0009;color:#fff;font-size:28px;font-weight:900;width:90px;height:90px;cursor:pointer;touch-action:none;user-select:none}.mine-hit:active{transform:scale(.95)}body.mine-mode .mine-hit{align-items:center;justify-content:center;flex-direction:column;line-height:1.05}
-.mine-instructions{position:fixed;left:50%;transform:translateX(-50%);bottom:80px;z-index:3;width:max-content;max-width:55vw;border-radius:12px;background:#111b2bcc;color:#dce7fb;font-size:12px;padding:7px 10px;text-align:center;pointer-events:none}
-body.mine-mode .room-help,body.mine-mode .action{display:none!important}body.mine-mode .chat{bottom:160px}
-@media(max-width:700px){.mine-nav{top:8px;right:8px;padding:8px 10px;font-size:12px}.mine-tools{top:53px;right:8px;gap:5px}.mine-tool{width:52px;min-height:51px;font-size:21px}.mine-hud{top:214px;left:7px;width:169px;padding:9px}.mine-hud .level{font-size:13px}.mine-hud small,.mine-row{font-size:10px}.mine-hit{bottom:105px;right:12px;width:77px;height:77px;font-size:25px}.mine-instructions{bottom:184px;max-width:75vw;font-size:10px}.mine-ui.chat{bottom:172px}}
-@media(max-width:380px){.mine-hud{top:207px;width:157px}.mine-instructions{font-size:10px}}
-
-.life-top{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;background:#162c2cef;border:1px solid #aac9a866;border-radius:14px;padding:8px 12px;z-index:4;color:#effbed}
-.life-top strong{white-space:nowrap;color:#f9da98}.needs{display:flex;gap:10px}.needs label{display:grid;grid-template-columns:auto auto;gap:2px 4px;font-size:11px;white-space:nowrap}.needs meter{grid-column:span 2;width:65px;height:9px;accent-color:#7bd2a6}
-.life-top button,.life-card button,.interact{border:0;border-radius:9px;background:#d5edbe;color:#243925;padding:8px 10px;font-weight:750;cursor:pointer;touch-action:manipulation}
-.interact{position:fixed;right:17px;bottom:108px;z-index:6;background:#ffdb91;color:#453321;box-shadow:0 5px 20px #0006}
-.life-card{max-height:76dvh;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;width:min(460px,calc(100vw - 28px));border:1px solid #a5ccaa75;border-radius:19px;padding:18px;background:#172b2a;color:#edf6e7;box-shadow:0 18px 58px #0008}
-.life-card::backdrop{background:#071413a8}.life-card header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.life-card h2{font-size:20px;margin:0;color:#f8d891}.life-row{display:flex;align-items:center;gap:8px;border-top:1px solid #a5ccaa35;padding:11px 0}.life-row span{flex:1}.life-row button{flex-shrink:0}.life-card button:disabled{opacity:.45;cursor:default}
-.toast{top:61px;z-index:5}.panel summary{cursor:pointer;list-style:none;font-weight:750}.panel summary::before{content:'▸ ';color:#80d5c8}.panel details[open] summary::before{content:'▾ '}.panel small{display:block;margin-top:5px}.mine-hud{top:186px}
-@media(max-width:920px){.life-top{top:53px;left:auto;right:8px;transform:none;gap:6px;padding:6px;flex-wrap:wrap;justify-content:flex-end;max-width:206px}.life-top strong{font-size:12px}.needs{order:3;gap:7px}.needs meter{width:53px}.toast{top:auto;bottom:70px;right:14px;max-width:57vw}.mine-tools{top:145px}.interact{bottom:104px}}
-@media(max-width:700px){.joy{width:115px;height:115px;left:12px;bottom:20px}.chat,body.mine-mode .chat{bottom:136px}.toast{bottom:80px;max-width:56vw;font-size:12px}.mine-instructions{bottom:170px}.controls button{min-width:48px;height:48px}.mine-hud{top:181px}.mine-hit{bottom:107px}}
-@media(max-width:490px){.panel{max-width:calc(100vw - 150px);padding:7px}.panel input{width:85px}.panel .row{gap:3px}.panel input,.panel button{padding:6px}.life-top{top:49px;max-width:174px}.needs{gap:5px}.needs meter{width:49px}.needs label{font-size:10px}}
-.character-card{width:min(580px,calc(100vw - 26px));max-height:90dvh;overflow:auto;padding:21px;border:1px solid #86ae8f;border-radius:22px;background:#182d2c;color:#ecf5e5;box-shadow:0 24px 74px #0009;overscroll-behavior:contain;touch-action:pan-y}
-.character-card::backdrop{background:#0b1817ba;backdrop-filter:blur(4px)}
-.character-card header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
-.character-card h2{margin:0;font-size:23px;color:#ffdfa1}
-.character-layout{display:grid;grid-template-columns:38% 1fr;gap:17px;align-items:center}
-.character-preview{background:radial-gradient(ellipse at 50% 57%,#bad5a9,#759782 60%,#41665b);border:1px solid #9dbe99;border-radius:16px;overflow:hidden}
-.character-preview canvas{width:100%;height:auto;aspect-ratio:128/141;display:block}
-.character-fields{min-width:0}
-.character-fields fieldset{display:flex;flex-wrap:wrap;gap:6px;border:0;margin:0 0 11px;padding:0}
-.character-fields legend{font-weight:750;margin-bottom:6px}
-.character-fields fieldset label{display:flex;align-items:center;gap:4px;padding:5px 7px;background:#284741;border:1px solid #729c7c;border-radius:8px;cursor:pointer}
-.character-fields fieldset label:has(input:checked){background:#416759;border-color:#f2d68f;color:#fff4d2}
-.character-fields fieldset label:focus-within{outline:2px solid #f2d68f;outline-offset:2px}
-.character-fields input{margin:0;accent-color:#e7cc85}
-.character-options{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-.character-options label{display:grid;gap:3px;min-width:0;color:#e6f0dc}
-.character-options select{width:100%;padding:5px;border:1px solid #729c7c;border-radius:7px;background:#284741;color:#fff4d2;font:inherit;cursor:pointer}
-.character-card button{border:1px solid #98b79a;border-radius:9px;padding:7px 11px;background:#315348;color:#f0f6e5;font:inherit;font-weight:700;cursor:pointer}
-.character-card .character-submit{display:block;width:100%;margin-top:16px;background:#f2d68f;color:#433b22;border-color:#f5dd9e;padding:9px}
-#editCharacter{white-space:nowrap}
-@media(max-width:490px){.character-card{padding:14px}.character-layout{gap:9px;grid-template-columns:30% 1fr}.character-options{gap:5px}.character-options select{font-size:12px}.character-fields fieldset label{font-size:12px;padding:4px}.life-top button#editCharacter{font-size:11px;padding:5px}.life-top:has(#editCharacter) #bag{font-size:11px;padding:5px}}
-
-.life-card:has(.item-grid){width:min(588px,calc(100vw - 24px))}
-.item-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
-.item-grid .life-row{grid-column:1/-1;padding:8px 0}
-.item-tile{min-width:0;position:relative;display:flex;flex-direction:column;border-radius:15px;background:#203b38;border:1px solid #8db6a05e;overflow:hidden}
-.item-tile .item-tile-main{width:100%;display:flex;position:relative;flex:1;flex-direction:column;justify-content:start;align-items:center;gap:3px;min-height:86px;padding:9px 6px 8px;background:#203b38;color:#f8ecd0;border-radius:0;font-size:12px;text-align:center}
-.item-tile button.item-tile-main:hover:not(:disabled),.item-tile button.item-tile-main:focus-visible{background:#355653;outline:2px solid #e0c57f;outline-offset:-2px}
-.item-tile .item-tile-main:disabled{opacity:.67}
-.item-tile-main strong{font-size:12px;overflow-wrap:anywhere;font-weight:680}
-.item-symbol{font-size:31px;line-height:1.15;filter:drop-shadow(0 3px 4px #101e1f80)}
-.item-quantity{position:absolute;right:6px;top:6px;background:#101f24;color:#ffedbf;border-radius:7px;padding:2px 5px;font-size:10px;line-height:1.2}
-.item-tile-main small{color:#c2e1d2;font-size:10px;overflow-wrap:anywhere}
-.item-command{margin-top:auto;color:#e3cb88;font-size:10px;padding-top:2px}
-.item-extra{display:flex;justify-content:center;gap:3px;flex-wrap:wrap;padding:0 4px 6px}
-.item-extra button{font-size:10px;padding:4px 6px;background:#bed4aa}
-@media(max-width:510px){.item-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.life-card:has(.item-grid){padding:12px}}
-
-.mine-reset{align-self:start;border:1px solid #d4a37788;background:#422f35;color:#ffe9cf;border-radius:8px;font-size:11px;font-weight:700;padding:6px 8px;cursor:pointer}
-.mine-reset:disabled{opacity:.52;cursor:default}
-.life-row:first-child{border-top:0}.life-row button:hover:not(:disabled),.life-top button:hover{background:#f4e6b5}
-.room-help{max-width:72vw}
-.town-clock{white-space:nowrap;color:#fff2c9;font-size:11px}.life-top button{white-space:nowrap}.life-top button:disabled{opacity:.52;cursor:default}
-@media(max-width:490px){.life-top{max-width:190px;gap:4px}.life-top .pose-button{padding:4px 7px}.life-top .town-clock{font-size:10px}}
-.workout-status{position:fixed;bottom:225px;left:50%;transform:translateX(-50%);z-index:4;min-width:142px;border-radius:12px;padding:8px 14px;background:#162c2cf0;color:#ffebaf;text-align:center;pointer-events:none}
-.workout-status progress{display:block;width:100%;height:7px;margin-top:4px;accent-color:#8cd3b1}
-@media(max-width:700px){.workout-status{bottom:179px}}
-@media (min-width:921px){.mine-hud{top:64px}}
-@media (max-width:490px){.life-top{max-width:186px}.life-top button{padding:5px 7px}.mine-hud{width:153px}}
-@property --fill{syntax:'<percentage>';inherits:false;initial-value:0%}
-.life-top{padding:9px 11px;gap:12px;border-color:#9fc79f60;background:#132a28f3;box-shadow:0 8px 24px #101e1c64}
-.life-heading{display:grid;gap:5px;min-width:0}
-.life-location{display:flex;align-items:center;gap:6px;min-width:0}
-.life-location strong{overflow:hidden;text-overflow:ellipsis}
-.wallet{display:inline-flex;justify-self:start;align-items:center;gap:5px;padding:4px 8px;border-radius:8px;background:#57482b;border:1px solid #f0c67570;color:#ffe1a2;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
-.life-top .needs{display:flex;gap:9px}
-.need{display:grid;justify-items:center;gap:3px;color:#e7f2db;font-size:11px;white-space:nowrap}
-.need-ring{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;font-variant-numeric:tabular-nums;font-weight:800;color:#fff9e5;background:radial-gradient(circle,#203933 57%,transparent 60%),conic-gradient(var(--tone) var(--fill),#3f5b53 var(--fill));transition:--fill .36s ease-out}
-.need-ring.sprinting{box-shadow:0 0 10px #f8d1799e}
-#fullness{--tone:#ecad75}#energy{--tone:#f9d77a}#mood{--tone:#96cfad}#health{--tone:#80cbdf}
-@media(prefers-reduced-motion:reduce){.need-ring{transition:none}}
-.life-actions{display:flex;gap:6px}
-.life-actions .compact{display:none}
-#gameSound[aria-pressed="false"]{background:#304943;color:#e6f2db}
-@media(min-width:1151px){
- .life-top{width:max-content;max-width:calc(100vw - 300px)}
- .toast{top:104px}
-}
-@media(max-width:1150px){
- .life-top{top:49px;left:auto;right:8px;transform:none;gap:5px;padding:6px;width:206px;display:grid;grid-template-columns:minmax(0,1fr)}
- .life-heading{grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px}
- .life-location{display:grid;gap:0}
- .life-top strong{font-size:11px}
- .town-clock{font-size:10px}
- .wallet{padding:4px 6px;font-size:11px}
- .life-top .needs{order:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px}
- .need{font-size:9px;gap:2px}
- .need-ring{width:35px;height:35px;font-size:10px}
- .life-actions{display:grid}
- .life-actions{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
- .life-actions button,.life-actions button#editCharacter,.life-actions:has(#editCharacter) #bag{font-size:14px;padding:4px 0;min-height:30px}
- .life-actions .wide{display:none}
- .life-actions .compact{display:inline}
- .mine-tools{top:192px}
- .toast{top:auto;bottom:80px;right:14px}
-}
-.controls #runBoost[aria-pressed="true"]{background:#695535;border-color:#ffe2a2}
-.map-launch{position:fixed;left:10px;top:54px;z-index:2;border:1px solid #a9c6a36a;border-radius:10px;background:#1d3934;color:#eff4d9;padding:7px 9px;font:inherit;font-size:12px;cursor:pointer}
-.map-card{width:min(760px,calc(100vw - 24px));max-height:87dvh}
-.map-card p{line-height:1.5;margin:7px 0 12px;color:#cfdfcb}
-.map-card textarea{width:100%;height:min(46vh,400px);resize:vertical;overflow:auto;padding:10px;border:1px solid #aac9a87a;border-radius:8px;background:#102421;color:#f1f5d9;font:13px/1.45 Consolas,monospace;touch-action:pan-y;user-select:text;tab-size:2}
-.map-card input[type=file]{max-width:100%;margin-bottom:9px}
-.map-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-#mapMessage{min-height:1.4em;margin:8px 0 0;color:#f0d496}
-@media(min-width:921px){.mine-hud{top:96px}}
-</style></head><body><canvas id="game"></canvas><section class="panel"><details><summary>👥 ห้องออนไลน์</summary><div id="state"></div><div class="row"><input id="name" maxlength="14" placeholder="ชื่อผู้เล่น"><button id="rename">ตั้งชื่อ</button></div><div class="row"><button id="create">สร้างห้อง</button><button id="copy">คัดลอกลิงก์</button></div><div class="row"><input id="room" placeholder="รหัสห้อง"><button id="join">เข้าห้อง</button></div><div class="row"><button id="leaveRoom" class="room-exit" title="ออกจากห้องออนไลน์">🚪 ออกจากห้อง</button></div><small id="count">ออนไลน์ 1 คน</small></details></section><button class="mine-nav" id="mineToggle">⛏️ ไปเหมือง</button>
-
-<section class="life-top" aria-label="สถานะตัวละคร">
- <div class="life-heading">
-  <div class="life-location"><strong id="place"></strong><span id="townClock" class="town-clock"></span></div>
-  <div class="wallet" aria-label="เงิน"><span aria-hidden="true">🪙</span><span id="walletCoins">0</span></div>
- </div>
- <div class="needs">
-  <div class="need"><div class="need-ring" id="fullness" role="meter" aria-labelledby="fullnessLabel" aria-valuemin="0" aria-valuemax="100"><span id="fullnessValue" aria-hidden="true"></span></div><span id="fullnessLabel">ความอิ่ม</span></div>
-  <div class="need"><div class="need-ring" id="energy" role="meter" aria-labelledby="energyLabel" aria-valuemin="0" aria-valuemax="100"><span id="energyValue" aria-hidden="true"></span></div><span id="energyLabel">พลังงาน</span></div>
-  <div class="need"><div class="need-ring" id="mood" role="meter" aria-labelledby="moodLabel" aria-valuemin="0" aria-valuemax="100"><span id="moodValue" aria-hidden="true"></span></div><span id="moodLabel">ความสุข</span></div>
-  <div class="need"><div class="need-ring" id="health" role="meter" aria-labelledby="healthLabel" aria-valuemin="0" aria-valuemax="100"><span id="healthValue" aria-hidden="true"></span></div><span id="healthLabel">สุขภาพ</span></div>
- </div>
- <div class="life-actions">
-  <button id="poseMenu" class="pose-button" aria-label="ท่าทาง" title="ท่าทาง (G)"><span class="wide">ท่าทาง</span><span class="compact" aria-hidden="true">🙋</span></button>
-  <button id="bag" aria-label="กระเป๋า" title="เปิดกระเป๋า (I)">🎒<span class="wide"> กระเป๋า</span></button>
-  <button id="editCharacter" type="button" title="แต่งตัวละคร" aria-label="แต่งตัวละคร">👤<span class="wide"> แต่งตัว</span></button>
-  <button id="gameSound" type="button" aria-label="เสียงเกม" aria-pressed="true" title="เปิดหรือปิดเสียงบรรยากาศและเสียงเกม"><span class="compact" aria-hidden="true">♪</span><span class="wide" id="gameSoundLabel">♪ เสียงเกม</span></button>
- </div>
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#152b27"><title>My Little Neighborhood V5 | ชุมชน 002</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
+<section id="lobby" class="lobby" aria-label="เลือกชุมชนออนไลน์">
+  <div class="lobby-shell">
+    <div class="hero"><div class="brand">🏡 <span>MY LITTLE<br><strong>NEIGHBORHOOD</strong></span></div><p>เริ่มต้นจากบ้านเล็ก ๆ แล้วเติบโตไปพร้อมชุมชนออนไลน์</p><div class="intro-tags"><span>🌱 สวน 10 แปลง</span><span>💵 เริ่ม 100 บาท</span><span>👥 สูงสุด 8 คน</span></div></div>
+    <div class="login-card">
+      <label for="nickname">ชื่อตัวละคร</label><input id="nickname" maxlength="18" placeholder="ผู้เล่น" value="ผู้เล่น" autocomplete="nickname">
+      <div class="server-title"><strong>🌐 เลือกชุมชน</strong><button id="refreshRooms" class="mini">↻ รีเฟรช</button></div>
+      <div id="serverList" class="server-list" aria-live="polite"></div>
+      <div id="connectionHint" class="hint">โหมดทดลองเล่นในเครื่องพร้อมใช้งาน • ออนไลน์ต้องตั้งค่าเซิร์ฟเวอร์ก่อน</div>
+      <button id="joinOnline" class="primary">🌍 เข้าชุมชนออนไลน์</button>
+      <button id="playDemo" class="secondary">🎮 ทดลองเล่นคนเดียว (เซฟในเครื่อง)</button>
+      <details class="account"><summary>🔐 บัญชีออนไลน์และเซฟข้ามเครื่อง</summary>
+        <p>หากต้องการเล่นข้ามเครื่อง ใช้บัญชีอีเมลและรหัสผ่านจาก Supabase (ต้องตั้งค่า config.js และเปิด Email Auth)</p>
+        <input id="email" type="email" placeholder="อีเมล" autocomplete="email"><input id="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)" autocomplete="current-password" minlength="6">
+        <div class="account-actions"><button id="loginAccount" class="mini" type="button">เข้าสู่ระบบ</button><button id="signupAccount" class="mini" type="button">สมัครบัญชี</button></div>
+        <button id="guestAccount" type="button" class="mini ghost">ลองเข้าด้วยบัญชีชั่วคราว</button>
+        <p class="warning">บัญชีชั่วคราวอาจเรียกคืนไม่ได้หากล้างข้อมูลเว็บหรือเปลี่ยนเครื่อง ควรใช้บัญชีถาวรหากต้องการเก็บบ้านระยะยาว</p>
+      </details>
+      <div id="lobbyError" class="lobby-error" role="status"></div>
+    </div>
+  </div>
 </section>
-<button id="interact" class="interact" hidden></button>
-<div id="workoutStatus" class="workout-status" hidden><strong id="workoutLabel"></strong><progress id="workoutProgress" max="1" value="0" aria-label="ความคืบหน้าการออกกำลังกาย"></progress></div>
-<dialog id="lifeDialog" class="life-card" aria-labelledby="lifeTitle">
- <header><h2 id="lifeTitle"></h2><button id="lifeClose" autofocus>ปิด</button></header>
- <div id="lifeRows"></div>
-</dialog>
-<button id="openMapEditor" type="button" class="map-launch">🗺️ แผนที่</button>
-<dialog id="mapDialog" class="life-card map-card" aria-labelledby="mapTitle">
- <header><h2 id="mapTitle">จัดการแผนที่เมือง</h2><button id="closeMapEditor" type="button" autofocus>ปิด</button></header>
- <p>แก้พิกัดอาคาร ถนน และสวนในช่องด้านล่าง หรือเลือกไฟล์ที่เคยบันทึก กดใช้แผนที่เพื่อโหลดเกมใหม่</p>
- <input type="file" id="mapFile" accept=".json,.js,application/json,text/javascript" aria-label="เปิดไฟล์แผนที่">
- <textarea id="mapEditor" aria-label="ข้อมูลแผนที่ JSON" spellcheck="false"></textarea>
- <div class="map-actions">
-  <button id="applyTownMap" type="button">ใช้แผนที่นี้</button>
-  <button id="exportTownJson" type="button">บันทึก town.json</button>
-  <button id="exportTownJs" type="button">บันทึก town.js</button>
-  <button id="resetTownMap" type="button">ใช้แผนที่เริ่มต้น</button>
- </div>
- <div id="mapMessage" role="status"></div>
-</dialog>
-<section class="mine-ui mine-hud" id="mineHud" aria-label="เลเวลขุดหิน">
- <div class="level"><span id="mineLevel">⛏️ Lv. 1</span><span id="mineSpeed">1.0×</span></div>
- <div class="xp-track"><div class="xp-fill" id="mineXpBar"></div></div>
- <small id="mineXpLabel">EXP 0 / 28</small>
- <div class="mine-row"><span id="mineOre">🪨 หิน 0</span><span id="mineHps">⚡ 1 / ครั้ง</span></div>
- <small id="mineToolName">ถือ: ⛏️ อีเต้อเริ่มต้น</small><button id="mineReset" class="mine-reset">↻ รีเซ็ตเหมือง</button><small id="mineCountdown"></small>
-</section>
-<div class="mine-ui mine-tools" id="mineTools" aria-label="เลือกอาวุธในมือ">
- <button type="button" class="mine-tool equipped" data-tool="0" title="ช่อง 1 - อีเต้อ">⛏️<small>1</small></button>
- <button type="button" class="mine-tool locked" data-tool="1" title="ช่อง 2 - ค้อน (ปลดล็อกเลเวล 3)">🔨<small>Lv.3</small></button>
- <button type="button" class="mine-tool locked" data-tool="2" title="ช่อง 3 - สว่าน (ปลดล็อกเลเวล 6)">⚙️<small>Lv.6</small></button>
-</div>
-<button id="mineHit" class="mine-ui mine-hit" type="button" title="กดทุบหิน (Space)">💥<small style="display:block;font-size:12px">ทุบหิน</small></button>
-<div class="mine-ui mine-instructions">WASD / จอยเดิน • หันไปหาหิน • Space / 💥 เพื่อทุบ • 1-3 เปลี่ยนอุปกรณ์</div>
-<div class="toast" id="toast">กดสร้างห้อง แล้วแชร์ลิงก์ให้เพื่อน</div><div class="joy" id="joy"><div class="stick" id="stick"></div></div><form class="chat" id="chat"><input id="input" maxlength="120" placeholder="พิมพ์ข้อความหรือกดไมค์..." autocomplete="off"><button>ส่ง</button></form><button id="rise" class="action" title="ลุกขึ้น (คีย์ E)">🧍 ลุกขึ้น</button><div class="room-help">WASD / ลูกศร • Shift วิ่ง • E ใช้งาน • I กระเป๋า</div><div class="controls"><button id="runBoost" type="button" title="กดค้างเพื่อวิ่ง" aria-label="วิ่ง" aria-pressed="false">🏃</button><button id="speaker" title="เปิด/ปิดเสียงผู้เล่นอื่น">🔊</button><div><div class="wave" id="wave"></div><button id="mic" title="เปิด/ปิดไมค์">🎤</button></div></div>
-<dialog id="characterDialog" class="character-card" aria-labelledby="characterTitle">
- <form id="characterForm">
-   <header>
-     <h2 id="characterTitle">สร้างตัวละคร</h2>
-     <button type="button" id="cancelCharacter" hidden>ยกเลิก</button>
-   </header>
-   <div class="character-layout">
-     <div class="character-preview"><canvas id="characterPreview" width="256" height="282" aria-label="ตัวอย่างตัวละคร"></canvas></div>
-     <div class="character-fields">
-       <fieldset id="characterGender"><legend>เพศ</legend></fieldset>
-       <div class="character-options" id="characterOptions"></div>
-     </div>
-   </div>
-   <button id="saveCharacter" class="character-submit" type="submit">เริ่มเล่น</button>
- </form>
-</dialog>
-<script src="maps/town.js" defer></script>
-<script src="map.js" defer></script>
-<script src="game.js" defer></script>
-<script src="npc.js" defer></script>
-<script src="city-ai.js" defer></script>
-<script src="life.js" defer></script>
-<script src="audio.js" defer></script>
-<script src="multiplayer.js" defer></script>
-</body></html>
-
+<header id="hud" class="hud" hidden>
+  <div class="hud-brand">🏘️ <span id="hudRoom">ชุมชน 002</span> <small id="netState">● ทดลอง</small></div>
+  <div class="hud-stats"><span id="money">💵 100</span><span id="level">⭐ Lv.1</span><span id="onlineCount">👥 1/8</span></div>
+  <button id="menuBtn" class="hud-menu" title="กลับหน้าหลัก">☰</button>
+</header>
+<div id="toast" class="toast" role="status" hidden></div>
+<div id="gameHelp" class="game-help" hidden>WASD / ลูกศร = เดิน · E = ใช้งาน · คลิกแปลง = ทำสวน · I = กระเป๋า</div>
+<div id="joystick" class="joystick" hidden><div id="stick" class="stick"></div></div>
+<div id="gameActions" class="game-actions" hidden><button id="interactBtn">✋ ใช้งาน</button><button id="bagBtn">🎒 ของ</button><button id="soundBtn">🔇 เสียง</button></div>
+<form id="chatForm" class="chat-form" hidden><input id="chatInput" maxlength="120" placeholder="ทักทายเพื่อนบ้าน..." autocomplete="off"><button>ส่ง</button></form>
+<dialog id="dialog" class="game-dialog"><header><strong id="dialogTitle">เมนู</strong><button id="dialogClose" type="button">✕</button></header><div id="dialogContent"></div></dialog>
+<script src="config.js"></script>
+<script type="module" src="client.js"></script>
+</body>
+</html>
