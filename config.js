@@ -1,11 +1,15 @@
-// Firebase Realtime Database for My Little Neighborhood V5
-// The URL is connected. Add the Web API key from Firebase Console > Project settings > Your apps.
-// This public Web API key identifies the Firebase project; NEVER place private keys or service accounts here.
+// My Little Neighborhood V5 — Firebase Web App configuration
+// Web API key is a public client identifier, not a server secret.
+// Never put service account keys, Admin SDK credentials, or service-role keys here.
 window.GAME_CONFIG = {
   firebase: {
-    apiKey: '', // REQUIRED: Firebase Console > Your apps > Web app > firebaseConfig.apiKey
+    apiKey: 'AIzaSyClJQjbn5LcGB6yfwXjmcD__223vQ3CBq8',
     authDomain: 'gamesurvival-58e92.firebaseapp.com',
     databaseURL: 'https://gamesurvival-58e92-default-rtdb.asia-southeast1.firebasedatabase.app',
-    projectId: 'gamesurvival-58e92'
+    projectId: 'gamesurvival-58e92',
+    storageBucket: 'gamesurvival-58e92.firebasestorage.app',
+    messagingSenderId: '536376546379',
+    appId: '1:536376546379:web:462374863d0cc2103be9ce',
+    measurementId: 'G-MTQQJJ2MP4'
   }
 };
