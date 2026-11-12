@@ -2,7 +2,7 @@
  * V4->V5 avatar adapter. The model/animation is imported verbatim from the user's V4 game.js.
  * The bridge retains stable actors across Firebase updates and provides an accessible appearance editor.
  */
-import {renderClassicAvatar,V4_APPEARANCE_OPTIONS} from './v4-character.js';
+import {renderClassicAvatar,V4_APPEARANCE_OPTIONS} from './v4-character.js?v=v5-gameplay-1';
 import {sanitizeAppearance} from './shared/rules.js';
 
 const actors=new Map();
@@ -30,9 +30,7 @@ export function drawClassicActor(ctx,p,now,local,profileName,localAppearance){
   name:local?profileName:(p.name||'ผู้เล่น'),
   appearance:(local?sanitizeAppearance(localAppearance):
      p.appearance?sanitizeAppearance(p.appearance):undefined)});
- ctx.save();ctx.translate(x,y);
- renderClassicAvatar(ctx,actor,now,{speaking:!!(p.text&&p.until>Date.now())});
- ctx.restore();
+ return renderClassicAvatar(ctx,actor,now,{speaking:!!(p.text&&p.until>Date.now())});
 }
 
 function appearancePreview(canvas){

@@ -548,8 +548,10 @@ export const V4_BASE_APPEARANCE=baseAppearance;
 export {cleanAppearance};
 export function renderClassicAvatar(c,p,now,{speaking=false}={}){
   const pose=poseProgress(p,now),motion=movingCharacter(p,now);
+  const x=pose.x+motion.x-p.x,y=pose.y+motion.y-p.y;
   c.save();
-  c.translate(pose.x+motion.x-p.x,pose.y+motion.y-p.y);
+  c.translate(x,y);
   paintCharacter(c,p,now,speaking,motion,pose.seat);
   c.restore();
+  return {x,y};
 }

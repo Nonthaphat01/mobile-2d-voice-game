@@ -1,5 +1,5 @@
-import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS} from './shared/rules.js';
-import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v4-model-20261112-5';
+import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS} from './shared/rules.js?v=v5-gameplay-1';
+import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-gameplay-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 
 const el=id=>document.getElementById(id);
@@ -11,14 +11,18 @@ let scene='outside',active=false,online=false,fbGame=null,session=null;
 let selectedRoom='002',room='002',slot=0,myId='local',ownProfile=starter(),serverRooms=[];
 let me={x:0,y:0,face:1,walking:false,text:'',until:0};
 let joyX=0,joyY=0,joyId=null,sound=false,soundCtx=null,lastStep=0,ambientAt=0;
-let nearestPlot=-1,plotActionTimeout=null,gameHour=8,weather='sun';
+let plotReadyTimer,renderedCamera;
 const keys=new Set();
 const demoKey='my_little_neighborhood_v5_demo';
 const onlineReady=Boolean(cfg.firebase?.apiKey&&cfg.firebase?.databaseURL&&cfg.firebase?.projectId);
 const localNotice='โหมดทดลองเล่นคนเดียว • เซฟในเบราว์เซอร์นี้เท่านั้น';
 function resize(){w=innerWidth;h=innerHeight;dpr=Math.min(devicePixelRatio||1,2);c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
 addEventListener('resize',resize);resize();
-function notice(msg){const t=el('toast');t.textContent=String(msg).slice(0,160);t.hidden=false;clearTimeout(notice.timer);notice.timer=setTimeout(()=>{t.hidden=true},3500)}
+function notice(msg){
+ const message=String(msg).slice(0,160);
+ if(el('dialog').open){el('dialogStatus').textContent=message;return}
+ const t=el('toast');t.textContent=message;t.hidden=false;clearTimeout(notice.timer);notice.timer=setTimeout(()=>{t.hidden=true},3500)
+}
 function lobbyError(t){el('lobbyError').textContent=t||''}
 function mine(n){return Math.round(Number(n)||0)}
 function hud(){el('money').textContent=`💵 ${mine(ownProfile.money)} บาท`;el('level').textContent=`⭐ Lv.${ownProfile.level}`;const count=online?1+remote.size:1;el('onlineCount').textContent=`👥 ${count}/${MAX_PLAYERS}`;el('hudRoom').textContent=`ชุมชน ${room}`;el('netState').textContent=online?'● ออนไลน์':'● ทดลอง'}
@@ -28,7 +32,7 @@ function renderRooms(){const list=el('serverList');list.replaceChildren();for(co
  const count=document.createElement('span');count.className='count';count.textContent=r?`${r.count}/${r.capacity}`:'—/8';btn.disabled=Boolean(r?.count>=MAX_PLAYERS);btn.append(icon,body,count);btn.onclick=()=>{selectedRoom=id;renderRooms()};list.append(btn)} }
 async function firebaseClient(){
  if(!onlineReady)throw Error('ยังขาด Firebase Web API key ใน config.js');
- if(!fbGame){const {FirebaseGame}=await import('./firebase-game.js');fbGame=new FirebaseGame(cfg.firebase,onNetwork)}
+ if(!fbGame){const {FirebaseGame}=await import('./firebase-game.js?v=v5-gameplay-1');fbGame=new FirebaseGame(cfg.firebase,onNetwork)}
  await fbGame.ready();return fbGame;
 }
 async function refreshRooms(){
@@ -77,7 +81,7 @@ function applyAvatarAppearance(look){
   notice(active?'🎨 ใช้โมเดล V4 และบันทึกตัวละครแล้ว':'🎨 เลือกรูปลักษณ์ตัวละครแล้ว');
 }
 el('playDemo').onclick=()=>{online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
-function onJoined(){const l=lots[slot];scene='outside';resetAvatarMotion();me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
+function onJoined(){const l=lots[slot];scene='outside';renderedCamera=null;resetAvatarMotion();me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
 function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
  if(m.type==='rooms'){serverRooms=m.rooms;renderRooms()}
  else if(m.type==='players'){remote.clear();for(const p of m.players||[])remote.set(p.id,p);hud()}
@@ -86,25 +90,38 @@ function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
  else if(m.type==='left'){remote.delete(m.id);hud()}
  else if(m.type==='moved'){const p=remote.get(m.id);if(p)Object.assign(p,{x:m.x,y:m.y,scene:m.scene})}
  else if(m.type==='said'){const p=remote.get(m.id);if(p)Object.assign(p,{text:m.text,until:m.until})}
- else if(m.type==='profile'){ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();notice(m.notice||'บันทึกข้อมูลแล้ว')}
+ else if(m.type==='profile'){ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();drawOpenDialog();notice(m.notice||'บันทึกข้อมูลแล้ว')}
  else if(m.type==='homeUpdate'){const p=remote.get(m.id);if(p)p.home=m.home}
  else if(m.type==='notice'){notice(m.message)}
  else if(m.type==='kicked'){notice(m.message);leaveGame()}
  else if(m.type==='error'){notice(m.message)}
 }
-function send(m){if(online&&fbGame)Promise.resolve(fbGame.send(m)).catch(e=>notice('ส่งข้อมูลไม่สำเร็จ: '+e.message))}
+function send(m){if(online&&fbGame)return Promise.resolve(fbGame.send(m)).catch(e=>notice('ส่งข้อมูลไม่สำเร็จ: '+e.message))}
 function action(a){if(['plant','water','harvest'].includes(a?.type)){
   const motion={kind:a.type,started:performance.now(),duration:950};me.action=motion;
   setTimeout(()=>{if(me.action===motion)me.action=null},960);
  }
- if(online){send({type:'action',action:a});return}const result=applyAction(ownProfile,a);notice(result.message);if(result.ok){demoSave();hud();drawOpenDialog()}}
+ if(online)return send({type:'action',action:a});
+ const result=applyAction(ownProfile,a);
+ if(result.ok){demoSave();hud();drawOpenDialog()}
+ notice(result.message)
+}
 function leaveGame(){active=false;online=false;fbGame?.leave();remote.clear();resetAvatarMotion();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
-el('menuBtn').onclick=()=>showDialog('เมนูเกม',d=>{addButton(d,'🎨 แต่งตัวละคร V4',()=>showDialog('🎨 แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')});
+el('menuBtn').onclick=()=>{dialogType=null;showDialog('เมนูเกม',d=>{addButton(d,'🎨 แต่งตัวละคร V4',()=>showDialog('🎨 แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')})};
 function addText(parent,t,cls='muted'){const p=document.createElement('p');p.textContent=t;p.className=cls;parent.append(p);return p}
-function addButton(parent,text,fn,disabled=false){const b=document.createElement('button');b.className='dialog-action';b.textContent=text;b.disabled=disabled;b.onclick=()=>{fn()};parent.append(b);return b}
-function showDialog(title,draw){el('dialogTitle').textContent=title;el('dialogContent').replaceChildren();draw(el('dialogContent'));if(!el('dialog').open)el('dialog').showModal()}
+function addButton(parent,text,fn,disabled=false){
+ const b=document.createElement('button');b.type='button';b.className='dialog-action';b.textContent=text;b.disabled=disabled;
+ b.onclick=async()=>{b.disabled=true;try{await fn()}finally{b.disabled=false}};
+ parent.append(b);return b
+}
+function showDialog(title,draw){
+ clearTimeout(plotReadyTimer);
+ el('dialogTitle').textContent=title;el('dialogStatus').textContent='';
+ el('dialogContent').replaceChildren();draw(el('dialogContent'));if(!el('dialog').open)el('dialog').showModal()
+}
 function dialogClose(){el('dialog').close?.()}
 el('dialogClose').onclick=dialogClose;el('dialog').addEventListener('click',e=>{if(e.target===el('dialog'))dialogClose()});
+el('dialog').addEventListener('close',()=>clearTimeout(plotReadyTimer));
 let dialogType=null,dialogPlot=-1;
 function drawOpenDialog(){if(!el('dialog').open)return;if(dialogType==='inventory')inventory();else if(dialogType==='plot')openPlot(dialogPlot);else if(dialogType==='house')homeDialog();else if(dialogType==='shop')shopDialog()}
 function inventory(){dialogType='inventory';showDialog('🎒 กระเป๋าของฉัน',d=>{
@@ -114,13 +131,18 @@ function inventory(){dialogType='inventory';showDialog('🎒 กระเป๋�
  addButton(d,'🪑 ซื้อเฟอร์นิเจอร์เข้าบ้าน',()=>homeDialog());
  });
 }
-function openPlot(i){if(i<0||i>=10)return;dialogType='plot';dialogPlot=i;const p=ownProfile.home.plots[i];const ripe=p.crop&&p.watered&&Date.now()-p.plantedAt>=GROW_MS;
+function openPlot(i){if(i<0||i>=PLOT_COUNT)return;dialogType='plot';dialogPlot=i;const p=ownProfile.home.plots[i];const remaining=p.plantedAt+GROW_MS-Date.now();
  showDialog(`🌱 แปลงสวนที่ ${i+1}`,d=>{
  addText(d,p.crop?`ปลูกมะเขือเทศแล้ว${p.watered?' • รดน้ำแล้ว':' • ต้องรดน้ำ'}`:'แปลงว่าง พร้อมปลูกพืช');
- if(p.crop&&p.watered&&!ripe)addText(d,`รอเก็บเกี่ยวประมาณ ${Math.max(0,Math.ceil((GROW_MS-(Date.now()-p.plantedAt))/1000))} วินาที`);
  if(!p.crop)addButton(d,`ปลูกเมล็ดมะเขือเทศ (มี ${ownProfile.inventory.tomato_seed})`,()=>action({type:'plant',plot:i}),ownProfile.inventory.tomato_seed<1);
  else if(!p.watered)addButton(d,'💦 รดน้ำ',()=>action({type:'water',plot:i}));
- else addButton(d,'🍅 เก็บเกี่ยว +3 ผล / +10 EXP',()=>action({type:'harvest',plot:i}),!ripe);
+ else {
+   const harvest=addButton(d,'🍅 เก็บเกี่ยว +3 ผล / +10 EXP',()=>action({type:'harvest',plot:i}),remaining>0);
+   if(remaining>0){
+     const wait=addText(d,`รอเก็บเกี่ยวประมาณ ${Math.ceil(remaining/1000)} วินาที`);
+     plotReadyTimer=setTimeout(()=>{harvest.disabled=false;wait.remove()},remaining);
+   }
+ }
  });
 }
 function homeDialog(){dialogType='house';showDialog('🏡 บ้านของฉัน',d=>{addText(d,'บ้านเริ่มต้นว่างเปล่า คุณค่อย ๆ ซื้อเฟอร์นิเจอร์ได้');addText(d,'ของในบ้าน: '+(ownProfile.home.furniture.join(', ')||'ยังไม่มี'));
@@ -135,6 +157,10 @@ function shopDialog(){dialogType='shop';showDialog('🏪 ตลาดชุม�
 el('bagBtn').onclick=inventory;
 function localLot(){return lots[slot]}
 function plotRect(l,i){return {x:l.x+269+(i%2)*94,y:l.y+53+Math.floor(i/2)*65,w:78,h:53}}
+const market={x:WORLD.w/2-64,y:588,w:128,h:111};
+const plotReach=75;
+function distanceToRect(x,y,r){return Math.hypot(Math.max(r.x-x,0,x-r.x-r.w),Math.max(r.y-y,0,y-r.y-r.h))}
+function plotInReach(r){return distanceToRect(me.x,me.y,r)<=plotReach}
 function houseRect(l){return {x:l.x+35,y:l.y+55,w:192,h:165}}
 function doorPos(l){return {x:l.x+131,y:l.y+237}}
 function nearestInteract(){if(scene==='inside'){
@@ -149,12 +175,12 @@ function nearestInteract(){if(scene==='inside'){
   return nearest||{type:'exit'}
  }const l=localLot();const door=doorPos(l);
  if(Math.hypot(me.x-door.x,me.y-door.y)<110)return {type:'door'};
- let best=-1,dist=105;for(let i=0;i<10;i++){const r=plotRect(l,i);const d=Math.hypot(me.x-r.x-r.w/2,me.y-r.y-r.h/2);if(d<dist){dist=d;best=i}}
+ let best=-1,dist=Infinity;for(let i=0;i<PLOT_COUNT;i++){const r=plotRect(l,i);const d=Math.hypot(me.x-r.x-r.w/2,me.y-r.y-r.h/2);if(plotInReach(r)&&d<dist){dist=d;best=i}}
  if(best>=0)return {type:'plot',plot:best};
- if(Math.hypot(me.x-WORLD.w/2,me.y-640)<130)return {type:'shop'};
+ if(distanceToRect(me.x,me.y,market)<=plotReach)return {type:'shop'};
  return {type:'none'}
 }
-function interact(){const act=nearestInteract();if(act.type==='stand'){me.pose='stand';me.onBed=false;notice('ลุกขึ้นยืนแล้ว');return}
+function interact(act=nearestInteract()){if(act.type==='stand'){me.pose='stand';me.onBed=false;notice('ลุกขึ้นยืนแล้ว');return}
  else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
  if(act.type==='exit'){me.pose='stand';me.onBed=false;scene='outside';const p=doorPos(localLot());me.x=p.x;me.y=p.y+45;notice('ออกจากบ้านแล้ว')}
  else if(act.type==='door'){scene='inside';me.x=325;me.y=300;notice('เข้าบ้านของคุณแล้ว')}
@@ -162,7 +188,7 @@ function interact(){const act=nearestInteract();if(act.type==='stand'){me.pose='
  else if(act.type==='shop')shopDialog();
  else notice('เดินเข้าใกล้เตียงบ้าน แปลงสวน หรือร้านกลางชุมชน แล้วกด E')
 }
-el('interactBtn').onclick=interact;
+el('interactBtn').onclick=()=>interact();
 el('soundBtn').onclick=async()=>{sound=!sound;el('soundBtn').textContent=sound?'🔊 เสียง':'🔇 เสียง';if(sound){try{soundCtx??=new (window.AudioContext||window.webkitAudioContext)();await soundCtx.resume();notice('เปิดเสียงลม นก และฝีเท้าแล้ว')}catch{notice('เบราว์เซอร์นี้ไม่รองรับเสียงประกอบ')}}};
 function blip(freq=440,duration=.09,vol=.015,type='sine'){if(!sound||!soundCtx)return;const a=soundCtx.createOscillator(),g=soundCtx.createGain();a.type=type;a.frequency.setValueAtTime(freq,soundCtx.currentTime);g.gain.setValueAtTime(vol,soundCtx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,soundCtx.currentTime+duration);a.connect(g).connect(soundCtx.destination);a.start();a.stop(soundCtx.currentTime+duration)}
 // Reuse the genuine V4 footstep samples from legacy/assets/audio.
@@ -201,7 +227,7 @@ function text(t,x,y,size=13,col='#fff',align='center'){ctx.textAlign=align;ctx.f
 function road(){round(0,0,WORLD.w,WORLD.h,0,'#77a65c');grassTexture(ctx,0,0,WORLD.w,WORLD.h,.8);for(let x=0;x<WORLD.w;x+=110)for(let y=0;y<WORLD.h;y+=110){circle(x+((y/110)%2)*33,y,3,'#689a52')}
  round(0,560,WORLD.w,176,0,'#4e6564');round(0,575,WORLD.w,146,0,'#657578');roadTexture(ctx,0,575,WORLD.w,146,.9);for(let x=10;x<WORLD.w;x+=130)round(x,646,72,6,3,'#f7e6ae');
  line(0,559,WORLD.w,559,'#d7c2a3',10);line(0,735,WORLD.w,735,'#d7c2a3',10);
- round(WORLD.w/2-64,588,128,111,10,'#3e5549');text('🏪',WORLD.w/2,625,26);text('ตลาด',WORLD.w/2,656,15);
+ round(market.x,market.y,market.w,market.h,10,'#3e5549');text('🏪',WORLD.w/2,625,26);text('ตลาด',WORLD.w/2,656,15);
  for(let x=54;x<WORLD.w;x+=235){circle(x,566,19,'#597d4c');circle(x-7,552,12,'#7fa85a');circle(x,737,16,'#6d8e51')}
 }
 function fence(l){const x=l.x,y=l.y,right=x+l.w,bottom=y+l.h,gx=x+225,gw=42,top=l.slot>=4;
@@ -225,7 +251,7 @@ function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#
  text(String(i+1),r.x+10,r.y+15,10,'#dccfb6')}
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
 function worldDraw(now){road();const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
- for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<10;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
+ for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<PLOT_COUNT;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
  for(const p of remote.values())if(p.scene==='outside')avatar(p,now,false);avatar({...me,name:ownProfile.displayName},now,true)
 }
 function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430,.87);for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
@@ -234,12 +260,13 @@ function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430
  avatar({...me,name:ownProfile.displayName},now,true)
 }
 function avatar(p,now,local){
-  drawClassicActor(ctx,{...p,scene:local?scene:p.scene,face:local?me.face:p.face},now,local,ownProfile.displayName,ownProfile.appearance);
-  const x=p.x,y=p.y,name=String(local?ownProfile.displayName:(p.name||'ผู้เล่น')).slice(0,18);
+  const {x,y}=drawClassicActor(ctx,{...p,scene:local?scene:p.scene,face:local?me.face:p.face},now,local,ownProfile.displayName,ownProfile.appearance);
+  const name=String(local?ownProfile.displayName:(p.name||'ผู้เล่น')).slice(0,18);
   round(x-62,y-65,124,20,9,local?'#fff2cf':'#effff5');text(name,x,y-50,11,'#30454b');
   if(p.text&&p.until>Date.now()){const msg=String(p.text).slice(0,40);round(x-119,y-107,238,31,11,'#fff8e9');text(msg,x,y-86,12,'#304849')}
 }
 function background(now){ctx.fillStyle='#6b985e';ctx.fillRect(0,0,w,h);const camera=scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)};
+ renderedCamera={...camera,scene,w,h};
  ctx.save();ctx.translate(w/2,h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
  if(scene==='outside')worldDraw(now);else indoors(now);ctx.restore();
  const minute=(now/1000)%720,night=minute>540||minute<120;
@@ -280,12 +307,28 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
  requestAnimationFrame(tick)
 }
 requestAnimationFrame(tick);
-// Tap gardens or door. Mouse/touch on canvas is mapped into world coordinates.
-c.addEventListener('pointerup',e=>{if(!active||el('dialog').open)return;const zoom=scene==='outside'?Math.min(1,Math.max(.7,w/830)):Math.min(w/670,h/450,1.5),bx=scene==='outside'?me.x:325,by=scene==='outside'?me.y:215;
- const x=(e.clientX-w/2)/zoom+bx,y=(e.clientY-h/2)/zoom+by;
- if(scene==='inside'){if(Math.hypot(x-325,y-413)<75)interact();return}
- const l=localLot();for(let i=0;i<10;i++){const r=plotRect(l,i);if(x>r.x&&y>r.y&&x<r.x+r.w&&y<r.y+r.h){if(Math.hypot(me.x-x,me.y-y)<115)openPlot(i);else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');return}}
- const door=doorPos(l);if(Math.hypot(x-door.x,y-door.y)<40)interact();
+c.addEventListener('pointerup',e=>{
+ const camera=renderedCamera;
+ if(!active||el('dialog').open||!camera||camera.scene!==scene||camera.w!==w||camera.h!==h)return;
+ const bounds=c.getBoundingClientRect();
+ const x=((e.clientX-bounds.left)*w/bounds.width-w/2)/camera.zoom+camera.x;
+ const y=((e.clientY-bounds.top)*h/bounds.height-h/2)/camera.zoom+camera.y;
+ if(scene==='inside'){if(Math.hypot(x-325,y-413)<40)interact({type:'exit'});return}
+ const l=localLot();
+ for(let i=0;i<PLOT_COUNT;i++){
+   const r=plotRect(l,i);
+   if(distanceToRect(x,y,r)!==0)continue;
+   if(plotInReach(r))openPlot(i);else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
+   return
+ }
+ if(distanceToRect(x,y,market)===0){
+   if(distanceToRect(me.x,me.y,market)<=plotReach)shopDialog();else notice('เดินเข้าใกล้ตลาดก่อนครับ');
+   return
+ }
+ const door=doorPos(l);
+ if(Math.hypot(x-door.x,y-door.y)<40){
+   if(Math.hypot(me.x-door.x,me.y-door.y)<110)interact({type:'door'});else notice('เดินเข้าใกล้ประตูบ้านก่อนครับ');
+ }
 });
 if(!onlineReady)el('connectionHint').textContent='เชื่อม URL Firebase แล้ว • ยังต้องใส่ Web API key ใน config.js และเปิด Rules; เดโมเล่นได้ทันที';
 else el('connectionHint').textContent='เชื่อม Firebase แล้ว • เข้าสู่ระบบเพื่อโหลดเซฟออนไลน์และเข้าชุมชน';

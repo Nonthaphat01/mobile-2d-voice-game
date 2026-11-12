@@ -25,3 +25,9 @@ test('8 distinct plot slots, valid sanitization',()=>{
  const s=sanitizeState({money:-500,home:{furniture:['bed','EXPLOIT'],plots:[{crop:'tomato',plantedAt:100,watered:true}]}});
  assert.equal(s.money,0);assert.deepEqual(s.home.furniture,['bed']);assert.equal(s.home.plots.length,10);
 });
+test('invalid action targets leave an existing save untouched',()=>{
+ const s=starter();
+ assert.equal(applyAction(s,{type:'plant',plot:null}).ok,false);
+ assert.equal(applyAction(s,{type:'buy',item:'constructor'}).ok,false);
+ assert.deepEqual(s,starter());
+});

@@ -45,8 +45,8 @@
 <div id="joystick" class="joystick" hidden><div id="stick" class="stick"></div></div>
 <div id="gameActions" class="game-actions" aria-label="ปุ่มควบคุมตัวละคร" hidden><button id="interactBtn" type="button" aria-label="ใช้งานสิ่งที่อยู่ใกล้">✋ ใช้งาน</button><button id="bagBtn" type="button" aria-label="เปิดกระเป๋า">🎒 ของ</button><button id="soundBtn" type="button" aria-label="เปิดปิดเสียงประกอบ">🔇 เสียง</button></div>
 <form id="chatForm" class="chat-form" hidden><input id="chatInput" maxlength="120" placeholder="ทักทายเพื่อนบ้าน..." autocomplete="off"><button>ส่ง</button></form>
-<dialog id="dialog" class="game-dialog"><header><strong id="dialogTitle">เมนู</strong><button id="dialogClose" type="button">✕</button></header><div id="dialogContent"></div></dialog>
+<dialog id="dialog" class="game-dialog" aria-labelledby="dialogTitle"><header><strong id="dialogTitle">เมนู</strong><button id="dialogClose" type="button">✕</button></header><div id="dialogContent"></div><div id="dialogStatus" role="status"></div></dialog>
 <script src="config.js?v=firebase-20261112-2"></script>
-<script type="module" src="client.js?v=v4-model-20261112-5"></script>
+<script type="module" src="client.js?v=v5-gameplay-1"></script>
 </body>
 </html>

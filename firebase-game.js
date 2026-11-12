@@ -9,6 +9,7 @@ export class FirebaseGame {
  constructor(config,emit){
   this.config=config;this.emit=emit;this.app=null;this.auth=null;this.db=null;this.uid='';this.room='';this.slot=-1;
   this.slotRef=null;this.unsubscribe=null;this.unsubConnected=null;this.profile=null;this.lastChat=0;this.ended=false;
+  this.profileWrites=Promise.resolve();
  }
  async ready(){
   if(this.app)return;
@@ -66,6 +67,7 @@ export class FirebaseGame {
     // After reserving the lot, register server-side cleanup on disconnect.
     await onDisconnect(slotRef).remove();
     this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.profile=profile;this.ended=false;
+    this.profileWrites=Promise.resolve();
     this.unsubscribe=onValue(slotsRef,snap=>{
       const v=snap.val()||{};const players=Object.values(v).filter(p=>p&&p.uid!==uid).map(p=>({id:p.uid,...p}));
       this.emit({type:'players',players});
@@ -85,35 +87,52 @@ export class FirebaseGame {
     const now=Date.now();if(now-this.lastChat<850)return;
     this.lastChat=now;return update(this.slotRef,{text:String(m.text||'').slice(0,120),until:now+5000});
   }
-  if(m.type==='action')return this.action(m.action);
-  if(m.type==='appearance')return this.setAppearance(m.appearance);
+  if(m.type==='action'||m.type==='appearance'){
+    const slotRef=this.slotRef;
+    const write=this.profileWrites.then(()=>{
+      if(this.slotRef!==slotRef)return;
+      return m.type==='action'?this.action(m.action):this.setAppearance(m.appearance);
+    });
+    this.profileWrites=write.catch(()=>{});
+    return write;
+  }
  }
  async action(action){
   const uid=this.uid;
   if(!uid||this.ended)return;
+  const slotRef=this.slotRef;
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
   try{
     const result=await runTransaction(profileRef,current=>{
-      if(current==null)return undefined;
+      // RTDB can start with a null local cache. Let the server compare its value
+      // and retry against the existing save before deciding the action failed.
+      if(current==null)return null;
       const state=sanitizeState(current);
       const r=applyAction(state,action,Date.now());lastResult=r;
       return r.ok?state:undefined;
     },{applyLocally:false});
-    if(!result.committed){this.emit({type:'notice',message:lastResult.message});return}
+    if(this.slotRef!==slotRef)return;
+    if(!result.committed||!result.snapshot.exists()){this.emit({type:'notice',message:lastResult.message});return}
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
-    await update(this.slotRef,{name:profile.displayName,home:profile.home,updatedAt:Date.now()});
     this.emit({type:'profile',profile,notice:lastResult.message});
-  }catch(e){this.emit({type:'error',message:'บันทึกข้อมูลไม่สำเร็จ: '+e.message})}
+    try{
+      await update(slotRef,{name:profile.displayName,home:profile.home,updatedAt:Date.now()});
+    }catch(e){
+      if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ: '+e.message});
+    }
+  }catch(e){if(this.slotRef===slotRef)this.emit({type:'error',message:'บันทึกข้อมูลไม่สำเร็จ: '+e.message})}
  }
  async setAppearance(value){
   if(!this.uid||!this.slotRef||this.ended)return;
+  const slotRef=this.slotRef;
   const appearance=sanitizeAppearance(value);
   const profileRef=ref(this.db,`${ROOT}/profiles/${this.uid}`);
   await update(profileRef,{appearance});
-  await update(this.slotRef,{appearance,updatedAt:Date.now()});
+  if(this.slotRef!==slotRef)return;
   this.profile={...this.profile,appearance};
   this.emit({type:'profile',profile:this.profile,notice:'🎨 บันทึกตัวละครเดิมจาก V4 ลง Firebase แล้ว'});
+  await update(slotRef,{appearance,updatedAt:Date.now()});
  }
  async leave(){
   const slot=this.slotRef;this.ended=true;

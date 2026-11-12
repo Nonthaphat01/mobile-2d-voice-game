@@ -47,7 +47,7 @@ export function sanitizeState(s,name='ผู้เล่น') {
 }
 export function applyAction(s,action,now=Date.now()) {
   const items=s.inventory;
-  const plotIndex=Number(action?.plot);
+  const plotIndex=action?.plot;
   const plot=Number.isInteger(plotIndex)&&plotIndex>=0&&plotIndex<PLOT_COUNT?s.home.plots[plotIndex]:null;
   let status='';
   switch(action?.type){
@@ -70,7 +70,7 @@ export function applyAction(s,action,now=Date.now()) {
       s.money-=5;items.tomato_seed++;status='ซื้อเมล็ด 1 ชิ้น';break;
     case 'buy': {
       const price={bed:45,chair:25};const item=String(action.item);
-      if(!(item in price)||s.home.furniture.length>=12||s.money<price[item])return {ok:false,message:'ซื้อไม่ได้: เงินไม่พอหรือบ้านเต็ม'};
+      if(!Object.hasOwn(price,item)||s.home.furniture.length>=12||s.money<price[item])return {ok:false,message:'ซื้อไม่ได้: เงินไม่พอหรือบ้านเต็ม'};
       s.home.furniture.push(item);s.money-=price[item];status=`ซื้อ${item==='bed'?'เตียง':'เก้าอี้'}แล้ว`;break;
     }
     case 'name':
