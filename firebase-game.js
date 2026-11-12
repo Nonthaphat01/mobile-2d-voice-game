@@ -57,7 +57,7 @@ export class FirebaseGame {
   });
   for(const index of order){
     const candidate=ref(this.db,`${ROOT}/rooms/${room}/slots/${index}`),l=lots[index];
-    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',text:'',until:0,home:profile.home,appearance:profile.appearance,updatedAt:Date.now()};
+    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',pose:'stand',text:'',until:0,home:profile.home,appearance:profile.appearance,updatedAt:Date.now()};
     const result=await runTransaction(candidate,previous=>previous==null?pos:undefined,{applyLocally:false});
     if(result.committed){taken=index;slotRef=candidate;break;}
   }
@@ -80,7 +80,7 @@ export class FirebaseGame {
  }
  send(m){
   if(!this.slotRef||this.ended)return;
-  if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,updatedAt:Date.now()});
+  if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
   if(m.type==='say'){
     const now=Date.now();if(now-this.lastChat<850)return;
     this.lastChat=now;return update(this.slotRef,{text:String(m.text||'').slice(0,120),until:now+5000});
