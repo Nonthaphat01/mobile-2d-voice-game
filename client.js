@@ -1,4 +1,5 @@
 import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS} from './shared/rules.js';
+import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js';
 
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
@@ -188,10 +189,11 @@ function indoors(now){round(0,0,650,430,0,'#d6b88e');for(let y=36;y<430;y+=48)li
  ownProfile.home.furniture.forEach((item,i)=>{const x=96+(i%3)*166,y=190+Math.floor(i/3)*94;if(item==='bed'){round(x,y,108,66,8,'#806352');round(x+8,y+7,90,55,6,'#e4f2ee');round(x+11,y+9,35,48,6,'#c9dfd4');text('🛏️',x+53,y+48,32)}else{round(x,y,72,65,8,'#b27e55');round(x+7,y+8,58,48,4,'#e0ad75');text('🪑',x+36,y+42,28)}});
  avatar({...me,name:ownProfile.displayName},now,true)
 }
-function avatar(p,now,local){const x=p.x,y=p.y;circle(x,y+14,15,'#3d513848');const moving=local?me.walking:false;const phase=moving?Math.sin(now/95)*4:0;
- round(x-11,y+2,10,16+phase,4,'#314d65');round(x+1,y+2,10,16-phase,4,'#314d65');round(x-15,y-10,30,25,9,local?'#6ec2b5':'#e8a469');circle(x,y-16,12,'#f4c4a0');circle(x-4,y-18,1.8,'#263b38');circle(x+4,y-18,1.8,'#263b38');line(x-3,y-11,x+3,y-11,'#a55e59',1.7);
- const name=String(p.name||'ผู้เล่น').slice(0,18);round(x-58,y-58,116,20,8,local?'#eefbea':'#fbeed7');text(name,x,y-43,11,'#254c34');
- if(p.text&&p.until>Date.now()){const txt=String(p.text).slice(0,40);round(x-118,y-96,236,31,10,'#fff');text(txt,x,y-76,12,'#245044')}
+function avatar(p,now,local){
+  drawClassicActor(ctx,{...p,scene:local?scene:p.scene,face:local?me.face:p.face},now,local,ownProfile.displayName,ownProfile.appearance);
+  const x=p.x,y=p.y,name=String(local?ownProfile.displayName:(p.name||'ผู้เล่น')).slice(0,18);
+  round(x-62,y-65,124,20,9,local?'#fff2cf':'#effff5');text(name,x,y-50,11,'#30454b');
+  if(p.text&&p.until>Date.now()){const msg=String(p.text).slice(0,40);round(x-119,y-107,238,31,11,'#fff8e9');text(msg,x,y-86,12,'#304849')}
 }
 function background(now){ctx.fillStyle='#6b985e';ctx.fillRect(0,0,w,h);const camera=scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)};
  ctx.save();ctx.translate(w/2,h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
@@ -220,7 +222,7 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
   if(me.walking){dx/=m;dy/=m;const speed=174;
     if(canMove(me.x+dx*speed*dt,me.y))me.x+=dx*speed*dt;
     if(canMove(me.x,me.y+dy*speed*dt))me.y+=dy*speed*dt;
-    me.face=dx>=0?1:-1;
+    me.face=Math.atan2(dy,dx);
     if(now-lastStep>210){lastStep=now;blip(160+(now%3)*24,.05,.008,'triangle')}
   }
   if(online&&now-lastMove>185){lastMove=now;send({type:'move',x:Math.round(me.x),y:Math.round(me.y),scene})}
