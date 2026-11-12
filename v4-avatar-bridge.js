@@ -9,7 +9,7 @@ const actors=new Map();
 const STORAGE='v5_v4_appearance';
 let chosen=sanitizeAppearance();
 let touched=false;
-try{chosen=sanitizeAppearance(JSON.parse(localStorage.getItem(STORAGE)||'null'))}catch{}
+try{chosen=sanitizeAppearance(JSON.parse(localStorage.getItem(STORAGE)||localStorage.getItem('thai2d_appearance_v5')||'null'))}catch{}
 function persist(){try{localStorage.setItem(STORAGE,JSON.stringify(chosen))}catch{}}
 export function getChosenAppearance(){return sanitizeAppearance(chosen)}
 export function hasChosenAppearance(){return touched}
