@@ -2,7 +2,7 @@
 import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots} from './shared/rules.js';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js';
 
 const ROOT='little-neighborhood-v5';
 export class FirebaseGame {
@@ -57,7 +57,7 @@ export class FirebaseGame {
   });
   for(const index of order){
     const candidate=ref(this.db,`${ROOT}/rooms/${room}/slots/${index}`),l=lots[index];
-    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',text:'',until:0,home:profile.home,updatedAt:Date.now()};
+    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',text:'',until:0,home:profile.home,appearance:profile.appearance,updatedAt:Date.now()};
     const result=await runTransaction(candidate,previous=>previous==null?pos:undefined,{applyLocally:false});
     if(result.committed){taken=index;slotRef=candidate;break;}
   }
@@ -86,6 +86,7 @@ export class FirebaseGame {
     this.lastChat=now;return update(this.slotRef,{text:String(m.text||'').slice(0,120),until:now+5000});
   }
   if(m.type==='action')return this.action(m.action);
+  if(m.type==='appearance')return this.setAppearance(m.appearance);
  }
  async action(action){
   const uid=this.uid;
@@ -104,6 +105,15 @@ export class FirebaseGame {
     await update(this.slotRef,{name:profile.displayName,home:profile.home,updatedAt:Date.now()});
     this.emit({type:'profile',profile,notice:lastResult.message});
   }catch(e){this.emit({type:'error',message:'บันทึกข้อมูลไม่สำเร็จ: '+e.message})}
+ }
+ async setAppearance(value){
+  if(!this.uid||!this.slotRef||this.ended)return;
+  const appearance=sanitizeAppearance(value);
+  const profileRef=ref(this.db,`${ROOT}/profiles/${this.uid}`);
+  await update(profileRef,{appearance});
+  await update(this.slotRef,{appearance,updatedAt:Date.now()});
+  this.profile={...this.profile,appearance};
+  this.emit({type:'profile',profile:this.profile,notice:'🎨 บันทึกตัวละครเดิมจาก V4 ลง Firebase แล้ว'});
  }
  async leave(){
   const slot=this.slotRef;this.ended=true;
