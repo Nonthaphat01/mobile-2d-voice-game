@@ -56,15 +56,27 @@ async function joinOnline(){
    remote.clear();
    const joined=await f.join(selectedRoom,el('nickname').value.trim().slice(0,18)||'ผู้เล่น');
    online=true;room=joined.room;slot=joined.slot;myId=joined.id;ownProfile=sanitizeState(joined.profile);
-   onJoined();notice('🏡 โหลดบ้านเดิมจาก Firebase แล้ว');
+   if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);
+   onJoined();
+   if(hasChosenAppearance())send({type:'appearance',appearance:ownProfile.appearance});
+   notice('🏡 โหลดบ้านและโมเดล V4 จาก Firebase แล้ว');
  }catch(e){online=false;lobbyError('เข้าชุมชนไม่สำเร็จ: '+(e.message||String(e)))}
  finally{button.disabled=false;button.textContent='🌍 เข้าชุมชนออนไลน์'}
 }
 el('joinOnline').onclick=joinOnline;
 function demoData(){try{const d=JSON.parse(localStorage.getItem(demoKey)||'null');if(d&&d.profile)return sanitizeState(d.profile)}catch{}return starter(el('nickname').value)}
 function demoSave(){if(!online)try{localStorage.setItem(demoKey,JSON.stringify({profile:ownProfile,savedAt:Date.now()}))}catch{}}
-el('playDemo').onclick=()=>{online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
-function onJoined(){const l=lots[slot];scene='outside';me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:1,walking:false,text:'',until:0};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
+function applyAvatarAppearance(look){
+  const appearance=getChosenAppearance();
+  if(active){
+    ownProfile.appearance=appearance;
+    resetAvatarMotion();
+    if(online)send({type:'appearance',appearance});else demoSave();
+  }
+  notice(active?'🎨 ใช้โมเดล V4 และบันทึกตัวละครแล้ว':'🎨 เลือกรูปลักษณ์ตัวละครแล้ว');
+}
+el('playDemo').onclick=()=>{online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
+function onJoined(){const l=lots[slot];scene='outside';resetAvatarMotion();me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
 function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
  if(m.type==='rooms'){serverRooms=m.rooms;renderRooms()}
  else if(m.type==='players'){remote.clear();for(const p of m.players||[])remote.set(p.id,p);hud()}
@@ -73,7 +85,7 @@ function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
  else if(m.type==='left'){remote.delete(m.id);hud()}
  else if(m.type==='moved'){const p=remote.get(m.id);if(p)Object.assign(p,{x:m.x,y:m.y,scene:m.scene})}
  else if(m.type==='said'){const p=remote.get(m.id);if(p)Object.assign(p,{text:m.text,until:m.until})}
- else if(m.type==='profile'){ownProfile=sanitizeState(m.profile);hud();notice(m.notice||'บันทึกข้อมูลแล้ว')}
+ else if(m.type==='profile'){ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();notice(m.notice||'บันทึกข้อมูลแล้ว')}
  else if(m.type==='homeUpdate'){const p=remote.get(m.id);if(p)p.home=m.home}
  else if(m.type==='notice'){notice(m.message)}
  else if(m.type==='kicked'){notice(m.message);leaveGame()}
@@ -81,8 +93,8 @@ function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
 }
 function send(m){if(online&&fbGame)Promise.resolve(fbGame.send(m)).catch(e=>notice('ส่งข้อมูลไม่สำเร็จ: '+e.message))}
 function action(a){if(online){send({type:'action',action:a});return}const result=applyAction(ownProfile,a);notice(result.message);if(result.ok){demoSave();hud();drawOpenDialog()}}
-function leaveGame(){active=false;online=false;fbGame?.leave();remote.clear();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
-el('menuBtn').onclick=()=>showDialog('เมนูเกม',d=>{addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')});
+function leaveGame(){active=false;online=false;fbGame?.leave();remote.clear();resetAvatarMotion();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
+el('menuBtn').onclick=()=>showDialog('เมนูเกม',d=>{addButton(d,'🎨 แต่งตัวละคร V4',()=>showDialog('🎨 แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')});
 function addText(parent,t,cls='muted'){const p=document.createElement('p');p.textContent=t;p.className=cls;parent.append(p);return p}
 function addButton(parent,text,fn,disabled=false){const b=document.createElement('button');b.className='dialog-action';b.textContent=text;b.disabled=disabled;b.onclick=()=>{fn()};parent.append(b);return b}
 function showDialog(title,draw){el('dialogTitle').textContent=title;el('dialogContent').replaceChildren();draw(el('dialogContent'));if(!el('dialog').open)el('dialog').showModal()}
@@ -246,4 +258,5 @@ if(!onlineReady)el('connectionHint').textContent='เชื่อม URL Firebas
 else el('connectionHint').textContent='เชื่อม Firebase แล้ว • เข้าสู่ระบบเพื่อโหลดเซฟออนไลน์และเข้าชุมชน';
 try{el('nickname').value=localStorage.getItem('v5_nickname')||'ผู้เล่น'}catch{}
 el('nickname').addEventListener('input',()=>{try{localStorage.setItem('v5_nickname',el('nickname').value)}catch{}});
+buildAppearanceEditor(el('avatarFields'),applyAvatarAppearance,{lobby:true});
 refreshRooms();setInterval(()=>{if(!active)refreshRooms()},12000);
