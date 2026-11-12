@@ -5,7 +5,7 @@ GitHub Pages frontend for 2D community 002, using Firebase Realtime Database for
 ## Quick setup (required before online mode works)
 
 1. In [Firebase Console](https://console.firebase.google.com/), select project **gamesurvival-58e92**.
-2. Open **Project settings → Your apps → Web App**. Create a Web App if none exists, then copy **`apiKey`** from `firebaseConfig` into `config.js`. The database URL is already set.
+2. **Completed:** `config.js` now contains the Firebase Web App config (API key, app ID, and database URL) for `gamesurvival-58e92`. No secret service credentials should be added to public files.
 3. Open **Build → Authentication → Sign-in method**. Enable **Email/Password** and (if guest play desired) **Anonymous**. Add the GitHub Pages domain to Firebase Authentication's authorized domains if required.
 4. Open **Build → Realtime Database → Rules**, back up existing rules, merge carefully with or publish the supplied `database.rules.json`. Do **not** publish open `.read: true` / `.write: true` rules. The included rules assume this project database is dedicated to this game. If it contains existing data, merge with existing rules instead of overwriting them.
 5. Publish static files to GitHub Pages root: `index.html`, `style.css`, `client.js`, `shared/rules.js`, `config.js`, and `firebase-game.js`.
