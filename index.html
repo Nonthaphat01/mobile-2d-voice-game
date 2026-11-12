@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#101a2b"><title>My Little Neighborhood V5 | ชุมชน 002</title>
 <link rel="stylesheet" href="style.css?v=ui-v4-20261112">
-<link rel="stylesheet" href="ui-v4.css?v=ui-v4-20261112">
+<link rel="stylesheet" href="ui-v4.css?v=v4-model-20261112-3">
 </head>
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
@@ -13,6 +13,10 @@
     <div class="hero"><div class="hero-kicker">EARLY ACCESS · LIFE SIM ONLINE</div><div class="brand">🏡 <span>MY LITTLE<br><strong>NEIGHBORHOOD</strong></span></div><p>เริ่มต้นจากบ้านเล็ก ๆ แล้วเติบโตไปพร้อมชุมชนออนไลน์</p><div class="intro-tags"><span>🌱 สวน 10 แปลง</span><span>💵 เริ่ม 100 บาท</span><span>👥 สูงสุด 8 คน</span></div><div class="hero-world" aria-hidden="true"><span class="hero-house">🏡</span><span class="hero-garden">🌱 🌱<br>🌾 🌱</span><span class="hero-map-note">🏘️ ชุมชนของเรา • เริ่มจากบ้านหลังแรก</span></div></div>
     <div class="login-card">
       <label for="nickname">ชื่อตัวละคร</label><input id="nickname" maxlength="18" placeholder="ผู้เล่น" value="ผู้เล่น" autocomplete="nickname">
+      <details class="avatar-customizer" id="avatarCustomizer">
+        <summary>🎨 สร้างตัวละครจากโมเดล V4 <span class="customizer-hint">สีผิว · ทรงผม · เสื้อผ้า</span></summary>
+        <div id="avatarFields" class="avatar-editor" aria-label="ปรับแต่งตัวละคร 2 มิติ"></div>
+      </details>
       <div class="server-title"><strong>🌐 เลือกเซิร์ฟเวอร์ชุมชน</strong><button id="refreshRooms" class="mini">↻ รีเฟรช</button></div>
       <div id="serverList" class="server-list" aria-live="polite"></div>
       <div id="connectionHint" class="hint">โหมดทดลองเล่นในเครื่องพร้อมใช้งาน • ออนไลน์ต้องตั้งค่า Firebase Web App ก่อน</div>
@@ -42,6 +46,6 @@
 <form id="chatForm" class="chat-form" hidden><input id="chatInput" maxlength="120" placeholder="ทักทายเพื่อนบ้าน..." autocomplete="off"><button>ส่ง</button></form>
 <dialog id="dialog" class="game-dialog"><header><strong id="dialogTitle">เมนู</strong><button id="dialogClose" type="button">✕</button></header><div id="dialogContent"></div></dialog>
 <script src="config.js?v=firebase-20261112-2"></script>
-<script type="module" src="client.js?v=ui-v4-20261112"></script>
+<script type="module" src="client.js?v=v4-model-20261112-3"></script>
 </body>
 </html>
