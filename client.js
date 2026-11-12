@@ -52,9 +52,10 @@ async function joinOnline(){
  const button=el('joinOnline');button.disabled=true;button.textContent='⏳ กำลังโหลดบ้านเดิม...';lobbyError('');
  try{
    const f=await firebaseClient();if(!f.currentUser()){lobbyError('กรุณาเข้าสู่ระบบด้วย Firebase ก่อน');return}
+   remote.clear();
    const joined=await f.join(selectedRoom,el('nickname').value.trim().slice(0,18)||'ผู้เล่น');
    online=true;room=joined.room;slot=joined.slot;myId=joined.id;ownProfile=sanitizeState(joined.profile);
-   remote.clear();onJoined();notice('🏡 โหลดบ้านเดิมจาก Firebase แล้ว');
+   onJoined();notice('🏡 โหลดบ้านเดิมจาก Firebase แล้ว');
  }catch(e){online=false;lobbyError('เข้าชุมชนไม่สำเร็จ: '+(e.message||String(e)))}
  finally{button.disabled=false;button.textContent='🌍 เข้าชุมชนออนไลน์'}
 }
