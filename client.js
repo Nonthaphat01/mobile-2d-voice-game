@@ -149,6 +149,21 @@ function interact(){const act=nearestInteract();if(act.type==='exit'){scene='out
 el('interactBtn').onclick=interact;
 el('soundBtn').onclick=async()=>{sound=!sound;el('soundBtn').textContent=sound?'🔊 เสียง':'🔇 เสียง';if(sound){try{soundCtx??=new (window.AudioContext||window.webkitAudioContext)();await soundCtx.resume();notice('เปิดเสียงลม นก และฝีเท้าแล้ว')}catch{notice('เบราว์เซอร์นี้ไม่รองรับเสียงประกอบ')}}};
 function blip(freq=440,duration=.09,vol=.015,type='sine'){if(!sound||!soundCtx)return;const a=soundCtx.createOscillator(),g=soundCtx.createGain();a.type=type;a.frequency.setValueAtTime(freq,soundCtx.currentTime);g.gain.setValueAtTime(vol,soundCtx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,soundCtx.currentTime+duration);a.connect(g).connect(soundCtx.destination);a.start();a.stop(soundCtx.currentTime+duration)}
+// Reuse the genuine V4 footstep samples from legacy/assets/audio.
+const v4StepSamples=new Map();
+function playV4Footstep(){
+  if(!sound)return;
+  const ground=scene==='inside'?'wood':me.y>=575&&me.y<=721?'stone':'grass';
+  let clip=v4StepSamples.get(ground);
+  if(!clip){
+    clip=document.createElement('audio');
+    clip.src='legacy/assets/audio/step-'+ground+'.wav';
+    clip.preload='auto';
+    v4StepSamples.set(ground,clip);
+  }
+  try{clip.pause();clip.currentTime=0;clip.volume=.3;clip.play().catch(()=>blip(160,.06,.008,'triangle'))}
+  catch{blip(160,.06,.008,'triangle')}
+}
 function playAmbient(t){if(!sound||!soundCtx||t-ambientAt<1900)return;ambientAt=t;const f=600+Math.sin(t/9000)*130;blip(f,.2,.006,'sine');setTimeout(()=>blip(f*1.15,.13,.003,'sine'),130)}
 el('chatForm').onsubmit=e=>{e.preventDefault();const input=el('chatInput'),t=input.value.trim().slice(0,120);if(!t)return;me.text=t;me.until=Date.now()+5000;if(online)send({type:'say',text:t});input.value='';input.blur();notice('💬 '+t)};
 addEventListener('keydown',e=>{
@@ -236,7 +251,7 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
     if(canMove(me.x+dx*speed*dt,me.y))me.x+=dx*speed*dt;
     if(canMove(me.x,me.y+dy*speed*dt))me.y+=dy*speed*dt;
     me.face=Math.atan2(dy,dx);
-    if(now-lastStep>210){lastStep=now;blip(160+(now%3)*24,.05,.008,'triangle')}
+    if(now-lastStep>210){lastStep=now;playV4Footstep()}
   }
   if(online&&now-lastMove>185){lastMove=now;send({type:'move',x:Math.round(me.x),y:Math.round(me.y),scene})}
   playAmbient(now);
