@@ -93,7 +93,11 @@ function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
  else if(m.type==='error'){notice(m.message)}
 }
 function send(m){if(online&&fbGame)Promise.resolve(fbGame.send(m)).catch(e=>notice('ส่งข้อมูลไม่สำเร็จ: '+e.message))}
-function action(a){if(online){send({type:'action',action:a});return}const result=applyAction(ownProfile,a);notice(result.message);if(result.ok){demoSave();hud();drawOpenDialog()}}
+function action(a){if(['plant','water','harvest'].includes(a?.type)){
+  const motion={kind:a.type,started:performance.now(),duration:950};me.action=motion;
+  setTimeout(()=>{if(me.action===motion)me.action=null},960);
+ }
+ if(online){send({type:'action',action:a});return}const result=applyAction(ownProfile,a);notice(result.message);if(result.ok){demoSave();hud();drawOpenDialog()}}
 function leaveGame(){active=false;online=false;fbGame?.leave();remote.clear();resetAvatarMotion();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
 el('menuBtn').onclick=()=>showDialog('เมนูเกม',d=>{addButton(d,'🎨 แต่งตัวละคร V4',()=>showDialog('🎨 แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')});
 function addText(parent,t,cls='muted'){const p=document.createElement('p');p.textContent=t;p.className=cls;parent.append(p);return p}
@@ -133,14 +137,26 @@ function localLot(){return lots[slot]}
 function plotRect(l,i){return {x:l.x+269+(i%2)*94,y:l.y+53+Math.floor(i/2)*65,w:78,h:53}}
 function houseRect(l){return {x:l.x+35,y:l.y+55,w:192,h:165}}
 function doorPos(l){return {x:l.x+131,y:l.y+237}}
-function nearestInteract(){if(scene==='inside')return {type:'exit'};const l=localLot();const door=doorPos(l);
+function nearestInteract(){if(scene==='inside'){
+  if(me.pose==='sit'||me.pose==='sleep')return {type:'stand'};
+  let nearest=null,distance=90;
+  ownProfile.home.furniture.forEach((item,i)=>{
+    const x=96+(i%3)*166,y=190+Math.floor(i/3)*94;
+    const tx=x+(item==='bed'?54:36),ty=y+(item==='bed'?33:30);
+    const gap=Math.hypot(me.x-tx,me.y-ty);
+    if(gap<distance){distance=gap;nearest={type:item==='bed'?'sleep':'sit',x:tx,y:ty}}
+  });
+  return nearest||{type:'exit'}
+ }const l=localLot();const door=doorPos(l);
  if(Math.hypot(me.x-door.x,me.y-door.y)<110)return {type:'door'};
  let best=-1,dist=105;for(let i=0;i<10;i++){const r=plotRect(l,i);const d=Math.hypot(me.x-r.x-r.w/2,me.y-r.y-r.h/2);if(d<dist){dist=d;best=i}}
  if(best>=0)return {type:'plot',plot:best};
  if(Math.hypot(me.x-WORLD.w/2,me.y-640)<130)return {type:'shop'};
  return {type:'none'}
 }
-function interact(){const act=nearestInteract();if(act.type==='exit'){scene='outside';const p=doorPos(localLot());me.x=p.x;me.y=p.y+45;notice('ออกจากบ้านแล้ว')}
+function interact(){const act=nearestInteract();if(act.type==='stand'){me.pose='stand';me.onBed=false;notice('ลุกขึ้นยืนแล้ว');return}
+ else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
+ if(act.type==='exit'){me.pose='stand';me.onBed=false;scene='outside';const p=doorPos(localLot());me.x=p.x;me.y=p.y+45;notice('ออกจากบ้านแล้ว')}
  else if(act.type==='door'){scene='inside';me.x=325;me.y=300;notice('เข้าบ้านของคุณแล้ว')}
  else if(act.type==='plot')openPlot(act.plot);
  else if(act.type==='shop')shopDialog();
@@ -247,13 +263,14 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
   let dx=joyX+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
   let dy=joyY+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
   const m=Math.hypot(dx,dy);me.walking=m>.07&&!el('dialog').open;
+   if(me.walking&&me.pose!=='stand'){me.pose='stand';me.onBed=false}
   if(me.walking){dx/=m;dy/=m;const speed=174;
     if(canMove(me.x+dx*speed*dt,me.y))me.x+=dx*speed*dt;
     if(canMove(me.x,me.y+dy*speed*dt))me.y+=dy*speed*dt;
     me.face=Math.atan2(dy,dx);
     if(now-lastStep>210){lastStep=now;playV4Footstep()}
   }
-  if(online&&now-lastMove>185){lastMove=now;send({type:'move',x:Math.round(me.x),y:Math.round(me.y),scene})}
+  if(online&&now-lastMove>185){lastMove=now;send({type:'move',x:Math.round(me.x),y:Math.round(me.y),scene,pose:me.pose||'stand'})}
   playAmbient(now);
   background(now)
  }else{
