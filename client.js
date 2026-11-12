@@ -1,5 +1,6 @@
 import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS} from './shared/rules.js';
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js';
+import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
@@ -166,8 +167,8 @@ function round(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRec
 function line(x,y,x2,y2,color,width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.stroke()}
 function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
 function text(t,x,y,size=13,col='#fff',align='center'){ctx.textAlign=align;ctx.font=`600 ${size}px system-ui`;ctx.fillStyle=col;ctx.fillText(t,x,y)}
-function road(){round(0,0,WORLD.w,WORLD.h,0,'#77a65c');for(let x=0;x<WORLD.w;x+=110)for(let y=0;y<WORLD.h;y+=110){circle(x+((y/110)%2)*33,y,3,'#689a52')}
- round(0,560,WORLD.w,176,0,'#4e6564');round(0,575,WORLD.w,146,0,'#657578');for(let x=10;x<WORLD.w;x+=130)round(x,646,72,6,3,'#f7e6ae');
+function road(){round(0,0,WORLD.w,WORLD.h,0,'#77a65c');grassTexture(ctx,0,0,WORLD.w,WORLD.h,.8);for(let x=0;x<WORLD.w;x+=110)for(let y=0;y<WORLD.h;y+=110){circle(x+((y/110)%2)*33,y,3,'#689a52')}
+ round(0,560,WORLD.w,176,0,'#4e6564');round(0,575,WORLD.w,146,0,'#657578');roadTexture(ctx,0,575,WORLD.w,146,.9);for(let x=10;x<WORLD.w;x+=130)round(x,646,72,6,3,'#f7e6ae');
  line(0,559,WORLD.w,559,'#d7c2a3',10);line(0,735,WORLD.w,735,'#d7c2a3',10);
  round(WORLD.w/2-64,588,128,111,10,'#3e5549');text('🏪',WORLD.w/2,625,26);text('ตลาด',WORLD.w/2,656,15);
  for(let x=54;x<WORLD.w;x+=235){circle(x,566,19,'#597d4c');circle(x-7,552,12,'#7fa85a');circle(x,737,16,'#6d8e51')}
@@ -180,13 +181,13 @@ function fence(l){const x=l.x,y=l.y,right=x+l.w,bottom=y+l.h,gx=x+225,gw=42,top=
 }
 function drawHouse(l,p,now){const h=houseRect(l);round(h.x+4,h.y+10,h.w,h.h,10,'#3c3d33');round(h.x,h.y,h.w,h.h,12,'#a88460');
  // Wooden roof with gentle animated highlight.
- round(h.x+5,h.y+5,h.w-10,95,9,'#c48155');for(let i=0;i<7;i++)line(h.x+11,h.y+14+i*13,h.x+h.w-11,h.y+14+i*13,'#dba06f',2);
+ round(h.x+5,h.y+5,h.w-10,95,9,'#c48155');roofTexture(ctx,h.x+7,h.y+7,h.w-14,91,.9);for(let i=0;i<7;i++)line(h.x+11,h.y+14+i*13,h.x+h.w-11,h.y+14+i*13,'#dba06f',2);
  round(h.x+19,h.y+113,42,31,5,'#c8e8ce');round(h.x+129,h.y+113,42,31,5,'#c8e8ce');round(h.x+96,h.y+141,40,24,5,'#5c463e');
  text('🏠',h.x+h.w/2,h.y+89,31);
  const door=doorPos(l);round(door.x-13,door.y-12,26,18,5,'#a17d5a');
  text('🚪',door.x,door.y+8,19);text(p.name||'ผู้เล่น',l.x+l.w/2,l.y+31,15,'#f2fbec');
 }
-function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#60482f');for(let j=0;j<3;j++)line(r.x+9,r.y+12+j*15,r.x+r.w-9,r.y+12+j*15,'#82613d',3);
+function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#60482f');soilTexture(ctx,r.x+2,r.y+2,r.w-4,r.h-4,.9);for(let j=0;j<3;j++)line(r.x+9,r.y+12+j*15,r.x+r.w-9,r.y+12+j*15,'#82613d',3);
  if(plot?.crop){const grow=plot.watered?Math.min(1,(Date.now()-plot.plantedAt)/GROW_MS):.17;const yy=r.y+r.h/2;const size=12+grow*6;
  for(const ox of [-20,0,20]){line(r.x+r.w/2+ox,yy+12,r.x+r.w/2+ox,yy-7,'#6cad45',4);circle(r.x+r.w/2+ox-5,yy-10,size/2,'#4c994f');if(grow>.92)circle(r.x+r.w/2+ox+7,yy-7,6,'#ee624a')}
  }else text('+',r.x+r.w/2,r.y+r.h/2+6,20,'#d0b888');
@@ -196,7 +197,7 @@ function worldDraw(now){road();const lotsUsed=new Map([[slot,{name:ownProfile.di
  for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<10;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
  for(const p of remote.values())if(p.scene==='outside')avatar(p,now,false);avatar({...me,name:ownProfile.displayName},now,true)
 }
-function indoors(now){round(0,0,650,430,0,'#d6b88e');for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
+function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430,.87);for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
  text('บ้านของ '+ownProfile.displayName,325,90,22,'#4b443a');if(ownProfile.home.furniture.length===0)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
  ownProfile.home.furniture.forEach((item,i)=>{const x=96+(i%3)*166,y=190+Math.floor(i/3)*94;if(item==='bed'){round(x,y,108,66,8,'#806352');round(x+8,y+7,90,55,6,'#e4f2ee');round(x+11,y+9,35,48,6,'#c9dfd4');text('🛏️',x+53,y+48,32)}else{round(x,y,72,65,8,'#b27e55');round(x+7,y+8,58,48,4,'#e0ad75');text('🪑',x+36,y+42,28)}});
  avatar({...me,name:ownProfile.displayName},now,true)
