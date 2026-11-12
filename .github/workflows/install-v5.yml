@@ -1,0 +1,52 @@
+name: Install V5 community game
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/v5_core.b64
+      - .github/workflows/install-v5.yml
+permissions:
+  contents: write
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unpack V5 and preserve old game in legacy
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs'),path=require('node:path'),zlib=require('node:zlib');
+          const payload=fs.readFileSync('.github/v5_core.b64','utf8').trim();
+          const files=JSON.parse(zlib.brotliDecompressSync(Buffer.from(payload,'base64')).toString('utf8'));
+          if(!files['index.html']||!files['client.js']||!files['shared/rules.js']||!files['style.css']) throw Error('Incomplete V5 payload');
+          fs.mkdirSync('legacy',{recursive:true});
+          for (const n of fs.readdirSync('.')) {
+            if (['.git','.github','legacy'].includes(n)) continue;
+            fs.renameSync(n,path.join('legacy',n));
+          }
+          for (const [name,content] of Object.entries(files)) {
+            if(name.includes('..')||name.startsWith('/')||typeof content!=='string') throw Error('Unsafe V5 path: '+name);
+            fs.mkdirSync(path.dirname(name),{recursive:true});
+            fs.writeFileSync(name,content,'utf8');
+          }
+          console.log('Installed V5 files:',Object.keys(files).join(', '));
+          NODE
+      - name: Validate game scripts
+        run: |
+          node --check client.js
+          node --check shared/rules.js
+          node --check server/index.js
+          node --test tests/rules.test.mjs
+      - name: Commit updated game
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Deploy My Little Neighborhood V5 community 002"
+            git push
+          fi
