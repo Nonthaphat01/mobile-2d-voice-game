@@ -553,7 +553,9 @@ function atHomeDoor(){
  return Math.abs(me.x-homeDoor.x)<36&&me.y>homeBuilding.y+homeBuilding.h+13&&me.y<homeDoor.y+19;
 }
 function nearTownShop(){
- return Math.hypot(me.x-townShopDoor.x,me.y-townShopDoor.y)<51&&me.y>townShop.y+townShop.h;
+ if(Math.hypot(me.x-townShopDoor.x,me.y-townShopDoor.y)<51&&me.y>townShop.y+townShop.h)return true;
+ return townBuildings.some(building=>building.developed&&building.kind==='shop'&&
+   me.y>building.y+building.h&&Math.hypot(me.x-building.x-building.w/2,me.y-building.y-building.h-23)<48);
 }
 function townRegion(x,y){
  if(inBackyard(x,y))return 'สวนหลังบ้าน';
@@ -745,6 +747,7 @@ function townDrawMinimap(cam){
  rect(px+1,py+mainRoad.y*scale,w-2,mainRoad.h*scale,2,'#5c6b70');
  for(const lake of townLakes)rect(px+lake.x*scale,py+lake.y*scale,lake.w*scale,lake.h*scale,2,'#5f9a9b');
  for(const building of townBuildings)rect(px+building.x*scale,py+building.y*scale,building.w*scale,building.h*scale,1,building.roof);
+ for(const site of developmentSites)if(site.stage!=='empty')circle(px+site.x*scale,py+site.y*scale,2,'#b0774c');
  ctx.strokeStyle='#fff1c6ba';ctx.lineWidth=1;
  ctx.strokeRect(px+cam.x*scale,py+cam.y*scale,Math.min(w,cam.vw*scale),Math.min(h,cam.vh*scale));
  circle(px+homeDoor.x*scale,py+homeDoor.y*scale,3,'#fff0ab');
@@ -782,6 +785,7 @@ function drawOutside(now){
  const people=[me,...townResidentsNow(),...[...others.values()].filter(p=>p.scene==='outside')];
  for(const p of people)if(visible(p.x,p.y)&&!isVehicleRider(p))drawList.push([p.y,()=>{drawFishingLine(p,now);avatar(p)}]);
  queueGardenDrawing(drawList,visible);
+ queueDevelopmentDrawing(drawList,visible,now);
  queueStallDrawing(drawList,visible,now);queueCityActors(drawList,visible,now);queueCityTraffic(drawList,visible,now);queueVehicleDrawing(drawList,visible,now);
  drawList.sort((a,b)=>a[0]-b[0]);
  for(const [,draw] of drawList)draw();

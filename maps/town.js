@@ -5,6 +5,7 @@ const DEFAULT_TOWN_MAP = {
     "h": 5630
   },
   "city": {
+    "openLayout": true,
     "districts": [
       {
         "key": "harbor",
@@ -409,6 +410,7 @@ const DEFAULT_TOWN_MAP = {
     }
   },
   "neighborhood": {
+    "openLayout": true,
     "buildings": [
       {
         "x": 78,

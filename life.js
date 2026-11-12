@@ -922,7 +922,7 @@ function lifeTick(now,dt){
  }
  if(scene==='outside'){
    if(!lifeDialog.open&&me.walking&&!me.action&&!isInVehicle()&&atHomeDoor()&&me.y<homeDoor.y-4&&me.face<-.35&&me.face>-2.8)setLifeScene('room',390,479);
-   if(scene==='outside'){townTick(now,dt);tickCity(now,dt)}
+   if(scene==='outside'){townTick(now,dt);tickCity(now,dt);tickDevelopment(now)}
  }
  changeNeed('fullness',-dt*(scene==='mine'?.12:.05));
  changeNeed('energy',dt*(me.pose==='sleep'?5:me.pose==='sit'?.65:me.running?-3.8:scene==='mine'?-.15:-.06));

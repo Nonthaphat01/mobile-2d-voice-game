@@ -19,7 +19,6 @@ const cityPedestrians=cityDistricts.flatMap((d,i)=>cityCitizenNames[i].map((name
    [Math.min(d.x+d.w-60,start+260),y+23],[start+78,y+28]],
   ['สวัสดี! แวะมาเดินเล่นแถว'+d.label+'เหรอ','เดินตามถนนใหญ่กลับไปละแวกบ้านได้นะ']];
 }));
-const cityNightPeople=new Set(cityCitizenNames.filter((_,i)=>i!==2&&i!==6).map(names=>names[0]));
 
 const cityPetAnchors=[
  ['dog',464,310],['cat',268,333],['bird',406,451],['dog',517,544],['cat',709,399],
@@ -225,18 +224,17 @@ const townPedestrians=[
 const townSpeeds=[38,45,50,42];
 const townGreetings=['สวัสดี!','วันนี้เป็นยังไงบ้าง','สวัสดีจ้ะ','เดินเล่นอยู่เหรอ'];
 const personTextRange=100;
-const skippedLocalResidents=new Set(['ภู','เฟิร์น','วิน','ตะวัน','เก้า','ภูมิ','ฝน','ใบหม่อน']);
+const localResidents=new Set(['มะลิ','ต้น','ข้าวหอม','แก้ว','เมฆ','ริน','บัว','ปั้น']);
 
 function makeTownResidents(routes){
  const cityStart=townPedestrians.length*2;
  return routes.flatMap(([name,color,gender,route,lines],index)=>{
    if(index<cityStart){
-     if(skippedLocalResidents.has(name))return [];
+     if(!localResidents.has(name))return [];
    }else{
      const district=Math.floor((index-cityStart)/6);
      const slot=(index-cityStart)%6;
-     const kept=district%2===0?[0,1,3,5]:[0,2,4,5];
-     if(!kept.includes(slot)&&!(district===7&&slot===1))return [];
+     if(slot!==district%6)return [];
    }
    return [{
    name,color,x:route[0][0],y:route[0][1],route,lines,
@@ -299,7 +297,7 @@ function addTownResidents(){
    return [moreResidentNames[index],color,(gender+1)%3,shifted,lines];
  });
 }
-const nightResidents=new Set(['มะลิ','ต้น','ริน','ปั้น',...cityNightPeople]);
+const nightResidents=new Set(['มะลิ','ต้น','ริน']);
 function townResidentsNow(){
  return isTownNight()?nightNeighbors:neighbors;
 }

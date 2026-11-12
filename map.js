@@ -14,17 +14,18 @@ function buildTownLayout(map){
  const {size,city,landmarks,neighborhood,backyard:yard}=map;
  const {districts,buildingSlots,lakes,roads}=city;
  const cityBuildings=districts.flatMap((district,i)=>district.names.map((label,j)=>{
+   if(city.openLayout&&j%2===1)return null;
    const [dx,dy]=buildingSlots[j];
    return {x:district.x+dx+(j%3)*15,y:district.y+dy,w:150+(j*29+i*11)%100,
      h:89+(j*17+i*13)%37,roof:district.roofs[(i+j)%3],
      wall:['#f0d9b8','#f1ddc3','#e0e7c9','#f0d2b2'][(j+i)%4],label};
- }));
+ }).filter(Boolean));
  const cityPaths=districts.flatMap(({x,y,w,h})=>[
    [x,y+299,w,38],[x+37,y+1020,w-74,38],[x+76,y+198,30,h-228],
    [x+470,y+330,34,690],[x+1855,y+330,34,690],[x+29,y+h-142,w-58,42]
  ]);
  const citySigns=districts.map(d=>({x:d.x+1160,y:d.y+374,label:d.label}));
- const cityTrees=districts.flatMap(({x,y,h},district)=>Array.from({length:47},(_,i)=>{
+ const cityTrees=districts.flatMap(({x,y,h},district)=>Array.from({length:city.openLayout?24:47},(_,i)=>{
    const spread=i%2===0?111+(i*63)%500:1950+(i*127)%626;
    return [x+spread+(district*7)%28,y+367+(i*137)%Math.max(500,h-430)];
  }));
@@ -46,8 +47,9 @@ function buildTownLayout(map){
    stallCounterBlock:landmarks.stall,backyard:yard,gardenDesk:yard.desk,gardenPlots:yard.plots,
    farmRoute,yardFences,townBuildings,
    townLakes:[...lakes,...neighborhood.lakes],townPaths:[...cityPaths,...neighborhood.paths],
-   townDistricts:[...citySigns,...neighborhood.signs],townTreeSpots:[...cityTrees,...neighborhood.trees],
-   townFlowerBeds:neighborhood.flowerBeds,townTraffic:neighborhood.traffic,
+   townDistricts:[...citySigns,...neighborhood.signs],townTreeSpots:[...cityTrees,
+     ...neighborhood.trees.filter(([x,y],i)=>!neighborhood.openLayout||x>1700||y>1050||i%3===0)],
+   townFlowerBeds:neighborhood.openLayout?neighborhood.flowerBeds.slice(0,4):neighborhood.flowerBeds,townTraffic:neighborhood.traffic,
    streetLights:neighborhood.streetLights,mainRoad:neighborhood.mainRoad,outdoorWorkoutMat:neighborhood.workoutMat,
    outsideBlocks:[...townBuildings,landmarks.stall,...yardFences]
  };
