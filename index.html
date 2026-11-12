@@ -14,11 +14,11 @@
       <label for="nickname">ชื่อตัวละคร</label><input id="nickname" maxlength="18" placeholder="ผู้เล่น" value="ผู้เล่น" autocomplete="nickname">
       <div class="server-title"><strong>🌐 เลือกชุมชน</strong><button id="refreshRooms" class="mini">↻ รีเฟรช</button></div>
       <div id="serverList" class="server-list" aria-live="polite"></div>
-      <div id="connectionHint" class="hint">โหมดทดลองเล่นในเครื่องพร้อมใช้งาน • ออนไลน์ต้องตั้งค่าเซิร์ฟเวอร์ก่อน</div>
+      <div id="connectionHint" class="hint">โหมดทดลองเล่นในเครื่องพร้อมใช้งาน • ออนไลน์ต้องตั้งค่า Firebase Web App ก่อน</div>
       <button id="joinOnline" class="primary">🌍 เข้าชุมชนออนไลน์</button>
       <button id="playDemo" class="secondary">🎮 ทดลองเล่นคนเดียว (เซฟในเครื่อง)</button>
       <details class="account"><summary>🔐 บัญชีออนไลน์และเซฟข้ามเครื่อง</summary>
-        <p>หากต้องการเล่นข้ามเครื่อง ใช้บัญชีอีเมลและรหัสผ่านจาก Supabase (ต้องตั้งค่า config.js และเปิด Email Auth)</p>
+        <p>หากต้องการเล่นข้ามเครื่อง ใช้บัญชีอีเมลและรหัสผ่านจาก Firebase (ต้องตั้งค่า Web API key, Authentication และ Database Rules)</p>
         <input id="email" type="email" placeholder="อีเมล" autocomplete="email"><input id="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)" autocomplete="current-password" minlength="6">
         <div class="account-actions"><button id="loginAccount" class="mini" type="button">เข้าสู่ระบบ</button><button id="signupAccount" class="mini" type="button">สมัครบัญชี</button></div>
         <button id="guestAccount" type="button" class="mini ghost">ลองเข้าด้วยบัญชีชั่วคราว</button>

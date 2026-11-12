@@ -1,7 +1,11 @@
-// ตั้งค่านี้ก่อนเปิดโหมดออนไลน์จริง (ค่าด้านล่างยังไม่ใช่การเชื่อมต่อจริง)
-// อย่าใส่ SUPABASE_SERVICE_ROLE_KEY หรือรหัสผ่านเซิร์ฟเวอร์ในไฟล์นี้
+// Firebase Realtime Database for My Little Neighborhood V5
+// The URL is connected. Add the Web API key from Firebase Console > Project settings > Your apps.
+// This public Web API key identifies the Firebase project; NEVER place private keys or service accounts here.
 window.GAME_CONFIG = {
-  apiUrl: '', // เช่น https://your-game-server.example.com
-  supabaseUrl: '', // เช่น https://YOUR_PROJECT.supabase.co
-  supabasePublishableKey: '' // publishable/anon key ฝั่งเว็บเท่านั้น
+  firebase: {
+    apiKey: '', // REQUIRED: Firebase Console > Your apps > Web app > firebaseConfig.apiKey
+    authDomain: 'gamesurvival-58e92.firebaseapp.com',
+    databaseURL: 'https://gamesurvival-58e92-default-rtdb.asia-southeast1.firebasedatabase.app',
+    projectId: 'gamesurvival-58e92'
+  }
 };

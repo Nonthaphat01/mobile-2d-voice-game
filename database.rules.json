@@ -1,0 +1,26 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "little-neighborhood-v5": {
+      "profiles": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['displayName','money','level','home','inventory']) && newData.child('money').isNumber() && newData.child('money').val() >= 0 && newData.child('money').val() <= 100000000 && newData.child('level').isNumber() && newData.child('level').val() >= 1 && newData.child('level').val() <= 99 && newData.child('displayName').isString() && newData.child('displayName').val().length <= 18"
+        }
+      },
+      "rooms": {
+        "$room": {
+          "slots": {
+            ".read": "auth != null && ($room === '001' || $room === '002' || $room === '003')",
+            "$slot": {
+              ".write": "auth != null && ($room === '001' || $room === '002' || $room === '003') && ($slot === '0' || $slot === '1' || $slot === '2' || $slot === '3' || $slot === '4' || $slot === '5' || $slot === '6' || $slot === '7') && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.child('uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)))",
+              ".validate": "newData.hasChildren(['uid','name','slot','x','y','scene','updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length <= 18 && newData.child('x').isNumber() && newData.child('x').val() >= 0 && newData.child('x').val() <= 2400 && newData.child('y').isNumber() && newData.child('y').val() >= 0 && newData.child('y').val() <= 1290 && newData.child('scene').isString() && (newData.child('scene').val() === 'inside' || newData.child('scene').val() === 'outside')"
+            }
+          }
+        }
+      }
+    }
+  }
+}
