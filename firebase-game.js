@@ -4,16 +4,18 @@ import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPass
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-gardener-1';
+import {requestSheetsMarket} from './shared/sheets-market-client.js?v=v5-sheets-1';
 
 const backgroundAction = type => type==='gardenerResume'?'gardenerStep':['gardenerStep','needsTick'].includes(type)?type:false;
 
 const ROOT='little-neighborhood-v5';
 export class FirebaseGame {
- constructor(config,emit,marketEnabled=false){
+ constructor(config,emit,marketEnabled=false,sheetsMarketUrl=''){
   this.config=config;this.emit=emit;this.app=null;this.auth=null;this.db=null;this.uid='';this.room='';this.slot=-1;
   this.slotRef=null;this.unsubscribe=null;this.unsubConnected=null;this.profile=null;this.lastChat=0;this.ended=false;
   this.profileWrites=Promise.resolve();
-  this.marketEnabled=marketEnabled;
+  this.marketEnabled=marketEnabled&&!sheetsMarketUrl;
+  this.sheetsMarketUrl=sheetsMarketUrl;
  }
  async ready(){
   if(this.app)return;
@@ -192,8 +194,13 @@ export class FirebaseGame {
   return pending;
  }
  async market(request){
-  if(!this.marketCall||!this.slotRef||this.ended)return {ok:false,message:'ร้านออนไลน์ยังไม่เปิดให้บริการ'};
+  if((!this.marketCall&&!this.sheetsMarketUrl)||!this.slotRef||this.ended)return {ok:false,message:'ร้านออนไลน์ยังไม่เปิดให้บริการ'};
   try{
+    if(this.sheetsMarketUrl){
+      const token=await this.currentUser()?.getIdToken();
+      if(!token)return {ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
+      return await requestSheetsMarket(this.sheetsMarketUrl,token,{...request,room:this.room,slot:this.slot});
+    }
     return (await this.marketCall({...request,room:this.room,slot:this.slot})).data;
   }catch(error){
     return {ok:false,message:error.code==='functions/internal'||error.code==='functions/unavailable'

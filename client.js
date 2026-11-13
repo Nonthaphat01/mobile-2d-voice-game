@@ -10,6 +10,7 @@ import {fatigueOpacity,hungerOffset,LOW_NEED,NEEDS_STEP_MS} from './shared/needs
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
 const cfg=window.GAME_CONFIG||{};
+const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
 let sentMovement;
@@ -184,8 +185,8 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=v5-hoodgame-1');
-   const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true);
+   const {FirebaseGame}=await import('./firebase-game.js?v=v5-sheets-1');
+   const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
  })().catch(error=>{firebasePromise=null;throw error});
@@ -756,11 +757,11 @@ async function onlineMarket(){
  dialogType='onlineMarket';
  showDialog('ร้านค้าออนไลน์',d=>{
    addButton(d,'กลับตลาดกลาง',shopDialog);
-   if(cfg.onlineMarket!==true)addText(d,'ร้านระหว่างผู้เล่นจะเปิดเมื่อเซิร์ฟเวอร์ตลาดพร้อม');
+   if(!marketConfigured)addText(d,'ร้านระหว่างผู้เล่นจะเปิดเมื่อเซิร์ฟเวอร์ตลาดพร้อม');
    else if(!online)addText(d,'เข้าชุมชนออนไลน์เพื่อซื้อและลงขายกับผู้เล่นอื่น');
    else addText(d,'กำลังโหลดรายการขาย…');
  });
- if(!online||cfg.onlineMarket!==true)return;
+ if(!online||!marketConfigured)return;
  const panel=el('dialogContent').lastElementChild;
  const response=await fbGame.requestMarket({type:'browse'});
  if(dialogType!=='onlineMarket'||!el('dialog').open||!panel.isConnected)return;
