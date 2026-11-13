@@ -1,0 +1,14 @@
+.build-mode{display:flex;flex-direction:column;gap:10px}
+.build-preview{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));grid-template-rows:repeat(6,34px);gap:2px;padding:8px;border:1px solid #79c990;background:#15392c;border-radius:14px;max-width:100%;overflow:auto}
+.build-tile{grid-column:auto;grid-row:auto;min-width:0;padding:0;border:1px solid #4dc77d;background:#2c9d5c66;border-radius:4px;cursor:pointer}
+.build-tile:hover{background:#73ef9b99;box-shadow:0 0 0 2px #baffc8}
+.build-item{z-index:2;min-width:0;padding:0;border:2px solid #f2d38c;background:linear-gradient(145deg,#b77e56,#87553d);border-radius:8px;color:#fff8d7;font-size:24px;cursor:pointer;box-shadow:0 3px 7px #0007}
+.build-item.selected{border-color:#fff;box-shadow:0 0 0 3px #74f0a0,0 3px 7px #0007}
+.build-stock{margin:0;text-align:left}
+.build-stock.selected{outline:3px solid #74f0a0}
+.build-tray,.build-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.build-controls{grid-template-columns:repeat(4,minmax(0,1fr))}
+.build-status{margin:0;padding:8px 10px;border:1px solid #6fc78b66;border-radius:9px;background:#173a2c;color:#caffd5;font-size:12px}
+@media(max-width:420px){.build-preview{grid-template-rows:repeat(6,28px);padding:5px}.build-item{font-size:18px}.build-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.build-tray button,.build-controls button{font-size:11px;padding:8px 5px}}
+
+

@@ -2,7 +2,7 @@
 import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-build-mode-1';
 
 const ROOT='little-neighborhood-v5';
 export class FirebaseGame {
@@ -113,7 +113,7 @@ export class FirebaseGame {
       return r.ok?state:undefined;
     },{applyLocally:false});
     if(this.slotRef!==slotRef)return;
-    if(!result.committed||!result.snapshot.exists()){this.emit({type:'notice',message:lastResult.message});return}
+    if(!result.committed||!result.snapshot.exists()){this.emit({type:'notice',message:lastResult.message});return lastResult}
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
     this.emit({type:'profile',profile,notice:lastResult.message});
     try{
@@ -141,3 +141,7 @@ export class FirebaseGame {
   if(slot){try{await onDisconnect(slot).cancel()}catch{};try{await remove(slot)}catch{}}
  }
 }
+
+
+
+
