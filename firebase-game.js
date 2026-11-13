@@ -1,6 +1,6 @@
 /** Firebase multiplayer and optional server-managed market adapter. */
 import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
-import {getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-farm-1';
@@ -18,14 +18,19 @@ export class FirebaseGame {
   this.app=getApps().find(a=>a.name==='neighborhood-v5')||initializeApp(this.config,'neighborhood-v5');
   this.auth=getAuth(this.app);this.db=getDatabase(this.app,this.config.databaseURL);
   if(this.marketEnabled)this.marketCall=httpsCallable(getFunctions(this.app,'asia-southeast1'),'neighborhoodMarket');
-  await new Promise((resolve,reject)=>{const unsub=onAuthStateChanged(this.auth,()=>{unsub();resolve()},reject)});
+  await this.auth.authStateReady();
  }
  async login(mode,email,password){
   await this.ready();let result;
   if(mode==='login')result=await signInWithEmailAndPassword(this.auth,email,password);
   else if(mode==='signup')result=await createUserWithEmailAndPassword(this.auth,email,password);
-  else result=await signInAnonymously(this.auth);
+  else if(mode==='guest')result=await signInAnonymously(this.auth);
+  else throw Error('Unknown sign-in method');
   return result.user;
+ }
+ async logout(){
+  await this.leave();
+  await signOut(this.auth);
  }
  currentUser(){return this.auth?.currentUser||null}
  async rooms(){

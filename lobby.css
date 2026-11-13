@@ -1,0 +1,76 @@
+.entry-lobby {
+  padding: clamp(18px, 5vw, 56px);
+  background: radial-gradient(ellipse at 14% 15%, #345949, transparent 66%), #152824;
+  font-family: system-ui, "Noto Sans Thai", sans-serif;
+}
+.entry-lobby::before { display: none; }
+.entry-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, .88fr);
+  width: min(100%, 960px);
+  margin: auto;
+  border: 1px solid #799680;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #1d382f;
+  box-shadow: 0 24px 80px #0718149e;
+}
+.entry-brand {
+  position: relative;
+  isolation: isolate;
+  min-height: 490px;
+  padding: clamp(24px, 5vw, 56px);
+  color: #fff3d8;
+  overflow: hidden;
+  background: linear-gradient(165deg, #244d40 15%, #375d47 64%, #688258);
+}
+.entry-brand h1 { margin: 22px 0 12px; font-size: clamp(31px, 4.5vw, 55px); line-height: 1.07; letter-spacing: -.035em; }
+.entry-brand p { max-width: 30ch; color: #e0ebd5; line-height: 1.65; }
+.entry-brand img { image-rendering: pixelated; }
+.entry-landscape {
+  position: absolute;
+  inset: auto -10% -1px;
+  height: 49%;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 72% 25%, #f3cb81 0 7%, transparent 7.3%),
+    radial-gradient(ellipse at 19% 110%, #4d6946 0 57%, transparent 57.4%),
+    radial-gradient(ellipse at 81% 126%, #719358 0 58%, transparent 58.4%),
+    radial-gradient(ellipse at 60% 117%, #a8b878 0 67%, transparent 67.4%);
+}
+.entry-card { min-width: 0; padding: clamp(20px, 4vw, 40px); background: #122820; color: #edf8ed; }
+.entry-card h2 { margin: 16px 0 5px; font-size: 27px; line-height: 1.25; }
+.entry-note { margin: 0 0 16px; font-size: 13px; color: #c2d7ca; line-height: 1.6; }
+.entry-modes { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border: 1px solid #3c5d4c; border-radius: 12px; background: #19362b; }
+.entry-modes button { border: 0; border-radius: 8px; padding: 9px; background: transparent; color: #c9dfd0; font-weight: 700; }
+.entry-modes button[aria-pressed="true"] { background: #3b624d; color: #fff4db; }
+.entry-card label { display: block; margin: 12px 0 6px; font-size: 14px; font-weight: 700; }
+.entry-card small { color: #c2d7ca; font-weight: 400; }
+.entry-card input { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid #668373; background: #0e211a; color: #f1fff3; user-select: text; }
+.entry-primary,.entry-demo { width: 100%; min-height: 43px; margin-top: 16px; padding: 10px; border-radius: 10px; font-weight: 800; }
+.entry-primary { border: 1px solid #caeaa7; background: #c7e59a; color: #1b3124; }
+.entry-primary:hover:not(:disabled) { background: #def4ba; }
+.entry-demo { border: 1px solid #678472; background: #203c30; color: #edf8ec; }
+.entry-demo small { margin-inline-start: 7px; }
+.entry-text { padding: 5px 0; border: 0; background: transparent; color: #bfe0ab; font-size: 13px; font-weight: 700; }
+#guestAccount { margin-top: 9px; }
+.entry-session,.entry-server-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.entry-session span { overflow-wrap: anywhere; color: #d6e8d2; font-size: 13px; }
+.entry-session button { flex-shrink: 0; }
+.entry-server-heading { margin-bottom: 7px; }
+.entry-card .server { min-height: 56px; padding: 7px 10px; background: #213b30; border-color: #618170; }
+.entry-card .server.selected { background: #315541; border-color: #b5de95; }
+.entry-card .server .sicon { padding: 3px 7px; }
+.entry-message { margin: 12px 0 0; padding: 9px 11px; border-radius: 8px; background: #52362e; color: #ffded0; font-size: 13px; overflow-wrap: anywhere; }
+#roomsStatus { margin: 8px 0 0; }
+#roomsStatus:empty { display: none; }
+@media (max-width: 740px) {
+  .entry-lobby { padding: 10px; }
+  .entry-shell { grid-template-columns: 1fr; max-width: 460px; }
+  .entry-brand { min-height: auto; padding: 16px 20px; }
+  .entry-brand img { width: 30px; height: 30px; }
+  .entry-brand h1 { margin: 6px 0; font-size: 29px; }
+  .entry-brand h1 br { display: none; }
+  .entry-brand p { margin: 5px 0 0; font-size: 13px; }
+  .entry-card { padding: 17px; }
+}

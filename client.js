@@ -31,50 +31,217 @@ function notice(msg){
  if(el('dialog').open){el('dialogStatus').textContent=message;return}
  const t=el('toast');t.textContent=message;t.hidden=false;clearTimeout(notice.timer);notice.timer=setTimeout(()=>{t.hidden=true},3500)
 }
-function lobbyError(t){el('lobbyError').textContent=t||''}
+function lobbyError(message=''){
+ const status=el('lobbyError');
+ status.textContent=message;
+ status.hidden=!message;
+}
 function mine(n){return Math.round(Number(n)||0)}
 function hud(){el('money').textContent=`💵 ${mine(ownProfile.money)} บาท`;el('level').textContent=`⭐ Lv.${ownProfile.level}`;const count=online?1+remote.size:1;el('onlineCount').textContent=`👥 ${count}/${MAX_PLAYERS}`;el('hudRoom').textContent=`ชุมชน ${room}`;el('netState').textContent=online?'● ออนไลน์':'● ทดลอง'}
-function renderRooms(){const list=el('serverList');list.replaceChildren();for(const id of ROOM_IDS){const r=serverRooms.find(x=>x.id===id);const btn=document.createElement('button');btn.type='button';btn.className='server'+(selectedRoom===id?' selected':'');btn.setAttribute('aria-pressed',selectedRoom===id?'true':'false');
- const icon=document.createElement('span');icon.className='sicon';icon.textContent='🏘️';
- const body=document.createElement('span');body.className='sbody';const title=document.createElement('strong');title.textContent='ชุมชน '+id;const small=document.createElement('small');small.textContent=onlineReady?(r?`มีพื้นที่ว่าง ${MAX_PLAYERS-r.count} แปลง`:'กำลังตรวจสอบสถานะ...'):'ทดลองเล่นในเครื่องเท่านั้น';body.append(title,small);
- const count=document.createElement('span');count.className='count';count.textContent=r?`${r.count}/${r.capacity}`:'—/8';btn.disabled=Boolean(r?.count>=MAX_PLAYERS);btn.append(icon,body,count);btn.onclick=()=>{selectedRoom=id;renderRooms()};list.append(btn)} }
-async function firebaseClient(){
- if(!onlineReady)throw Error('ยังขาด Firebase Web API key ใน config.js');
- if(!fbGame){const {FirebaseGame}=await import('./firebase-game.js?v=v5-farm-1');fbGame=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true)}
- await fbGame.ready();return fbGame;
+
+let accountMode='login', accountBusy=false, joining=false;
+let firebasePromise, roomsRequest, roomsGeneration=0;
+const joinLabel=()=> 'เข้าชุมชน '+selectedRoom;
+
+function authMessage(error){
+ const messages={
+   'auth/invalid-credential':'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+   'auth/user-not-found':'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+   'auth/wrong-password':'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+   'auth/invalid-email':'กรุณาตรวจสอบอีเมล',
+   'auth/email-already-in-use':'อีเมลนี้มีบัญชีแล้ว กรุณาเข้าสู่ระบบ',
+   'auth/weak-password':'ใช้รหัสผ่านอย่างน้อย 6 ตัวอักษร',
+   'auth/password-does-not-meet-requirements':'รหัสผ่านไม่ผ่านเงื่อนไข กรุณาลองรหัสผ่านที่ยาวและซับซ้อนขึ้น',
+   'auth/network-request-failed':'เชื่อมต่อไม่ได้ กรุณาตรวจอินเทอร์เน็ตแล้วลองอีกครั้ง',
+   'auth/too-many-requests':'ลองหลายครั้งเกินไป กรุณารอสักครู่',
+   'auth/user-disabled':'บัญชีนี้ถูกระงับ',
+   'auth/operation-not-allowed':'ยังไม่ได้เปิดวิธีเข้าสู่ระบบนี้',
+   'auth/admin-restricted-operation':'ยังไม่ได้เปิดวิธีเข้าสู่ระบบนี้'
+ };
+ return messages[error?.code] || 'เชื่อมต่อระบบบัญชีไม่สำเร็จ กรุณาลองอีกครั้ง';
 }
-async function refreshRooms(){
- if(!onlineReady){serverRooms=[];renderRooms();return}
- try{
-   const f=await firebaseClient();
-   if(!f.currentUser()){serverRooms=[];lobbyError('เข้าสู่ระบบ Firebase เพื่อดูจำนวนผู้เล่นออนไลน์จริง');}
-   else {serverRooms=await f.rooms();lobbyError('')}
- }catch(e){serverRooms=[];lobbyError('ตรวจสอบห้องไม่สำเร็จ: '+e.message)}
+
+function updateEntryControls(){
+ for(const id of ['loginMode','signupMode','email','password','accountSubmit','guestAccount','logoutAccount']){
+   el(id).disabled=accountBusy||joining;
+ }
+ el('confirmPassword').disabled=accountMode!=='signup'||accountBusy;
+ el('playDemo').disabled=accountBusy||joining;
+ el('refreshRooms').disabled=Boolean(roomsRequest)||joining||accountBusy;
+ const selected=serverRooms.find(r=>r.id===selectedRoom);
+ el('joinOnline').disabled=!session||accountBusy||joining||Boolean(selected&&selected.count>=selected.capacity);
+ el('joinOnline').textContent=joining?'กำลังเข้าชุมชน…':joinLabel();
+ for(const button of el('serverList').querySelectorAll('button')){
+   const room=serverRooms.find(r=>r.id===button.dataset.room);
+   button.disabled=joining||accountBusy||Boolean(room&&room.count>=room.capacity);
+ }
+}
+
+function setAccountMode(mode){
+ accountMode=mode;
+ const signup=mode==='signup';
+ el('loginMode').setAttribute('aria-pressed',String(!signup));
+ el('signupMode').setAttribute('aria-pressed',String(signup));
+ el('accountTitle').textContent=signup?'สมัครสมาชิก':'เข้าสู่ระบบ';
+ el('accountIntro').textContent=signup?'ใช้อีเมลเป็นไอดี และตั้งรหัสผ่านอย่างน้อย 6 ตัวอักษร':'ใช้อีเมลเป็นไอดีเพื่อเข้าเล่นต่อจากเซฟเดิม';
+ el('accountSubmit').textContent=signup?'สร้างบัญชี':'เข้าสู่ระบบ';
+ el('password').autocomplete=signup?'new-password':'current-password';
+ el('password').minLength=signup?6:0;
+ el('password').value=el('confirmPassword').value='';
+ el('confirmField').hidden=!signup;
+ el('confirmPassword').required=signup;
+ lobbyError();
+ updateEntryControls();
+}
+
+function renderRooms(){
+ const list=el('serverList');
+ const focused=list.contains(document.activeElement)?document.activeElement.dataset.room:null;
+ const selected=serverRooms.find(r=>r.id===selectedRoom);
+ const available=serverRooms.find(r=>r.count<r.capacity);
+ if(selected&&selected.count>=selected.capacity&&available)selectedRoom=available.id;
+ list.replaceChildren();
+ for(const id of ROOM_IDS){
+   const room=serverRooms.find(r=>r.id===id);
+   const button=document.createElement('button');
+   button.type='button';
+   button.dataset.room=id;
+   button.className='server'+(selectedRoom===id?' selected':'');
+   button.setAttribute('aria-pressed',String(selectedRoom===id));
+   const icon=document.createElement('span');
+   icon.className='sicon';icon.textContent='🏘️';icon.setAttribute('aria-hidden','true');
+   const body=document.createElement('span');body.className='sbody';
+   const title=document.createElement('strong');title.textContent='ชุมชน '+id;
+   const hint=document.createElement('small');
+   hint.textContent=!room?'รอตรวจจำนวนผู้เล่น':room.count>=room.capacity?'เซิร์ฟเวอร์เต็ม':'ว่าง '+(room.capacity-room.count)+' ที่';
+   body.append(title,hint);
+   const count=document.createElement('span');count.className='count';
+   count.textContent=room?room.count+'/'+room.capacity:'—/'+MAX_PLAYERS;
+   button.append(icon,body,count);
+   button.onclick=()=>{selectedRoom=id;lobbyError();renderRooms()};
+   list.append(button);
+ }
+ updateEntryControls();
+ if(focused)list.querySelector('button[data-room="'+focused+'"]:not(:disabled)')?.focus();
+}
+
+function showEntry(user, focus=false){
+ session=user;
+ roomsGeneration++;
+ roomsRequest=null;
+ serverRooms=[];
+ lobbyError();
+ el('roomsStatus').textContent='';
+ el('accountScreen').hidden=Boolean(user);
+ el('serverScreen').hidden=!user;
+ el('accountIdentity').textContent=user?(user.isAnonymous?'บัญชีชั่วคราว':user.email||'บัญชีสมาชิก'):'';
  renderRooms();
+ if(user){
+   if(focus)el('serverTitle').focus();
+   if(!active)refreshRooms();
+ }else if(focus)el('email').focus();
 }
-el('refreshRooms').onclick=refreshRooms;
+
+async function firebaseClient(){
+ if(!onlineReady)throw Error('Firebase is not configured');
+ firebasePromise??=(async()=>{
+   const {FirebaseGame}=await import('./firebase-game.js?v=v5-account-1');
+   const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true);
+   await adapter.ready();
+   return adapter;
+ })().catch(error=>{firebasePromise=null;throw error});
+ fbGame=await firebasePromise;
+ return fbGame;
+}
+
+function refreshRooms(){
+ if(!session||active||joining||roomsRequest)return roomsRequest;
+ const generation=roomsGeneration;
+ const update=async()=>{
+   try{
+     const rooms=await fbGame.rooms();
+     if(generation!==roomsGeneration)return;
+     serverRooms=rooms;
+     el('roomsStatus').textContent=rooms.length&&rooms.every(r=>r.count>=r.capacity)?'ทุกชุมชนเต็ม กรุณาลองใหม่อีกครั้ง':'';
+   }catch{
+     if(generation!==roomsGeneration)return;
+     el('roomsStatus').textContent='ตรวจจำนวนผู้เล่นไม่ได้ กดรีเฟรชเพื่อลองอีกครั้ง';
+   }finally{
+     if(generation===roomsGeneration){roomsRequest=null;renderRooms()}
+   }
+ };
+ if(!serverRooms.length)el('roomsStatus').textContent='กำลังตรวจจำนวนผู้เล่น…';
+ roomsRequest=update();
+ updateEntryControls();
+ return roomsRequest;
+}
+
 async function authUser(mode){
- const f=await firebaseClient(),email=el('email').value.trim(),password=el('password').value;
- if(mode!=='guest'&&(!email||password.length<6))throw Error('กรอกอีเมลและรหัสผ่านอย่างน้อย 6 ตัว');
- const user=await f.login(mode,email,password);session=user;lobbyError('');notice(mode==='guest'?'เข้าสู่ระบบชั่วคราวแล้ว':'เข้าสู่ระบบ Firebase สำเร็จ');await refreshRooms();return true;
-}
-for(const [button,mode] of [['loginAccount','login'],['signupAccount','signup'],['guestAccount','guest']])el(button).onclick=async()=>{
- try{el(button).disabled=true;await authUser(mode)}catch(e){lobbyError('เข้าสู่ระบบไม่ได้: '+e.message)}finally{el(button).disabled=false}
-};
-async function joinOnline(){
- if(!onlineReady){lobbyError('กรุณาใส่ Firebase Web API key ใน config.js แล้วเปิด Authentication และตั้ง Rules');return}
- const button=el('joinOnline');button.disabled=true;button.textContent='⏳ กำลังโหลดบ้านเดิม...';lobbyError('');
+ if(accountBusy||active)return;
+ const email=el('email').value.trim(), password=el('password').value;
+ if(mode==='signup'&&password!==el('confirmPassword').value){
+   lobbyError('รหัสผ่านทั้งสองช่องไม่ตรงกัน');
+   el('confirmPassword').focus();
+   return;
+ }
+ accountBusy=true;
+ lobbyError();
+ updateEntryControls();
+ el('accountSubmit').textContent=mode==='guest'?'กำลังเชื่อมต่อ…':'กำลังตรวจสอบบัญชี…';
  try{
-   const f=await firebaseClient();if(!f.currentUser()){lobbyError('กรุณาเข้าสู่ระบบด้วย Firebase ก่อน');return}
+   const adapter=await firebaseClient();
+   const user=await adapter.login(mode,email,password);
+   el('password').value=el('confirmPassword').value='';
+   showEntry(user,true);
+ }catch(error){
+   lobbyError(onlineReady?authMessage(error):'ระบบบัญชีออนไลน์ยังไม่พร้อม คุณสามารถทดลองเล่นคนเดียวได้');
+ }finally{
+   accountBusy=false;
+   el('accountSubmit').textContent=accountMode==='signup'?'สร้างบัญชี':'เข้าสู่ระบบ';
+   updateEntryControls();
+ }
+}
+
+el('loginMode').onclick=()=>setAccountMode('login');
+el('signupMode').onclick=()=>setAccountMode('signup');
+el('accountForm').onsubmit=e=>{e.preventDefault();authUser(accountMode)};
+el('guestAccount').onclick=()=>authUser('guest');
+el('refreshRooms').onclick=refreshRooms;
+el('logoutAccount').onclick=async()=>{
+ if(accountBusy||joining)return;
+ accountBusy=true;
+ lobbyError();
+ updateEntryControls();
+ try{
+   await fbGame.logout();
+   el('accountForm').reset();
+   setAccountMode('login');
+   showEntry(null,true);
+ }catch(error){lobbyError(authMessage(error))}
+ finally{accountBusy=false;updateEntryControls();if(!session)el('email').focus()}
+};
+
+async function joinOnline(){
+ if(!session||joining||accountBusy||active)return;
+ joining=true;
+ lobbyError();
+ updateEntryControls();
+ try{
+   const adapter=await firebaseClient();
+   if(!adapter.currentUser()){
+     showEntry(null,true);
+     lobbyError('กรุณาเข้าสู่ระบบอีกครั้ง');
+     return;
+   }
    remote.clear();
-   const joined=await f.join(selectedRoom,el('nickname').value.trim().slice(0,18)||'ผู้เล่น');
+   const joined=await adapter.join(selectedRoom,el('nickname').value.trim().slice(0,18)||'ผู้เล่น');
    online=true;room=joined.room;slot=joined.slot;myId=joined.id;ownProfile=sanitizeState(joined.profile);
    if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);
    onJoined();
    if(hasChosenAppearance())send({type:'appearance',appearance:ownProfile.appearance});
-   notice('🏡 โหลดบ้านและโมเดล V4 จาก Firebase แล้ว');
- }catch(e){online=false;lobbyError('เข้าชุมชนไม่สำเร็จ: '+(e.message||String(e)))}
- finally{button.disabled=false;button.textContent='🌍 เข้าชุมชนออนไลน์'}
+   notice('โหลดเซฟออนไลน์แล้ว');
+ }catch(error){online=false;lobbyError('เข้าชุมชนไม่สำเร็จ: '+(error.message||String(error)))}
+ finally{joining=false;updateEntryControls();if(!active)refreshRooms()}
 }
 el('joinOnline').onclick=joinOnline;
 function demoData(){try{const d=JSON.parse(localStorage.getItem(demoKey)||'null');if(d&&d.profile)return sanitizeState(d.profile)}catch{}return starter(el('nickname').value)}
@@ -92,7 +259,7 @@ function applyAvatarAppearance(look){
   }
   notice(active?'🎨 ใช้โมเดล V4 และบันทึกตัวละครแล้ว':'🎨 เลือกรูปลักษณ์ตัวละครแล้ว');
 }
-el('playDemo').onclick=()=>{online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
+el('playDemo').onclick=()=>{if(accountBusy||joining||active)return;online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
 function onJoined(){const l=lots[slot];scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};active=true;el('lobby').hidden=true;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=false;hud();if(!online)demoSave()}
 function trackRemote(player,now){
  if(!Number.isFinite(player.x)||!Number.isFinite(player.y))return;
@@ -133,7 +300,30 @@ function action(a){if(['plant','water','harvest'].includes(a?.type)){
  }
  if(result.message)notice(result.message)
 }
-function leaveGame(){closeBuild(false);active=false;online=false;fbGame?.leave();remote.clear();resetAvatarMotion();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
+async function leaveGame(){
+ if(!active)return;
+ closeBuild(false);
+ accountBusy=true;
+ active=false;
+ online=false;
+ const leaving=fbGame?.leave();
+ remote.clear();
+ resetAvatarMotion();
+ el('lobby').hidden=false;
+ for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;
+ dialogClose();
+ keys.clear();
+ joyReset();
+ lobbyError();
+ updateEntryControls();
+ try{await leaving}
+ finally{
+   accountBusy=false;
+   updateEntryControls();
+   if(session){el('serverTitle').focus();refreshRooms()}
+   else el('playDemo').focus();
+ }
+}
 el('menuBtn').onclick=()=>{dialogType=null;showDialog('เมนูเกม',d=>{addButton(d,'🎨 แต่งตัวละคร V4',()=>showDialog('🎨 แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')})};
 function addText(parent,t,cls='muted'){const p=document.createElement('p');p.textContent=t;p.className=cls;parent.append(p);return p}
 function addButton(parent,text,fn,disabled=false){
@@ -776,9 +966,13 @@ c.addEventListener('pointerup',e=>{
    if(Math.hypot(me.x-door.x,me.y-door.y)<110)interact({type:'door'});else notice('เดินเข้าใกล้ประตูบ้านก่อนครับ');
  }
 });
-if(!onlineReady)el('connectionHint').textContent='เชื่อม URL Firebase แล้ว • ยังต้องใส่ Web API key ใน config.js และเปิด Rules; เดโมเล่นได้ทันที';
-else el('connectionHint').textContent='เชื่อม Firebase แล้ว • เข้าสู่ระบบเพื่อโหลดเซฟออนไลน์และเข้าชุมชน';
 try{el('nickname').value=localStorage.getItem('v5_nickname')||'ผู้เล่น'}catch{}
 el('nickname').addEventListener('input',()=>{try{localStorage.setItem('v5_nickname',el('nickname').value)}catch{}});
 buildAppearanceEditor(el('avatarFields'),applyAvatarAppearance,{lobby:true});
-refreshRooms();setInterval(()=>{if(!active)refreshRooms()},12000);
+setAccountMode('login');
+if(onlineReady){
+ firebaseClient().then(adapter=>{
+   if(!accountBusy&&adapter.currentUser())showEntry(adapter.currentUser());
+ }).catch(()=>{});
+}
+setInterval(()=>{if(session&&!active)refreshRooms()},12000);

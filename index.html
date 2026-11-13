@@ -8,31 +8,56 @@
 <link rel="stylesheet" href="ui-v4.css?v=v4-model-20261112-5">
 <link rel="stylesheet" href="build-mode.css?v=v5-build-room-2">
 <link rel="stylesheet" href="farm-market.css?v=v5-farm-1">
+<link rel="stylesheet" href="lobby.css?v=v5-account-1">
 </head>
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
-<section id="lobby" class="lobby" aria-label="เลือกชุมชนออนไลน์">
-  <div class="lobby-shell">
-    <div class="hero"><div class="hero-kicker">EARLY ACCESS · LIFE SIM ONLINE</div><div class="brand">🏡 <span>MY LITTLE<br><strong>NEIGHBORHOOD</strong></span></div><p>เริ่มต้นจากบ้านเล็ก ๆ แล้วเติบโตไปพร้อมชุมชนออนไลน์</p><div class="intro-tags"><span>🌱 สวน 10 แปลง</span><span>💵 เริ่ม 100 บาท</span><span>👥 สูงสุด 8 คน</span></div><div class="hero-world" aria-hidden="true"><span class="hero-house">🏡</span><span class="hero-garden">🌱 🌱<br>🌾 🌱</span><span class="hero-map-note">🏘️ ชุมชนของเรา • เริ่มจากบ้านหลังแรก</span></div></div>
-    <div class="login-card">
-      <label for="nickname">ชื่อตัวละคร</label><input id="nickname" maxlength="18" placeholder="ผู้เล่น" value="ผู้เล่น" autocomplete="nickname">
-      <details class="avatar-customizer" id="avatarCustomizer">
-        <summary>🎨 สร้างตัวละครจากโมเดล V4 <span class="customizer-hint">สีผิว · ทรงผม · เสื้อผ้า</span></summary>
-        <div id="avatarFields" class="avatar-editor" aria-label="ปรับแต่งตัวละคร 2 มิติ"></div>
-      </details>
-      <div class="server-title"><strong>🌐 เลือกเซิร์ฟเวอร์ชุมชน</strong><button id="refreshRooms" class="mini">↻ รีเฟรช</button></div>
-      <div id="serverList" class="server-list" aria-live="polite"></div>
-      <div id="connectionHint" class="hint">โหมดทดลองเล่นในเครื่องพร้อมใช้งาน • ออนไลน์ต้องตั้งค่า Firebase Web App ก่อน</div>
-      <button id="joinOnline" class="primary">🌍 เข้าชุมชนออนไลน์</button>
-      <button id="playDemo" class="secondary">🎮 ทดลองเล่นคนเดียว (เซฟในเครื่อง)</button>
-      <details class="account"><summary>🔐 บัญชีออนไลน์และเซฟข้ามเครื่อง</summary>
-        <p>หากต้องการเล่นข้ามเครื่อง ใช้บัญชีอีเมลและรหัสผ่านจาก Firebase (ต้องตั้งค่า Web API key, Authentication และ Database Rules)</p>
-        <input id="email" type="email" placeholder="อีเมล" autocomplete="email"><input id="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)" autocomplete="current-password" minlength="6">
-        <div class="account-actions"><button id="loginAccount" class="mini" type="button">เข้าสู่ระบบ</button><button id="signupAccount" class="mini" type="button">สมัครบัญชี</button></div>
-        <button id="guestAccount" type="button" class="mini ghost">ลองเข้าด้วยบัญชีชั่วคราว</button>
-        <p class="warning">บัญชีชั่วคราวอาจเรียกคืนไม่ได้หากล้างข้อมูลเว็บหรือเปลี่ยนเครื่อง ควรใช้บัญชีถาวรหากต้องการเก็บบ้านระยะยาว</p>
-      </details>
-      <div id="lobbyError" class="lobby-error" role="status"></div>
+<section id="lobby" class="lobby entry-lobby" aria-label="หน้าเข้าเกม">
+  <div class="entry-shell">
+    <div class="entry-brand">
+      <img src="legacy/assets/images/home.png" width="44" height="44" alt="">
+      <h1>My Little <br>Neighborhood</h1>
+      <p>ปลูกสวน แต่งบ้าน และพบเพื่อนบ้านในชุมชนของคุณ</p>
+      <div class="entry-landscape" aria-hidden="true"></div>
+    </div>
+    <div class="entry-card">
+      <section id="accountScreen" aria-labelledby="accountTitle">
+        <div class="entry-modes" aria-label="เลือกประเภทบัญชี">
+          <button id="loginMode" type="button" aria-pressed="true">เข้าสู่ระบบ</button>
+          <button id="signupMode" type="button" aria-pressed="false">สมัครสมาชิก</button>
+        </div>
+        <h2 id="accountTitle">เข้าสู่ระบบ</h2>
+        <p class="entry-note" id="accountIntro">ใช้อีเมลเป็นไอดีเพื่อเข้าเล่นต่อจากเซฟเดิม</p>
+        <form id="accountForm">
+          <label for="email">อีเมล (ไอดี)</label>
+          <input id="email" type="email" autocomplete="username" spellcheck="false" placeholder="name@example.com" required>
+          <label for="password">รหัสผ่าน</label>
+          <input id="password" type="password" autocomplete="current-password" required>
+          <div id="confirmField" hidden>
+            <label for="confirmPassword">ยืนยันรหัสผ่าน</label>
+            <input id="confirmPassword" type="password" autocomplete="new-password" disabled>
+          </div>
+          <button id="accountSubmit" class="entry-primary" type="submit">เข้าสู่ระบบ</button>
+        </form>
+        <button id="guestAccount" class="entry-text" type="button">เข้าด้วยบัญชีชั่วคราว</button>
+      </section>
+      <section id="serverScreen" aria-labelledby="serverTitle" hidden>
+        <div class="entry-session"><span id="accountIdentity"></span><button id="logoutAccount" class="entry-text" type="button">ออกจากระบบ</button></div>
+        <h2 id="serverTitle" tabindex="-1">เลือกเซิร์ฟเวอร์</h2>
+        <p class="entry-note">เลือกชุมชนเพื่อเข้าเกม เซฟออนไลน์ติดตามบัญชีของคุณ</p>
+        <div class="entry-server-heading"><strong>ชุมชนออนไลน์</strong><button id="refreshRooms" class="entry-text" type="button">↻ รีเฟรช</button></div>
+        <div id="serverList" class="server-list" role="group" aria-label="เซิร์ฟเวอร์ชุมชน"></div>
+        <p id="roomsStatus" class="entry-note" role="status"></p>
+        <label for="nickname">ชื่อตัวละคร <small>ใช้เมื่อเริ่มเซฟใหม่</small></label>
+        <input id="nickname" maxlength="18" placeholder="ผู้เล่น" value="ผู้เล่น" autocomplete="nickname">
+        <details class="avatar-customizer" id="avatarCustomizer">
+          <summary>ปรับแต่งตัวละคร</summary>
+          <div id="avatarFields" class="avatar-editor" aria-label="ปรับแต่งตัวละคร 2 มิติ"></div>
+        </details>
+        <button id="joinOnline" class="entry-primary" type="button" disabled>เข้าชุมชน 002</button>
+      </section>
+      <p id="lobbyError" class="entry-message" role="status" hidden></p>
+      <button id="playDemo" class="entry-demo" type="button">ทดลองเล่นคนเดียว <small>เซฟในเครื่อง</small></button>
     </div>
   </div>
 </section>
@@ -63,6 +88,6 @@
   </div>
 </section>
 <script src="config.js?v=v5-farm-1"></script>
-<script type="module" src="client.js?v=v5-farm-1"></script>
+<script type="module" src="client.js?v=v5-account-1"></script>
 </body>
 </html>
