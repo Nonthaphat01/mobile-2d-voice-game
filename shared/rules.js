@@ -1,5 +1,6 @@
 /** Game state rules shared by the browser and server. */
 import {changeProduce, gardenerTravelMs, GARDENER_COST, GARDEN_STEP_MS, gradeOf, marketPrice, MAX_MONEY, MAX_PRODUCE, normalizeProduce, rollGrade} from './farming.js?v=v5-farm-1';
+import {advanceNeeds, NEEDS_STEP_MS, normalizeNeeds} from './needs.js?v=v5-hud-1';
 export const MAX_PLAYERS = 8;
 export const PLOT_COUNT = 10;
 export const ROOM_IDS = ['001', '002', '003'];
@@ -99,7 +100,7 @@ function clampCount(value){return Math.max(0,Math.min(99999,Math.floor(Number(va
 export function starter(name='ผู้เล่น') {
   return {
     version:5, displayName:String(name).trim().slice(0,18)||'ผู้เล่น',
-    money:100, level:1,xp:0, appearance:sanitizeAppearance(),
+    money:100, level:1,xp:0, appearance:sanitizeAppearance(), needs:normalizeNeeds(), needsAt:0,
     inventory:{hoe:1,watering_can:1,tomato_seed:3,tomato:0,tomatoGrades:{},furniture:{bed:0,chair:0}},
     home:{furniture:[],plots:Array.from({length:PLOT_COUNT},()=>({crop:null,plantedAt:0,watered:false}))}
   };
@@ -112,6 +113,8 @@ export function sanitizeState(s,name='ผู้เล่น') {
   o.level=Math.max(1,Math.min(99,Number(s.level)||1));
   o.xp=Math.max(0,Math.min(1e7,Number(s.xp)||0));
   o.appearance=sanitizeAppearance(s.appearance);
+  o.needs=normalizeNeeds(s.needs);
+  o.needsAt=Number.isFinite(s.needsAt)?Math.max(0,s.needsAt):0;
   for(const key of ['hoe','watering_can','tomato_seed'])o.inventory[key]=clampCount(s.inventory?.[key]);
   o.inventory.tomatoGrades=normalizeProduce(s.inventory);
   o.inventory.tomato=Object.values(o.inventory.tomatoGrades).reduce((sum,count)=>sum+count,0);
@@ -184,6 +187,20 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
   const plot=Number.isInteger(plotIndex)&&plotIndex>=0&&plotIndex<PLOT_COUNT?s.home.plots[plotIndex]:null;
   let status='';
   switch(action?.type){
+    case 'needsTick':
+      if(now-s.needsAt<NEEDS_STEP_MS-250)return {ok:false,message:''};
+      s.needs=advanceNeeds(s.needs,action.pose);
+      s.needsAt=now;
+      break;
+    case 'eat': {
+      if(s.needs.fullness>=100)return {ok:false,message:'ตัวละครอิ่มแล้ว'};
+      const key=Object.keys(items.tomatoGrades).find(grade=>items.tomatoGrades[grade]>0);
+      if(!key)return {ok:false,message:'ต้องมีมะเขือเทศในกระเป๋า'};
+      changeProduce(items,key,-1);
+      s.needs=normalizeNeeds({...s.needs,fullness:s.needs.fullness+28,happiness:s.needs.happiness+3});
+      status='กินมะเขือเทศแล้ว · ความอิ่มเพิ่มขึ้น';
+      break;
+    }
     case 'plant':
       if(!plot || plot.crop || items.tomato_seed<1)return {ok:false,message:'ต้องมีแปลงว่างและเมล็ดมะเขือเทศ'};
       plot.crop='tomato';plot.plantedAt=now;plot.watered=false;items.tomato_seed--;status='ปลูกมะเขือเทศแล้ว';break;

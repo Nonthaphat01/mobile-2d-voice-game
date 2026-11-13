@@ -3,7 +3,7 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-farm-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-hud-1';
 
 const ROOT='little-neighborhood-v5';
 export class FirebaseGame {
@@ -118,12 +118,13 @@ export class FirebaseGame {
   if(this.marketEnabled){
     const result=await this.market({type:'action',action});
     if(this.slotRef!==slotRef)return;
-    const background=action.type==='gardenerStep';
+    const background=['gardenerStep','needsTick'].includes(action.type)?action.type:false;
     if(!result.ok){
       if(result.message)this.emit({type:'notice',message:result.message});
       return result;
     }
     this.emit({type:'profile',profile:result.profile,notice:result.message,background});
+    if(action.type==='needsTick')return result;
     try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,updatedAt:Date.now()})}
     catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
     return result;
@@ -146,7 +147,9 @@ export class FirebaseGame {
       return failure;
     }
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
-    this.emit({type:'profile',profile,notice:lastResult.message,background:action.type==='gardenerStep'});
+    const background=['gardenerStep','needsTick'].includes(action.type)?action.type:false;
+    this.emit({type:'profile',profile,notice:lastResult.message,background});
+    if(action.type==='needsTick')return lastResult;
     try{
       await update(slotRef,{name:profile.displayName,home:profile.home,updatedAt:Date.now()});
     }catch(e){

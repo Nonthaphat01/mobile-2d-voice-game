@@ -209,7 +209,7 @@ function drawSleeper(c,a,skin,hair,shirt,now,onBed,progress){
  }
  c.restore();
 }
-function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
+function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now,unhappy=false){
  const side=Math.abs(lookX),turn=side*side,direction=Math.sign(lookX)||1;
  const away=smoothstep(.22,.92,-lookY),back=away>.75;
  const profile=bodyProfiles[a.gender];
@@ -255,7 +255,8 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
      if(alpha<=.01)continue;
      c.save();c.globalAlpha*=alpha;
      const ex=gazeX+offset*(1-.7*turn),eyeWidth=1-.37*turn;
-     shapeLine(c,[[ex-2*eyeWidth,-3.4+gazeY],[ex+.6,-4.1+gazeY],[ex+2.1*eyeWidth,-3.4+gazeY]],hair[1],a.gender===0?1.55:1.05);
+     const slope=unhappy?Math.sign(offset)*1.4:0;
+     shapeLine(c,[[ex-2*eyeWidth,-3.4+gazeY+slope],[ex+.6,-4.1+gazeY],[ex+2.1*eyeWidth,-3.4+gazeY-slope]],hair[1],unhappy?1.65:a.gender===0?1.55:1.05);
      if(blink)shapeLine(c,[[ex-1.6*eyeWidth,.3+gazeY],[ex+1.6*eyeWidth,.3+gazeY]],hair[2],1.35);
      else{
        shapeEllipse(c,ex,.2+gazeY,2.1*eyeWidth,2.4,'#fff9ee');
@@ -276,6 +277,7 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now){
    const chewing=motion?.kind==='eat'&&motion.phase>.26;
    const mouthX=gazeX+lookX*2.6,mouthWidth=2-turn*.75;
    if(speaking||chewing)shapeEllipse(c,mouthX,7.5,mouthWidth+Math.abs(Math.sin(now/83)),1.3+Math.abs(Math.sin(now/75))*1.2,'#91485a');
+   else if(unhappy)shapeLine(c,[[mouthX-mouthWidth-1,8.7],[mouthX,6.4],[mouthX+mouthWidth+1,8.7]],'#794751',1.6);
    else shapeLine(c,[[mouthX-mouthWidth,7],[mouthX,8-turn],[mouthX+mouthWidth,7]],'#975d5b',1.25);
    if(a.accessory===1&&side<.8)shapeLine(c,[[gazeX-1,0],[gazeX+1,0]],'#3f5063',1.1);
    c.restore();
@@ -533,7 +535,7 @@ function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1
  drawShirt(c,profile,a,shirt,skin,narrow,walkY<-.65);
  if(!sideOn)drawArm(legOrder[0]);
  drawArm(legOrder[1]);
- drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now);
+ drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now,p.unhappy);
  if(motion)drawHeldProp(c,motion,heldX,heldY,now,lookX);
  else if(p.inMine){
    c.save();c.translate(heldX,heldY);c.rotate(p.swing?Math.sin(now/74)*1.1-.25:.1);

@@ -2,8 +2,8 @@
  * V4->V5 avatar adapter. The model/animation is imported verbatim from the user's V4 game.js.
  * The bridge retains stable actors across Firebase updates and provides an accessible appearance editor.
  */
-import {renderClassicAvatar,V4_APPEARANCE_OPTIONS} from './v4-character.js?v=v5-smooth-1';
-import {sanitizeAppearance} from './shared/rules.js';
+import {renderClassicAvatar,V4_APPEARANCE_OPTIONS} from './v4-character.js?v=v5-hud-1';
+import {sanitizeAppearance} from './shared/rules.js?v=v5-hud-1';
 
 const actors=new Map();
 const STORAGE='v5_v4_appearance';

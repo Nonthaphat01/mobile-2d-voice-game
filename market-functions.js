@@ -2,14 +2,14 @@ import {initializeApp} from 'firebase-admin/app';
 import {getDatabase} from 'firebase-admin/database';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {randomInt} from 'node:crypto';
-import {applyAction, sanitizeState, starter, lots} from './shared/rules.js?v=v5-farm-1';
+import {applyAction, sanitizeState, starter, lots} from './shared/rules.js?v=v5-hud-1';
 import {trade} from './shared/market-trade.js';
 
 initializeApp({databaseURL:'https://gamesurvival-58e92-default-rtdb.asia-southeast1.firebasedatabase.app'});
 const ROOT = 'little-neighborhood-v5';
 const db = getDatabase();
 const game = db.ref(ROOT);
-const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','dismissGardener','gardenerStep']);
+const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','dismissGardener','gardenerStep','needsTick','eat']);
 const nearMarket = player => player.scene==='outside' &&
   Math.hypot(Math.max(1136-player.x,0,player.x-1264),Math.max(588-player.y,0,player.y-699))<=82;
 
@@ -42,6 +42,7 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
   if(data.type==='action'){
     const action={...data.action,slot};
     if(!allowedActions.has(action.type))throw new HttpsError('invalid-argument','คำสั่งไม่ถูกต้อง');
+    if(action.type==='needsTick')action.pose=player.scene==='inside'?player.pose:'stand';
     if(['sell','seed'].includes(action.type)&&!nearMarket(player))return {ok:false,message:'เดินไปที่ตลาดกลางก่อน'};
     const rolls=Array.from({length:2},()=>randomInt(1_000_000)/1_000_000);
     const saved=await profileRef.transaction(current=>{
