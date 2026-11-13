@@ -5,7 +5,7 @@ window.GAME_CONFIG = {
   // Enable after deploying neighborhoodMarket and its database rules.
   onlineMarket: false,
   // Set to the deployed, verified Google Apps Script /exec URL to use the Sheets market.
-  sheetsMarketUrl: '',
+  sheetsMarketUrl: 'https://script.google.com/macros/s/AKfycbyBAWet6aSYzFktKy1utbYRXZkYuzmUlBHkJooTfnJngNGNws_xC91vMDm7DsAjPZicTA/exec',
   firebase: {
     apiKey: 'AIzaSyClJQjbn5LcGB6yfwXjmcD__223vQ3CBq8',
     authDomain: 'gamesurvival-58e92.firebaseapp.com',
