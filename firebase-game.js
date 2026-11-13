@@ -3,7 +3,9 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-hud-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-gardener-1';
+
+const backgroundAction = type => type==='gardenerResume'?'gardenerStep':['gardenerStep','needsTick'].includes(type)?type:false;
 
 const ROOT='little-neighborhood-v5';
 export class FirebaseGame {
@@ -118,7 +120,7 @@ export class FirebaseGame {
   if(this.marketEnabled){
     const result=await this.market({type:'action',action});
     if(this.slotRef!==slotRef)return;
-    const background=['gardenerStep','needsTick'].includes(action.type)?action.type:false;
+    const background=backgroundAction(action.type);
     if(!result.ok){
       if(result.message)this.emit({type:'notice',message:result.message});
       return result;
@@ -147,7 +149,7 @@ export class FirebaseGame {
       return failure;
     }
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
-    const background=['gardenerStep','needsTick'].includes(action.type)?action.type:false;
+    const background=backgroundAction(action.type);
     this.emit({type:'profile',profile,notice:lastResult.message,background});
     if(action.type==='needsTick')return lastResult;
     try{

@@ -1,5 +1,5 @@
 import {gradeOf, marketPrice, changeProduce, MAX_MONEY, MAX_PRODUCE} from './farming.js?v=v5-farm-1';
-import {sanitizeState} from './rules.js?v=v5-hud-1';
+import {sanitizeState} from './rules.js?v=v5-gardener-1';
 
 export const LISTING_DURATION = 86_400_000;
 const MAX_LISTINGS = 80;

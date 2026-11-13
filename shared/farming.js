@@ -1,4 +1,11 @@
-export const GARDENER_COST = 35;
+export const GARDENER_PLANS = Object.freeze({
+  short: {label:'10 นาที',duration:600_000,cost:100},
+  hour: {label:'1 ชั่วโมง',duration:3_600_000,cost:500},
+  day: {label:'24 ชั่วโมง',duration:86_400_000,cost:3000}
+});
+export const GARDENER_HEARTBEAT = 15_000;
+export const GARDENER_OFFLINE_RATE = .8;
+export const gardenerPost = lot => ({x:lot.x+164,y:lot.y+280});
 export const GARDEN_STEP_MS = 4500;
 export const MAX_MONEY = 100_000_000;
 export const MAX_PRODUCE = 99999;

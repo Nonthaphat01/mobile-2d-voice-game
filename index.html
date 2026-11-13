@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="build-mode.css?v=v5-build-room-2">
 <link rel="stylesheet" href="farm-market.css?v=v5-farm-1">
 <link rel="stylesheet" href="lobby.css?v=v5-account-1">
-<link rel="stylesheet" href="game-hud.css?v=v5-hud-1">
+<link rel="stylesheet" href="game-hud.css?v=v5-gardener-1">
 </head>
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
@@ -73,6 +73,7 @@
   </div>
 </header>
 <div id="joystick" class="joystick" hidden><div id="stick" class="stick"></div></div>
+<button id="bagBtn" class="bag-shortcut" type="button" aria-label="เปิดกระเป๋า" title="เปิดกระเป๋า (I)" hidden>🎒</button>
 <button id="nearbyAction" class="nearby-action" type="button" hidden><span id="nearbyIcon" aria-hidden="true"></span><span id="nearbyLabel"></span><kbd>E</kbd></button>
 <section id="chatPanel" class="chat-panel" aria-label="แชทและการแจ้งเตือน" hidden>
   <button id="chatToggle" class="chat-toggle" type="button" aria-expanded="true" aria-controls="chatFeed">แชทและแจ้งเตือน <span id="chatBadge" hidden></span></button>
@@ -97,6 +98,6 @@
   </div>
 </section>
 <script src="config.js?v=v5-farm-1"></script>
-<script type="module" src="client.js?v=v5-hud-1"></script>
+<script type="module" src="client.js?v=v5-gardener-1"></script>
 </body>
 </html>

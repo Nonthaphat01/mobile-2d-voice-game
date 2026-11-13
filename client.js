@@ -1,9 +1,9 @@
-import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS,HOME_GRID,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=v5-hud-1';
+import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS,HOME_GRID,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=v5-gardener-1';
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-hud-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-build-room-2';
-import {GARDENER_COST, MARKET_HOUR_MS, gardenerPosition, gradeOf, marketPrice} from './shared/farming.js?v=v5-farm-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gradeOf,marketPrice} from './shared/farming.js?v=v5-gardener-1';
 import {weatherAt, drawWeather, sway} from './weather.js?v=v5-farm-1';
 import {fatigueOpacity,hungerOffset,LOW_NEED,NEEDS_STEP_MS} from './shared/needs.js?v=v5-hud-1';
 
@@ -18,7 +18,8 @@ let selectedRoom='002',room='002',slot=0,myId='local',ownProfile=starter(),serve
 let me={x:0,y:0,face:1,walking:false,text:'',until:0};
 let joyX=0,joyY=0,joyId=null,sound=false,soundCtx=null,lastStep=0,ambientAt=0;
 let plotReadyTimer,renderedCamera;
-let gardenerPending=false, marketEpoch=-1, weather=weatherAt(Date.now());
+let gardenerPending=false, gardenerRetryAt=0, gardenerResume=false, receiptSeen=0, enteredGardenerPost=false;
+let marketEpoch=-1, weather=weatherAt(Date.now());
 let nextNeedsAt=0, needsPending=false, tiredSince=null, hungrySince=null, unread=0;
 const reducedEffects=matchMedia('(prefers-reduced-motion: reduce)');
 const keys=new Set();
@@ -183,7 +184,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=v5-hud-1');
+   const {FirebaseGame}=await import('./firebase-game.js?v=v5-gardener-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true);
    await adapter.ready();
    return adapter;
@@ -303,12 +304,14 @@ function onJoined(){
  scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
  active=true;nextNeedsAt=Date.now()+NEEDS_STEP_MS;needsPending=false;tiredSince=hungrySince=null;
+ gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;enteredGardenerPost=false;receiptSeen=0;
  el('lobby').hidden=true;
- for(const id of ['hud','joystick','chatPanel'])el(id).hidden=false;
+ for(const id of ['hud','joystick','chatPanel','bagBtn'])el(id).hidden=false;
  el('chatLog').replaceChildren();
  el('chatInput').value='';
  setChatOpen(true);
  hud();if(!online)demoSave();
+ showGardenerReceipt();
 }
 function trackRemote(player,now){
  if(!Number.isFinite(player.x)||!Number.isFinite(player.y))return;
@@ -337,7 +340,12 @@ function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
      appendChat(p.name||'เพื่อนบ้าน',m.text);
    }
  }
- else if(m.type==='profile'){ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();if(!m.background||m.background==='gardenerStep'&&['inventory','garden'].includes(dialogType))drawOpenDialog();if(m.notice)notice(m.notice)}
+ else if(m.type==='profile'){
+   ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();
+   if(!m.background||m.background==='gardenerStep'&&['inventory','garden'].includes(dialogType))drawOpenDialog();
+   if(m.notice)notice(m.notice);
+   showGardenerReceipt();
+ }
  else if(m.type==='homeUpdate'){const p=remote.get(m.id);if(p)p.home=m.home}
  else if(m.type==='notice'){notice(m.message)}
  else if(m.type==='kicked'){leaveGame(m.message)}
@@ -352,11 +360,13 @@ function action(a){if(['plant','water','harvest'].includes(a?.type)){
  const next=sanitizeState(ownProfile);
  const result=applyAction(next,a);
  if(result.ok){
-   if(!demoSave(next)){notice('บันทึกในเบราว์เซอร์ไม่สำเร็จ');return}
+   if(!demoSave(next)){notice('บันทึกในเบราว์เซอร์ไม่สำเร็จ');return {ok:false}}
    ownProfile=next;hud();
-   if(a.type!=='needsTick'&&(a.type!=='gardenerStep'||['inventory','garden'].includes(dialogType)))drawOpenDialog()
+   if(a.type!=='needsTick'&&(!['gardenerStep','gardenerResume'].includes(a.type)||['inventory','garden'].includes(dialogType)))drawOpenDialog();
+   showGardenerReceipt();
  }
  if(result.message)notice(result.message)
+ return result;
 }
 async function leaveGame(message=''){
  if(!active)return;
@@ -368,7 +378,7 @@ async function leaveGame(message=''){
  remote.clear();
  resetAvatarMotion();
  el('lobby').hidden=false;
- for(const id of ['hud','joystick','chatPanel','nearbyAction'])el(id).hidden=true;
+ for(const id of ['hud','joystick','chatPanel','nearbyAction','bagBtn'])el(id).hidden=true;
  dialogClose();
  keys.clear();
  joyReset();
@@ -385,7 +395,6 @@ async function leaveGame(message=''){
 el('menuBtn').onclick=()=>{
  dialogType=null;
  showDialog('ตั้งค่าเกม',d=>{
-   addButton(d,'🎒 เปิดกระเป๋า',inventory);
    const soundButton=addButton(d,sound?'🔊 เสียง: เปิด':'🔇 เสียง: ปิด',async()=>{
      await toggleSound();
      soundButton.textContent=sound?'🔊 เสียง: เปิด':'🔇 เสียง: ปิด';
@@ -398,6 +407,7 @@ el('menuBtn').onclick=()=>{
    addText(d,'นั่งเก้าอี้เพิ่มความสุข นอนเตียงเพิ่มพลังงาน และกินมะเขือเทศจากกระเป๋าเพิ่มความอิ่ม');
  });
 };
+el('bagBtn').onclick=inventory;
 function addText(parent,t,cls='muted'){const p=document.createElement('p');p.textContent=t;p.className=cls;parent.append(p);return p}
 function addButton(parent,text,fn,disabled=false){
  const b=document.createElement('button');b.type='button';b.className='dialog-action';b.textContent=text;b.disabled=disabled;
@@ -426,7 +436,6 @@ function inventory(){dialogType='inventory';showDialog('🎒 กระเป๋�
  d.append(grid);
  appendProduce(d);
  if(ownProfile.inventory.tomato)addButton(d,'🍅 กินมะเขือเทศ 1 ผล',()=>action({type:'eat'}));
- addButton(d,'คนสวน',gardenDialog);
  addButton(d,'🏡 ดูบ้านและร้านเฟอร์นิเจอร์',()=>homeDialog());
 })}
 const buildPanel = el('buildMode');
@@ -502,7 +511,7 @@ function closeBuild(restoreFocus = true) {
   buildPanel.hidden = true;
   document.body.classList.remove('building');
   keys.clear();
-  if (restoreFocus) el('menuBtn').focus({preventScroll: true});
+  if (restoreFocus) el('bagBtn').focus({preventScroll: true});
 }
 function selectedFurniture() {
   if (buildSelection?.kind !== 'existing') return null;
@@ -692,17 +701,41 @@ function appendProduce(parent, atMarket=false){
 }
 function gardenDialog(){
  dialogType='garden';
- showDialog('คนสวน',d=>{
+ showDialog('จุดจ้างคนสวน',d=>{
    const worker=ownProfile.home.gardener;
    if(worker){
      const labels={garden:'กำลังดูแลสวน',outbound:'กำลังเดินไปขายที่ตลาดกลาง',return:'กำลังเดินกลับบ้าน'};
      addText(d,labels[worker.phase]);
-     addButton(d,'หยุดจ้างคนสวน',()=>action({type:'dismissGardener'}));
+     const time=addText(d,'');
+     time.id='gardenerTime';
+     updateGardenerTime(Date.now());
    }else{
-     addText(d,'คนสวนใช้เมล็ดในกระเป๋าเพื่อปลูก รดน้ำ เก็บเกี่ยว และเดินไปขายที่ตลาดกลางขณะเปิดเกม');
-     addButton(d,'จ้างคนสวน · '+GARDENER_COST+' บาท',()=>action({type:'hireGardener',slot}),ownProfile.money<GARDENER_COST);
+     addText(d,'คนสวนใช้เมล็ดในกระเป๋าแล้วขายผลผลิตที่ตลาดกลาง เวลาเดินต่อแม้ปิดเกม และรับรายได้ช่วงนั้น 80%');
+     for(const [plan,{label,cost}] of Object.entries(GARDENER_PLANS)){
+       addButton(d,label+' · '+cost.toLocaleString('th-TH')+' บาท',()=>action({type:'hireGardener',slot,plan}),ownProfile.money<cost);
+     }
    }
  });
+}
+function updateGardenerTime(now){
+ const time=el('gardenerTime'),worker=ownProfile.home.gardener;
+ if(!time||!worker||!el('dialog').open)return;
+ const seconds=Math.max(0,Math.ceil((worker.contractUntil-now)/1000));
+ const hours=Math.floor(seconds/3600),minutes=Math.floor(seconds/60)%60;
+ const value='เหลือเวลาจ้าง '+(hours?hours+' ชม. ':'')+minutes+' นาที '+seconds%60+' วินาที';
+ if(time.textContent!==value)time.textContent=value;
+}
+function showGardenerReceipt(){
+ const receipt=ownProfile.home.gardenerReceipt;
+ if(!receipt||receipt.at===receiptSeen)return;
+ receiptSeen=receipt.at;
+ const key='v5_gardener_receipt_'+myId;
+ try{
+   if(Number(localStorage.getItem(key))>=receipt.at)return;
+   localStorage.setItem(key,String(receipt.at));
+ }catch{}
+ const baht=n=>n.toLocaleString('th-TH')+' บาท';
+ notice('คนสวนช่วงออฟไลน์: ยอดขาย '+baht(receipt.gross)+' · หัก '+baht(receipt.gross-receipt.paid)+' · ได้สุทธิ '+baht(receipt.paid)+(receipt.ended?' · หมดเวลาจ้างแล้ว':''));
 }
 function shopDialog(){
  dialogType='shop';
@@ -806,7 +839,8 @@ function nearestInteract(){
    }
  }else{
    const lot=localLot(),door=doorPos(lot);
-   targets.push(point('door',door.x,door.y,95),area('shop',market));
+   const post=gardenerPost(lot);
+   targets.push(point('door',door.x,door.y,95),point('gardener',post.x,post.y,58),area('shop',market));
    for(let plot=0;plot<PLOT_COUNT;plot++)targets.push(area('plot',plotRect(lot,plot),{plot}));
  }
  return targets.reduce((best,target)=>target.distance<=target.reach&&(!best||target.distance<best.distance)?target:best,null);
@@ -818,7 +852,7 @@ function interactionLabel(target){
    if(!p.watered)return ['💧','รดน้ำ'];
    return Date.now()-p.plantedAt>=GROW_MS?['🍅','เก็บเกี่ยว']:['🌿','ดูแปลง'];
  }
- return {stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],
+ return {stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],gardener:['🌾','จ้างคนสวน'],
    shop:['🏪','ตลาดกลาง'],sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
 }
 function updateNearby(){
@@ -842,6 +876,7 @@ function interact(act=nearestInteract()){
  else if(act.type==='door'){scene='inside';me.x=325;me.y=300;notice('เข้าบ้านของคุณแล้ว')}
  else if(act.type==='plot')openPlot(act.plot);
  else if(act.type==='shop')shopDialog();
+ else if(act.type==='gardener')gardenDialog();
 }
 el('nearbyAction').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)interact()};
 async function toggleSound(){
@@ -929,9 +964,10 @@ function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
 function worldDraw(now){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
  for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<PLOT_COUNT;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
+ drawGardenerPost(now);
  for(const [index, player] of lotsUsed){
    const worker=player.home?.gardener;
-   if(!worker||worker.slot!==index)continue;
+   if(!worker||worker.slot!==index||worker.contractUntil&&Date.now()>=worker.contractUntil)continue;
    const p=gardenerPosition(lots[index],worker,Date.now());
    if(p)avatar({...p,id:'gardener-'+index,name:'คนสวน',scene:'outside',pose:'stand',positionInterpolated:true,appearance:{gender:2,skin:2,hair:2,style:0,outfit:3,accessory:1}},now,false);
  }
@@ -939,6 +975,26 @@ function worldDraw(now){road(now);const lotsUsed=new Map([[slot,{name:ownProfile
    if(p.scene==='outside')avatar({...p,...sampleRemoteMotion(p.motion,now),positionInterpolated:true},now,false);
  }
  avatar({...me,name:ownProfile.displayName},now,true)
+}
+function drawGardenerPost(now){
+ const {x,y}=gardenerPost(localLot());
+ const pulse=reducedEffects.matches?0:Math.sin(now/430)*3;
+ ctx.beginPath();
+ ctx.ellipse(x,y,27+pulse,15+pulse/2,0,0,Math.PI*2);
+ ctx.fillStyle='#80e3b24d';ctx.fill();
+ ctx.strokeStyle='#d0f9a9';ctx.lineWidth=2;ctx.stroke();
+ text('🌾',x,y+6,22);
+ text('จ้างคนสวน',x,y+31,12,'#fff2b6');
+}
+function checkGardenerPost(){
+ const post=gardenerPost(localLot());
+ const inside=scene==='outside'&&Math.hypot(me.x-post.x,me.y-post.y)<24;
+ if(inside&&!enteredGardenerPost&&!el('dialog').open&&!buildDraft){
+   keys.clear();
+   joyReset();
+   gardenDialog();
+ }
+ enteredGardenerPost=inside;
 }
 
 function drawBuildGrid() {
@@ -1026,12 +1082,18 @@ function tickNeeds(clock,now){
 }
 function tickGardener(now){
  const worker=ownProfile.home.gardener;
- if(!worker||gardenerPending||now<worker.nextAt||now<tickGardener.retryAt)return;
+ if(!worker||gardenerPending||document.hidden||now<gardenerRetryAt)return;
+ const due=Math.min(worker.nextAt,worker.contractUntil||now,worker.lastSeenAt+GARDENER_HEARTBEAT);
+ if(!gardenerResume&&now<due)return;
  gardenerPending=true;
- tickGardener.retryAt=now+1500;
- const result=action({type:'gardenerStep',slot});
- Promise.resolve(result).finally(()=>{gardenerPending=false});
+ gardenerRetryAt=now+1500;
+ const player=me,resume=gardenerResume;
+ gardenerResume=false;
+ Promise.resolve(action({type:resume?'gardenerResume':'gardenerStep',slot})).then(result=>{
+   if(me===player&&resume&&!result?.ok)gardenerResume=true;
+ }).finally(()=>{if(me===player)gardenerPending=false});
 }
+document.addEventListener('visibilitychange',()=>{if(document.hidden)gardenerResume=true});
 function canMove(x,y){if(scene==='inside')return x>22&&y>55&&x<628&&y<399;
  if(x<22||y<22||x>WORLD.w-22||y>WORLD.h-22)return false;
  const l=localLot(),house=houseRect(l);
@@ -1049,6 +1111,7 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
   const clock=Date.now();
   weather=weatherAt(clock);
   tickGardener(clock);
+  updateGardenerTime(clock);
   tickNeeds(clock,now);
   const period=Math.floor(clock/MARKET_HOUR_MS);
   if(marketEpoch!==period){
@@ -1066,6 +1129,7 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
     if(now-lastStep>210){lastStep=now;playV4Footstep()}
   }
   if(online)publishMovement(now);
+  checkGardenerPost();
   playAmbient(now);
   background(now);
   updateNearby();

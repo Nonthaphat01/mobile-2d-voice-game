@@ -1,15 +1,16 @@
 import {initializeApp} from 'firebase-admin/app';
 import {getDatabase} from 'firebase-admin/database';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
-import {randomInt} from 'node:crypto';
-import {applyAction, sanitizeState, starter, lots} from './shared/rules.js?v=v5-hud-1';
+import {createHmac, randomBytes} from 'node:crypto';
+import {applyAction, sanitizeState, starter, lots} from './shared/rules.js?v=v5-gardener-1';
+import {gardenerPost} from './shared/farming.js?v=v5-gardener-1';
 import {trade} from './shared/market-trade.js';
 
 initializeApp({databaseURL:'https://gamesurvival-58e92-default-rtdb.asia-southeast1.firebasedatabase.app'});
 const ROOT = 'little-neighborhood-v5';
 const db = getDatabase();
 const game = db.ref(ROOT);
-const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','dismissGardener','gardenerStep','needsTick','eat']);
+const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','gardenerStep','gardenerResume','needsTick','eat']);
 const nearMarket = player => player.scene==='outside' &&
   Math.hypot(Math.max(1136-player.x,0,player.x-1264),Math.max(588-player.y,0,player.y-699))<=82;
 
@@ -44,12 +45,17 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
     if(!allowedActions.has(action.type))throw new HttpsError('invalid-argument','คำสั่งไม่ถูกต้อง');
     if(action.type==='needsTick')action.pose=player.scene==='inside'?player.pose:'stand';
     if(['sell','seed'].includes(action.type)&&!nearMarket(player))return {ok:false,message:'เดินไปที่ตลาดกลางก่อน'};
-    const rolls=Array.from({length:2},()=>randomInt(1_000_000)/1_000_000);
+    if(action.type==='hireGardener'){
+      const post=gardenerPost(lots[slot]);
+      if(player.scene!=='outside'||Math.hypot(player.x-post.x,player.y-post.y)>75)
+        return {ok:false,message:'เดินไปที่จุดจ้างคนสวนหน้าบ้านก่อน'};
+    }
+    const seed=randomBytes(32);
     const saved=await profileRef.transaction(current=>{
       if(!current)return null;
       const state=sanitizeState(current);
       let cursor=0;
-      result=applyAction(state,action,now,()=>rolls[cursor++]);
+      result=applyAction(state,action,now,()=>createHmac('sha256',seed).update(String(cursor++)).digest().readUInt32BE()/0x100000000);
       return result.ok?state:undefined;
     },undefined,false);
     return saved.committed&&saved.snapshot.exists()?{...result,profile:sanitizeState(saved.snapshot.val())}:{...result,ok:false};
