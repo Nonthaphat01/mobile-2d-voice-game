@@ -2,6 +2,8 @@
 // Web API key is a public client identifier, not a server secret.
 // Never put service account keys, Admin SDK credentials, or service-role keys here.
 window.GAME_CONFIG = {
+  // Enable after deploying neighborhoodMarket and its database rules.
+  onlineMarket: false,
   firebase: {
     apiKey: 'AIzaSyClJQjbn5LcGB6yfwXjmcD__223vQ3CBq8',
     authDomain: 'gamesurvival-58e92.firebaseapp.com',

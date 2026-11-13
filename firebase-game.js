@@ -1,20 +1,23 @@
-/** Firebase Realtime Database V5 multiplayer adapter. Client-trusted prototype, not a fraud-resistant game server. */
+/** Firebase multiplayer and optional server-managed market adapter. */
 import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-build-mode-1';
+import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-farm-1';
 
 const ROOT='little-neighborhood-v5';
 export class FirebaseGame {
- constructor(config,emit){
+ constructor(config,emit,marketEnabled=false){
   this.config=config;this.emit=emit;this.app=null;this.auth=null;this.db=null;this.uid='';this.room='';this.slot=-1;
   this.slotRef=null;this.unsubscribe=null;this.unsubConnected=null;this.profile=null;this.lastChat=0;this.ended=false;
   this.profileWrites=Promise.resolve();
+  this.marketEnabled=marketEnabled;
  }
  async ready(){
   if(this.app)return;
   this.app=getApps().find(a=>a.name==='neighborhood-v5')||initializeApp(this.config,'neighborhood-v5');
   this.auth=getAuth(this.app);this.db=getDatabase(this.app,this.config.databaseURL);
+  if(this.marketEnabled)this.marketCall=httpsCallable(getFunctions(this.app,'asia-southeast1'),'neighborhoodMarket');
   await new Promise((resolve,reject)=>{const unsub=onAuthStateChanged(this.auth,()=>{unsub();resolve()},reject)});
  }
  async login(mode,email,password){
@@ -35,6 +38,7 @@ export class FirebaseGame {
  }
  async loadProfile(name){
   const uid=this.currentUser()?.uid;if(!uid)throw Error('กรุณาเข้าสู่ระบบก่อน');
+  if(this.marketEnabled)return (await this.marketCall({type:'load',name})).data.profile;
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   // Atomic first-create: existing save is never replaced by starter money.
   const result=await runTransaction(profileRef,previous=>previous==null?starter(name):undefined,{applyLocally:false});
@@ -68,6 +72,11 @@ export class FirebaseGame {
     await onDisconnect(slotRef).remove();
     this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.profile=profile;this.ended=false;
     this.profileWrites=Promise.resolve();
+    if(this.marketEnabled)this.unsubProfile=onValue(ref(this.db,`${ROOT}/profiles/${uid}`),snapshot=>{
+      if(this.slotRef!==slotRef||!snapshot.exists())return;
+      this.profile=sanitizeState(snapshot.val());
+      this.emit({type:'profile',profile:this.profile,background:true});
+    });
     this.unsubscribe=onValue(slotsRef,snap=>{
       const v=snap.val()||{};const players=Object.values(v).filter(p=>p&&p.uid!==uid).map(p=>({id:p.uid,...p}));
       this.emit({type:'players',players});
@@ -101,6 +110,19 @@ export class FirebaseGame {
   const uid=this.uid;
   if(!uid||this.ended)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
   const slotRef=this.slotRef;
+  if(this.marketEnabled){
+    const result=await this.market({type:'action',action});
+    if(this.slotRef!==slotRef)return;
+    const background=action.type==='gardenerStep';
+    if(!result.ok){
+      if(result.message)this.emit({type:'notice',message:result.message});
+      return result;
+    }
+    this.emit({type:'profile',profile:result.profile,notice:result.message,background});
+    try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,updatedAt:Date.now()})}
+    catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
+    return result;
+  }
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
   try{
@@ -115,11 +137,11 @@ export class FirebaseGame {
     if(this.slotRef!==slotRef)return;
     if(!result.committed||!result.snapshot.exists()){
       const failure={ok:false,message:lastResult.ok?'บันทึกข้อมูลไม่สำเร็จ':lastResult.message};
-      this.emit({type:'notice',message:failure.message});
+      if(failure.message)this.emit({type:'notice',message:failure.message});
       return failure;
     }
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
-    this.emit({type:'profile',profile,notice:lastResult.message});
+    this.emit({type:'profile',profile,notice:lastResult.message,background:action.type==='gardenerStep'});
     try{
       await update(slotRef,{name:profile.displayName,home:profile.home,updatedAt:Date.now()});
     }catch(e){
@@ -137,15 +159,27 @@ export class FirebaseGame {
   const slotRef=this.slotRef;
   const appearance=sanitizeAppearance(value);
   const profileRef=ref(this.db,`${ROOT}/profiles/${this.uid}`);
-  await update(profileRef,{appearance});
+  if(this.marketEnabled){
+    const result=await this.market({type:'action',action:{type:'appearance',appearance}});
+    if(!result.ok)return;
+  }else await update(profileRef,{appearance});
   if(this.slotRef!==slotRef)return;
   this.profile={...this.profile,appearance};
   this.emit({type:'profile',profile:this.profile,notice:'🎨 บันทึกตัวละครเดิมจาก V4 ลง Firebase แล้ว'});
   await update(slotRef,{appearance,updatedAt:Date.now()});
  }
+ async market(request){
+  if(!this.marketCall||!this.slotRef||this.ended)return {ok:false,message:'ร้านออนไลน์ยังไม่เปิดให้บริการ'};
+  try{
+    return (await this.marketCall({...request,room:this.room,slot:this.slot})).data;
+  }catch(error){
+    return {ok:false,message:error.code==='functions/internal'||error.code==='functions/unavailable'
+      ?'ติดต่อร้านออนไลน์ไม่สำเร็จ ลองใหม่อีกครั้ง':error.message};
+  }
+ }
  async leave(){
   const slot=this.slotRef;this.ended=true;
-  this.unsubscribe?.();this.unsubConnected?.();this.unsubscribe=null;this.unsubConnected=null;
+  this.unsubscribe?.();this.unsubConnected?.();this.unsubProfile?.();this.unsubscribe=null;this.unsubConnected=null;this.unsubProfile=null;
   this.slotRef=null;this.uid='';this.room='';this.slot=-1;
   if(slot){try{await onDisconnect(slot).cancel()}catch{};try{await remove(slot)}catch{}}
  }

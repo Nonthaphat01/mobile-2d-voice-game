@@ -1,0 +1,9 @@
+{
+  "database": { "rules": "database.market.rules.json" },
+  "functions": {
+    "source": ".",
+    "codebase": "neighborhood",
+    "runtime": "nodejs22",
+    "ignore": [".git", "node_modules", "legacy", "tests", "firebase-debug.log", "firebase-debug.*.log", ".runtimeconfig.json"]
+  }
+}

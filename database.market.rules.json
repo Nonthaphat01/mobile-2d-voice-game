@@ -6,7 +6,7 @@
       "profiles": {
         "$uid": {
           ".read": "auth != null && auth.uid === $uid",
-          ".write": "auth != null && auth.uid === $uid",
+          ".write": false,
           ".validate": "newData.hasChildren(['displayName','money','level','home','inventory']) && newData.child('money').isNumber() && newData.child('money').val() >= 0 && newData.child('money').val() <= 100000000 && newData.child('level').isNumber() && newData.child('level').val() >= 1 && newData.child('level').val() <= 99 && newData.child('displayName').isString() && newData.child('displayName').val().length <= 18"
         }
       },

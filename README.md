@@ -40,3 +40,22 @@ The appearance editor is available at the lobby and in the in-game **☰ menu �
 `v4-textures.js` carries the V4 **procedural** (Canvas-drawn, not downloaded photographic PNG) surface style for grass, roads, wooden interiors, clay roofs and farm soil; it is intentionally adapted to the V5 8-lot neighborhood layout. This preserves the V5 map collision, garden positions, room list and Firebase saving.
 
 **Not yet ported:** V4's separate mine, vehicles, fully simulated city NPCs and events, PeerJS live microphone and the complete V4 city map. Those modules depend on V4 global state and different network/save structures; copying them directly into the V5 client would break gameplay. The current V5 version reuses the V4 visual model and motions, surface textures and step sounds, not every V4 game system. The Firebase cloud security rules still need server-side configuration.
+
+## ตลาดกลาง คนสวน และร้านค้าออนไลน์
+
+- คอมใช้ WASD หรือลูกศร ส่วนจอสัมผัสมีจอยสำหรับเดิน
+- เปิดกระเป๋า → คนสวน เพื่อจ้างในราคา 35 บาท คนสวนใช้เมล็ดและบัวรดน้ำจากกระเป๋า แล้วเดินไปขายที่ตลาดกลางและกลับบ้านระหว่างที่เปิดเกม
+- มะเขือเทศเดิมในเซฟนับเป็นเกรด C มะเขือเทศใหม่สุ่มหนึ่งเกรดต่อการเก็บเกี่ยว 3 ผล ราคาตลาดกลางเปลี่ยนทุก 10 นาที อิงราคา 7 บาท/ผลและตัวคูณเกรด
+- โอกาส C 68% (1×), B 23% (1.5×), A 7% (5×), S 1.8% (10–50×), SS 0.2% (100–999×)
+- ร้านค้าออนไลน์ที่ตลาดกลางใช้เงินในเกม ประกาศล็อกราคาต่อผลตามราคาตลาดตอนลงขาย และผู้ขายเก็บผลผลิตคืนได้รวมถึงหลังครบ 24 ชั่วโมง
+
+### เปิดร้านค้าออนไลน์ใน Firebase
+
+ทดสอบ callable function `neighborhoodMarket` บน Emulator หรือโปรเจกต์ทดสอบก่อนเปิดร้านในโปรเจกต์จริง ฟังก์ชันอยู่ในภูมิภาค `asia-southeast1` และต้องใช้โปรเจกต์บนแผน Blaze
+
+1. ตรวจว่ากำหนด URL ฐานข้อมูลใน `market-functions.js` ตรงกับโปรเจกต์ที่จะเผยแพร่ รวมกฎของส่วนอื่นในโปรเจกต์จาก Firebase Console เข้ากับ `database.market.rules.json` ก่อนเผยแพร่กฎทั้งชุด
+2. ติดตั้งแพ็กเกจด้วย `npm install` แล้วเผยแพร่ด้วย `npx -y firebase-tools@latest deploy --only functions:neighborhood,database --project gamesurvival-58e92`
+3. ตั้ง `window.GAME_CONFIG.onlineMarket = true` ใน `config.js` แล้วเผยแพร่ไฟล์เกมใหม่ ให้ผู้เล่นโหลดหน้าเกมใหม่ กฎสำหรับตลาดจะให้เซิร์ฟเวอร์เป็นผู้เขียนเซฟและรายการขาย
+4. ทดสอบด้วยสองบัญชีและผลผลิตทดสอบ ตรวจว่าผู้ขายได้รับเงิน ผู้ซื้อได้รับของ และกดซื้อซ้ำไม่ได้
+
+ขณะที่ยังไม่เปิดร้านออนไลน์ ตลาดกลางและคนสวนทำงานผ่านระบบเซฟเดิมได้

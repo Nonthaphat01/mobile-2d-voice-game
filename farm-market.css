@@ -1,0 +1,16 @@
+@media (hover: hover) and (pointer: fine) {
+  #joystick { display: none; }
+}
+.produce-list { display: grid; gap: 6px; max-height: 38dvh; overflow: auto; }
+.produce-row { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
+.produce-row .dialog-action { width: auto; margin: 0; }
+.produce-grade { font-weight: 800; }
+.produce-grade.ss {
+  color: #f7b8ff;
+  background: linear-gradient(95deg,#ffadb6,#ffe58d,#9fe8b5,#a6dcff,#e3aaff);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.market-listing-form { display:grid; grid-template-columns:minmax(0,1fr) 4.5em; gap:6px; }
+.market-listing-form :is(select,input) { min-width:0; border:1px solid #719b93; border-radius:8px; padding:8px; background:#173b3a; color:white; }
+.market-listing-form button { grid-column:1/-1; }
