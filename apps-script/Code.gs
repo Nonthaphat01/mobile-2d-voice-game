@@ -561,21 +561,27 @@ function lookupPlayer_(config, token) {
 function openFirebase_(config) {
   const url=config.FIREBASE_DATABASE_URL+'/'+MARKET_ROOT+'.json';
   const oauth=ScriptApp.getOAuthToken();
+  const responseEtag=response=>{
+    const value=Object.entries(response.getAllHeaders()).find(([key])=>key.toLowerCase()==='etag')?.[1];
+    return Array.isArray(value)?value[0]:value;
+  };
   function read(headers={}) {
     const response=UrlFetchApp.fetch(url+'?format=export',{
-      headers:{Authorization:'Bearer '+oauth,...headers},muteHttpExceptions:true
+      headers:{Authorization:'Bearer '+oauth,'Cache-Control':'no-cache',...headers},muteHttpExceptions:true
     });
     if(response.getResponseCode()!==200)throw Error('อ่านฐานข้อมูลตลาดไม่สำเร็จ');
-    const etag=Object.entries(response.getAllHeaders()).find(([key])=>key.toLowerCase()==='etag')?.[1];
-    return {root:JSON.parse(response.getContentText())||{},etag};
+    return {root:JSON.parse(response.getContentText())||{},etag:responseEtag(response)};
   }
   function put(root,etag) {
     if(!etag)throw Error('ฐานข้อมูลไม่ได้ส่งรหัสรุ่นสำหรับบันทึก');
-    const response=UrlFetchApp.fetch(url,{
+    const response=UrlFetchApp.fetch(url+'?format=export',{
       method:'put',contentType:'application/json',payload:JSON.stringify(root),
-      headers:{Authorization:'Bearer '+oauth,'If-Match':etag},muteHttpExceptions:true
+      headers:{Authorization:'Bearer '+oauth,'If-Match':etag,'X-Firebase-ETag':'true'},muteHttpExceptions:true
     });
-    if(response.getResponseCode()===412)return false;
+    if(response.getResponseCode()===412){
+      const newest=responseEtag(response);
+      return newest?{root:JSON.parse(response.getContentText())||{},etag:newest}:false;
+    }
     if(response.getResponseCode()!==200)throw Error('บันทึกการซื้อขายไม่สำเร็จ');
     return true;
   }
@@ -591,8 +597,9 @@ function nearMarket_(root,uid,room,slot) {
 
 function marketOperation_(database,uid,request,now) {
   const {type,room,slot}=request;
-  for(let attempt=0;attempt<6;attempt++){
-    const {root,etag}=database.read(type==='browse'?{}:{'X-Firebase-ETag':'true'});
+  let latest;
+  for(let attempt=0;attempt<12;attempt++){
+    const {root,etag}=latest||database.read(type==='browse'?{}:{'X-Firebase-ETag':'true'});
     if(!nearMarket_(root,uid,room,slot))return failure('เดินไปที่ตลาดกลางก่อน');
     const profile=root.profiles?.[uid];
     if(!profile)return failure('ไม่พบเซฟผู้เล่น');
@@ -609,7 +616,8 @@ function marketOperation_(database,uid,request,now) {
     if(!result.ok)return result;
     root.marketListings={...root.marketListings,...marketState.marketListings};
     if(type==='buy'||type==='cancel')delete root.marketListings[request.id];
-    if(database.put(root,etag))return {...result,profile:root.profiles[uid]};
+    latest=database.put(root,etag);
+    if(latest===true)return {...result,profile:root.profiles[uid]};
   }
   return failure('ตลาดมีการเปลี่ยนแปลงพร้อมกัน กรุณาลองอีกครั้ง');
 }
