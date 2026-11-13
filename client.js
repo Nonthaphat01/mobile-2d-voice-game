@@ -2,6 +2,7 @@ import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,applyAction,lots,W
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-smooth-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
+import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-build-room-2';
 
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
@@ -18,10 +19,12 @@ const keys=new Set();
 const demoKey='my_little_neighborhood_v5_demo';
 const onlineReady=Boolean(cfg.firebase?.apiKey&&cfg.firebase?.databaseURL&&cfg.firebase?.projectId);
 const localNotice='โหมดทดลองเล่นคนเดียว • เซฟในเบราว์เซอร์นี้เท่านั้น';
-function resize(){w=innerWidth;h=innerHeight;dpr=Math.min(devicePixelRatio||1,2);c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}
+let buildCamera;
+function resize(){w=innerWidth;h=innerHeight;dpr=Math.min(devicePixelRatio||1,2);c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);buildCamera=null}
 addEventListener('resize',resize);resize();
 function notice(msg){
  const message=String(msg).slice(0,160);
+ if(buildDraft){el('buildStatus').textContent=message;return}
  if(el('dialog').open){el('dialogStatus').textContent=message;return}
  const t=el('toast');t.textContent=message;t.hidden=false;clearTimeout(notice.timer);notice.timer=setTimeout(()=>{t.hidden=true},3500)
 }
@@ -34,7 +37,7 @@ function renderRooms(){const list=el('serverList');list.replaceChildren();for(co
  const count=document.createElement('span');count.className='count';count.textContent=r?`${r.count}/${r.capacity}`:'—/8';btn.disabled=Boolean(r?.count>=MAX_PLAYERS);btn.append(icon,body,count);btn.onclick=()=>{selectedRoom=id;renderRooms()};list.append(btn)} }
 async function firebaseClient(){
  if(!onlineReady)throw Error('ยังขาด Firebase Web API key ใน config.js');
- if(!fbGame){const {FirebaseGame}=await import('./firebase-game.js?v=v5-gameplay-1');fbGame=new FirebaseGame(cfg.firebase,onNetwork)}
+ if(!fbGame){const {FirebaseGame}=await import('./firebase-game.js?v=v5-build-room-2');fbGame=new FirebaseGame(cfg.firebase,onNetwork)}
  await fbGame.ready();return fbGame;
 }
 async function refreshRooms(){
@@ -72,7 +75,11 @@ async function joinOnline(){
 }
 el('joinOnline').onclick=joinOnline;
 function demoData(){try{const d=JSON.parse(localStorage.getItem(demoKey)||'null');if(d&&d.profile)return sanitizeState(d.profile)}catch{}return starter(el('nickname').value)}
-function demoSave(){if(!online)try{localStorage.setItem(demoKey,JSON.stringify({profile:ownProfile,savedAt:Date.now()}))}catch{}}
+function demoSave(profile=ownProfile){
+ if(online)return false;
+ try{localStorage.setItem(demoKey,JSON.stringify({profile,savedAt:Date.now()}));return true}
+ catch{return false}
+}
 function applyAvatarAppearance(look){
   const appearance=getChosenAppearance();
   if(active){
@@ -118,7 +125,7 @@ function action(a){if(['plant','water','harvest'].includes(a?.type)){
  if(result.ok){demoSave();hud();drawOpenDialog()}
  notice(result.message)
 }
-function leaveGame(){active=false;online=false;fbGame?.leave();remote.clear();resetAvatarMotion();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
+function leaveGame(){closeBuild(false);active=false;online=false;fbGame?.leave();remote.clear();resetAvatarMotion();el('lobby').hidden=false;for(const id of ['hud','gameHelp','joystick','gameActions','chatForm'])el(id).hidden=true;dialogClose();joyReset();refreshRooms()}
 el('menuBtn').onclick=()=>{dialogType=null;showDialog('เมนูเกม',d=>{addButton(d,'🎨 แต่งตัวละคร V4',()=>showDialog('🎨 แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));addButton(d,'↩️ กลับหน้าเลือกเซิร์ฟเวอร์',()=>leaveGame());addText(d,online?'บ้านและเงินบันทึกไว้ใน Firebase Realtime Database แล้ว':'ข้อมูลทดลองบันทึกในเบราว์เซอร์เครื่องนี้')})};
 function addText(parent,t,cls='muted'){const p=document.createElement('p');p.textContent=t;p.className=cls;parent.append(p);return p}
 function addButton(parent,text,fn,disabled=false){
@@ -135,7 +142,7 @@ function dialogClose(){el('dialog').close?.()}
 el('dialogClose').onclick=dialogClose;el('dialog').addEventListener('click',e=>{if(e.target===el('dialog'))dialogClose()});
 el('dialog').addEventListener('close',()=>clearTimeout(plotReadyTimer));
 let dialogType=null,dialogPlot=-1,buildDraft=null,buildSelection=null;
-function drawOpenDialog(){if(!el('dialog').open)return;if(dialogType==='inventory')inventory();else if(dialogType==='plot')openPlot(dialogPlot);else if(dialogType==='house')homeDialog();else if(dialogType==='shop')shopDialog();else if(dialogType==='build')renderBuildDialog()}
+function drawOpenDialog(){if(!el('dialog').open)return;if(dialogType==='inventory')inventory();else if(dialogType==='plot')openPlot(dialogPlot);else if(dialogType==='house')homeDialog();else if(dialogType==='shop')shopDialog()}
 
 function furnitureLabel(type){const item=FURNITURE_TYPES[type];return item?item.emoji+' '+item.label:type}
 function cloneFurniture(list){return JSON.parse(JSON.stringify(Array.isArray(list)?list:[]))}
@@ -147,55 +154,222 @@ function inventory(){dialogType='inventory';showDialog('🎒 กระเป๋�
  for(const type of Object.keys(FURNITURE_TYPES)){const r=document.createElement('div');r.className='dialog-row';r.textContent=furnitureLabel(type)+' ในคลัง × '+(ownProfile.inventory.furniture?.[type]||0);grid.append(r)}
  d.append(grid);addButton(d,'🏡 ดูบ้านและร้านเฟอร์นิเจอร์',()=>homeDialog());
 })}
-function buildHome(){dialogType='build';buildDraft={furniture:cloneFurniture(ownProfile.home.furniture),inventory:furnitureInventory()};buildSelection=null;renderBuildDialog()}
-function buildTileClick(col,row){
- if(!buildSelection){notice('เลือกเฟอร์นิเจอร์จากคลัง หรือแตะของที่วางแล้วก่อน');return}
- if(buildSelection.kind==='new'){
-   const candidate={id:'f-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),type:buildSelection.type,col,row,rotation:buildSelection.rotation};
-   if(!isValidFurniturePlacement(candidate,buildDraft.furniture)){notice('ช่องนี้วางไม่ได้: ชนของเดิมหรืออยู่นอกพื้นบ้าน');return}
-   buildDraft.furniture.push(candidate);buildDraft.inventory[candidate.type]--;renderBuildDialog();return
- }
- const index=buildDraft.furniture.findIndex(item=>item.id===buildSelection.id);
- if(index<0){buildSelection=null;renderBuildDialog();return}
- const current=buildDraft.furniture[index];const candidate={...current,col,row};
- if(!isValidFurniturePlacement(candidate,buildDraft.furniture,current.id)){notice('ช่องนี้วางไม่ได้: ชนของเดิมหรืออยู่นอกพื้นบ้าน');return}
- buildDraft.furniture[index]=candidate;renderBuildDialog()
+const buildPanel = el('buildMode');
+const buildFloor = el('buildFloor');
+const buildTiles = [];
+const stockButtons = new Map();
+let hoverTile, savingBuild = false;
+let focusedTile = 0;
+
+for (let row = 0; row < HOME_GRID.rows; row++) {
+  for (let col = 0; col < HOME_GRID.cols; col++) {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'build-tile';
+    tile.tabIndex = -1;
+    const index = buildTiles.length;
+    tile.onfocus = () => {
+      buildTiles[focusedTile].tabIndex = -1;
+      focusedTile = index;
+      tile.tabIndex = 0;
+      hoverTile = {col, row};
+    };
+    tile.onpointerenter = () => { hoverTile = {col, row}; };
+    tile.onclick = () => buildTileClick(col, row);
+    buildTiles.push(tile);
+    buildFloor.append(tile);
+  }
 }
-function rotateSelected(){
- if(!buildSelection||buildSelection.kind!=='existing'){notice('เลือกของที่วางแล้วก่อนหมุน');return}
- const index=buildDraft.furniture.findIndex(item=>item.id===buildSelection.id);if(index<0)return;
- const current=buildDraft.furniture[index];const candidate={...current,rotation:(current.rotation+90)%360};
- if(!isValidFurniturePlacement(candidate,buildDraft.furniture,current.id)){notice('หมุนไม่ได้: ช่องข้าง ๆ ไม่ว่าง');return}
- buildDraft.furniture[index]=candidate;renderBuildDialog()
+buildFloor.style.gridTemplateColumns = 'repeat(' + HOME_GRID.cols + ', minmax(0,1fr))';
+buildFloor.style.gridTemplateRows = 'repeat(' + HOME_GRID.rows + ', minmax(0,1fr))';
+buildFloor.onpointerleave = () => { hoverTile = null; };
+buildFloor.onkeydown = e => {
+  const steps = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -HOME_GRID.cols, ArrowDown: HOME_GRID.cols};
+  if (!Object.hasOwn(steps, e.key)) return;
+  e.preventDefault();
+  const next = focusedTile + steps[e.key];
+  if (e.key === 'ArrowLeft' && focusedTile % HOME_GRID.cols === 0) return;
+  if (e.key === 'ArrowRight' && focusedTile % HOME_GRID.cols === HOME_GRID.cols - 1) return;
+  buildTiles[next]?.focus();
+};
+for (const type of Object.keys(FURNITURE_TYPES)) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.onclick = () => {
+    buildSelection = {kind: 'new', type, rotation: 0};
+    updateBuildControls();
+  };
+  stockButtons.set(type, button);
+  el('buildStock').append(button);
 }
-function removeSelected(){
- if(!buildSelection||buildSelection.kind!=='existing'){notice('เลือกของที่วางแล้วก่อนเก็บ');return}
- const index=buildDraft.furniture.findIndex(item=>item.id===buildSelection.id);if(index<0)return;
- const [removed]=buildDraft.furniture.splice(index,1);buildDraft.inventory[removed.type]++;buildSelection=null;renderBuildDialog()
+el('buildRotate').onclick = rotateSelected;
+el('buildStore').onclick = removeSelected;
+el('buildCancel').onclick = cancelBuild;
+el('buildSave').onclick = saveBuild;
+new ResizeObserver(() => { buildCamera = null; }).observe(el('buildDock'));
+
+function buildHome() {
+  if (!active || buildDraft) return;
+  buildDraft = {furniture: cloneFurniture(ownProfile.home.furniture), inventory: furnitureInventory()};
+  dialogClose();
+  dialogType = null;
+  keys.clear();
+  joyReset();
+  buildPanel.hidden = false;
+  document.body.classList.add('building');
+  updateBuildControls();
+  el('buildCancel').focus();
 }
-async function saveBuild(){
- const payload={type:'saveHome',furniture:cloneFurniture(buildDraft.furniture),inventoryFurniture:{...buildDraft.inventory}};
- const result=online?await send({type:'action',action:payload}):applyAction(ownProfile,payload);
- if(!result?.ok){notice(result?.message||'บันทึกการจัดบ้านไม่สำเร็จ');return}
- if(!online){demoSave();hud();ownProfile.home.furniture=cloneFurniture(buildDraft.furniture);ownProfile.inventory.furniture={...buildDraft.inventory}}
- buildDraft=null;buildSelection=null;dialogClose();notice('💾 บันทึกการจัดบ้านแล้ว ของที่เหลือยังอยู่ในกระเป๋า')
+function closeBuild(restoreFocus = true) {
+  if (!buildDraft) return;
+  buildDraft = buildSelection = buildCamera = hoverTile = null;
+  savingBuild = false;
+  buildPanel.hidden = true;
+  document.body.classList.remove('building');
+  keys.clear();
+  if (restoreFocus) el('bagBtn').focus({preventScroll: true});
 }
-function cancelBuild(){buildDraft=null;buildSelection=null;dialogClose();notice('ยกเลิกการจัดบ้านแล้ว ของและเงินไม่เปลี่ยน')}
-function renderBuildDialog(){if(!buildDraft)return;dialogType='build';showDialog('🏗️ โหมดสร้างบ้าน',d=>{
- addText(d,'แตะเฟอร์นิเจอร์เพื่อเลือก · เลือกของในคลังแล้วแตะช่องสีเขียวเพื่อวาง · ย้ายโดยแตะช่องใหม่');
- const mode=document.createElement('div');mode.className='build-mode';
- const preview=document.createElement('div');preview.className='build-preview';preview.setAttribute('role','grid');preview.setAttribute('aria-label','ตารางวางเฟอร์นิเจอร์');
- for(let row=0;row<HOME_GRID.rows;row++)for(let col=0;col<HOME_GRID.cols;col++){
-   const tile=document.createElement('button');tile.type='button';tile.className='build-tile';tile.style.gridColumn=String(col+1);tile.style.gridRow=String(row+1);tile.title='ช่อง '+(col+1)+','+(row+1);tile.setAttribute('aria-label','ช่องวาง '+(col+1)+','+(row+1));tile.onclick=()=>buildTileClick(col,row);preview.append(tile)
- }
- for(const item of buildDraft.furniture){
-   const footprint=furnitureFootprint(item);const button=document.createElement('button');button.type='button';button.className='build-item'+(buildSelection?.kind==='existing'&&buildSelection.id===item.id?' selected':'');button.textContent=FURNITURE_TYPES[item.type]?.emoji||'🪑';button.title=furnitureLabel(item.type)+' • หมุน '+item.rotation+'°';button.style.gridColumn=(item.col+1)+' / span '+footprint.w;button.style.gridRow=(item.row+1)+' / span '+footprint.h;button.onclick=e=>{e.stopPropagation();buildSelection={kind:'existing',id:item.id};renderBuildDialog()};preview.append(button)
- }
- mode.append(preview);
- const tray=document.createElement('div');tray.className='build-tray';for(const type of Object.keys(FURNITURE_TYPES)){const button=document.createElement('button');button.type='button';button.className='dialog-action build-stock'+(buildSelection?.kind==='new'&&buildSelection.type===type?' selected':'');button.disabled=!buildDraft.inventory[type];button.textContent=furnitureLabel(type)+' × '+buildDraft.inventory[type];button.onclick=()=>{buildSelection={kind:'new',type,rotation:0};renderBuildDialog()};tray.append(button)}mode.append(tray);
- const status=buildSelection?.kind==='existing'?'เลือก '+furnitureLabel(buildDraft.furniture.find(item=>item.id===buildSelection.id)?.type||'เฟอร์นิเจอร์'):(buildSelection?.kind==='new'?'เลือก '+furnitureLabel(buildSelection.type)+' แล้ว แตะช่องสีเขียว':'ยังไม่ได้เลือกเฟอร์นิเจอร์');addText(mode,status,'build-status');
- const controls=document.createElement('div');controls.className='build-controls';addButton(controls,'↻ หมุน',rotateSelected,!buildSelection||buildSelection.kind!=='existing');addButton(controls,'📦 เก็บเข้าคลัง',removeSelected,!buildSelection||buildSelection.kind!=='existing');addButton(controls,'ยกเลิก',cancelBuild);addButton(controls,'💾 บันทึกการจัดบ้าน',saveBuild);mode.append(controls);d.append(mode)
-})}
+function selectedFurniture() {
+  if (buildSelection?.kind !== 'existing') return null;
+  return buildDraft.furniture.find(item => item.id === buildSelection.id) || null;
+}
+function furnitureAt(col, row) {
+  return buildDraft.furniture.find(item => {
+    const {w, h} = furnitureFootprint(item);
+    return col >= item.col && col < item.col + w && row >= item.row && row < item.row + h;
+  });
+}
+function placementAt(col, row) {
+  const current = selectedFurniture();
+  if (current) return {...current, col, row};
+  if (buildSelection?.kind !== 'new') return null;
+  const {type, rotation} = buildSelection;
+  return {id: '', type, rotation, col, row};
+}
+function buildTileClick(col, row) {
+  if (savingBuild) return;
+  const item = furnitureAt(col, row);
+  if (item && buildSelection?.kind !== 'new') {
+    buildSelection = {kind: 'existing', id: item.id};
+    updateBuildControls();
+    return;
+  }
+  const candidate = placementAt(col, row);
+  if (!candidate) {
+    notice('เลือกของจากกระเป๋า หรือแตะเฟอร์นิเจอร์ที่วางแล้ว');
+    return;
+  }
+  if (!isValidFurniturePlacement(candidate, buildDraft.furniture, candidate.id)) {
+    notice('วางตรงนี้ไม่ได้ เพราะทับของเดิมหรือเลยขอบพื้น');
+    return;
+  }
+  const index = buildDraft.furniture.findIndex(p => p.id === candidate.id);
+  if (index >= 0) {
+    buildDraft.furniture[index] = candidate;
+  } else {
+    if (buildDraft.inventory[candidate.type] < 1) return;
+    candidate.id = 'f-' + crypto.randomUUID();
+    buildDraft.furniture.push(candidate);
+    buildDraft.inventory[candidate.type]--;
+    buildSelection = {kind: 'existing', id: candidate.id};
+  }
+  updateBuildControls();
+}
+function rotateSelected() {
+  const current = selectedFurniture();
+  if (!current) {
+    if (buildSelection?.kind === 'new') {
+      buildSelection.rotation = (buildSelection.rotation + 90) % 360;
+      updateBuildControls();
+    }
+    return;
+  }
+  const candidate = {...current, rotation: (current.rotation + 90) % 360};
+  if (!isValidFurniturePlacement(candidate, buildDraft.furniture, current.id)) {
+    notice('หมุนตรงนี้ไม่ได้ ลองย้ายไปช่องที่มีพื้นที่ว่าง');
+    return;
+  }
+  buildDraft.furniture[buildDraft.furniture.indexOf(current)] = candidate;
+  updateBuildControls();
+}
+function removeSelected() {
+  const current = selectedFurniture();
+  if (!current) return;
+  buildDraft.furniture.splice(buildDraft.furniture.indexOf(current), 1);
+  buildDraft.inventory[current.type]++;
+  buildSelection = null;
+  updateBuildControls();
+}
+async function saveBuild() {
+  if (!buildDraft || savingBuild) return;
+  const draft = buildDraft;
+  const payload = {type: 'saveHome', furniture: draft.furniture, inventoryFurniture: draft.inventory};
+  savingBuild = true;
+  updateBuildControls();
+  let result;
+  if (online) {
+    result = await send({type: 'action', action: payload});
+  } else {
+    const nextProfile = sanitizeState(ownProfile);
+    result = applyAction(nextProfile, payload);
+    if (result.ok && demoSave(nextProfile)) ownProfile = nextProfile;
+    else if (result.ok) result = {ok: false, message: 'บันทึกในเบราว์เซอร์ไม่สำเร็จ ลองอีกครั้ง'};
+  }
+  if (buildDraft !== draft) return;
+  if (!result?.ok) {
+    savingBuild = false;
+    updateBuildControls();
+    notice(result?.message || 'บันทึกการจัดบ้านไม่สำเร็จ ลองอีกครั้ง');
+    el('buildSave').focus();
+    return;
+  }
+  closeBuild();
+  hud();
+  notice(result.message);
+}
+function cancelBuild() {
+  if (!buildDraft || savingBuild) return;
+  closeBuild();
+  notice('ยกเลิกการจัดบ้านแล้ว');
+}
+function updateBuildControls() {
+  const selected = selectedFurniture() || buildSelection;
+  for (const [type, button] of stockButtons) {
+    button.textContent = FURNITURE_TYPES[type].label + ' × ' + buildDraft.inventory[type];
+    button.disabled = savingBuild || buildDraft.inventory[type] === 0;
+    button.setAttribute('aria-pressed', String(buildSelection?.kind === 'new' && buildSelection.type === type));
+  }
+  el('buildRotate').disabled = savingBuild || !selected;
+  el('buildStore').disabled = savingBuild || !selectedFurniture();
+  el('buildSave').disabled = el('buildCancel').disabled = savingBuild;
+  buildFloor.inert = savingBuild;
+  for (const [i, tile] of buildTiles.entries()) {
+    const col = i % HOME_GRID.cols, row = Math.floor(i / HOME_GRID.cols);
+    const item = furnitureAt(col, row);
+    const label = 'ช่อง ' + (col + 1) + ',' + (row + 1);
+    tile.setAttribute('aria-label', item ? label + ' ' + FURNITURE_TYPES[item.type].label : label + ' ว่าง');
+  }
+  buildTiles[focusedTile].tabIndex = 0;
+  notice(savingBuild ? 'กำลังบันทึก…' : selected
+    ? FURNITURE_TYPES[selected.type].label + ' · ' + selected.rotation + '° · แตะช่องว่างเพื่อจัดวาง'
+    : 'เลือกของจากกระเป๋า หรือแตะเฟอร์นิเจอร์บนพื้นห้อง');
+}
+function roomBuildCamera() {
+  if (buildCamera) return buildCamera;
+  const top = el('buildTitle').getBoundingClientRect().bottom + 4;
+  const bottom = el('buildDock').getBoundingClientRect().top - 6;
+  const centerY = (top + bottom) / 2;
+  const zoom = Math.min((w - 12) / 650, Math.max(1, bottom - top) / 430, 1.6);
+  buildCamera = {x: 325, y: 215, zoom, centerY};
+  Object.assign(buildFloor.style, {
+    left: (w / 2 + (HOME_GRID.x - 325) * zoom) + 'px',
+    top: (centerY + (HOME_GRID.y - 215) * zoom) + 'px',
+    width: HOME_GRID.cols * HOME_GRID.tile * zoom + 'px',
+    height: HOME_GRID.rows * HOME_GRID.tile * zoom + 'px'
+  });
+  return buildCamera;
+}
+
 function openPlot(i){if(i<0||i>=PLOT_COUNT)return;dialogType='plot';dialogPlot=i;const p=ownProfile.home.plots[i];const remaining=p.plantedAt+GROW_MS-Date.now();
  showDialog(`🌱 แปลงสวนที่ ${i+1}`,d=>{
  addText(d,p.crop?`ปลูกมะเขือเทศแล้ว${p.watered?' • รดน้ำแล้ว':' • ต้องรดน้ำ'}`:'แปลงว่าง พร้อมปลูกพืช');
@@ -235,7 +409,7 @@ function nearestInteract(){if(scene==='inside'){
   if(me.pose==='sit'||me.pose==='sleep')return {type:'stand'};
   let nearest=null,distance=90;
   ownProfile.home.furniture.forEach(item=>{
-    const r=homeFurnitureRect(item);const tx=r.x+r.w/2,ty=r.y+r.h/2;const gap=Math.hypot(me.x-tx,me.y-ty);
+    const r=furnitureRect(item);const tx=r.x+r.w/2,ty=r.y+r.h/2;const gap=Math.hypot(me.x-tx,me.y-ty);
     if(gap<distance){distance=gap;nearest={type:item.type==='bed'?'sleep':'sit',x:tx,y:ty}}
   });
   return nearest||{type:'exit'}
@@ -275,6 +449,7 @@ function playV4Footstep(){
 function playAmbient(t){if(!sound||!soundCtx||t-ambientAt<1900)return;ambientAt=t;const f=600+Math.sin(t/9000)*130;blip(f,.2,.006,'sine');setTimeout(()=>blip(f*1.15,.13,.003,'sine'),130)}
 el('chatForm').onsubmit=e=>{e.preventDefault();const input=el('chatInput'),t=input.value.trim().slice(0,120);if(!t)return;me.text=t;me.until=Date.now()+5000;if(online)send({type:'say',text:t});input.value='';input.blur();notice('💬 '+t)};
 addEventListener('keydown',e=>{
+ if(buildDraft){if(e.key==='Escape'){e.preventDefault();cancelBuild()}return}
  const tag=document.activeElement?.tagName;if(['INPUT','TEXTAREA','SELECT'].includes(tag))return;
  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)){keys.add(e.key.toLowerCase());if(active)e.preventDefault()}
  if(!active||e.repeat||el('dialog').open)return;
@@ -324,15 +499,49 @@ function worldDraw(now){road();const lotsUsed=new Map([[slot,{name:ownProfile.di
  avatar({...me,name:ownProfile.displayName},now,true)
 }
 
-function homeFurnitureRect(item){const footprint=furnitureFootprint(item);return{x:HOME_GRID.x+item.col*HOME_GRID.tile+4,y:HOME_GRID.y+item.row*HOME_GRID.tile+4,w:footprint.w*HOME_GRID.tile-8,h:footprint.h*HOME_GRID.tile-8}}
-function drawHomeFurniture(item){
- const r=homeFurnitureRect(item);const def=FURNITURE_TYPES[item.type];if(!def)return;
- round(r.x,r.y,r.w,r.h,8,item.type==='bed'?'#806352':'#b27e55');round(r.x+7,r.y+7,r.w-14,r.h-14,5,item.type==='bed'?'#e4f2ee':'#e0ad75');text(def.emoji,r.x+r.w/2,r.y+r.h/2+10,item.type==='bed'?30:27)
- if(item.rotation)text(item.rotation+'°',r.x+r.w-13,r.y+16,9,'#fff4d0')
+function drawBuildGrid() {
+ const {x, y, tile, cols, rows} = HOME_GRID;
+ const selectedId=selectedFurniture()?.id;
+ for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+   const item=furnitureAt(col,row);
+   const selected=item && item.id===selectedId;
+   const tx=x+col*tile+1, ty=y+row*tile+1;
+   round(tx,ty,tile-2,tile-2,4,selected?'#e8e18ba8':item?'#60463664':'#329f6aa3');
+   ctx.strokeStyle=selected?'#ffeaa4':item?'#9b7757':'#b2ffd1';
+   ctx.lineWidth=1.25;
+   ctx.stroke();
+ }
+}
+function drawBuildPreview() {
+ if (!hoverTile || savingBuild) return;
+ const {col,row}=hoverTile;
+ const item=furnitureAt(col,row);
+ if(item && buildSelection?.kind!=='new')return;
+ const candidate=placementAt(col,row);
+ if(!candidate)return;
+ const valid=isValidFurniturePlacement(candidate,buildDraft.furniture,candidate.id);
+ const r=furnitureRect(candidate);
+ ctx.save();
+ ctx.beginPath();
+ ctx.rect(HOME_GRID.x,HOME_GRID.y,HOME_GRID.cols*HOME_GRID.tile,HOME_GRID.rows*HOME_GRID.tile);
+ ctx.clip();
+ round(r.x+1,r.y+1,r.w-2,r.h-2,5,valid?'#bdffc884':'#ef7153b0');
+ ctx.strokeStyle=valid?'#ebffd4':'#ffdad1';
+ ctx.lineWidth=2;
+ ctx.stroke();
+ if(valid){
+   ctx.globalAlpha=.65;
+   drawFurniture(ctx,candidate);
+ }
+ ctx.restore();
 }
 function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430,.87);for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
- text('บ้านของ '+ownProfile.displayName,325,90,22,'#4b443a');if((ownProfile.home.furniture||[]).length===0)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
- for(const item of ownProfile.home.furniture||[])drawHomeFurniture(item);
+ const furniture=buildDraft?.furniture || ownProfile.home.furniture;
+ text('บ้านของ '+ownProfile.displayName,325,90,22,'#4b443a');
+ if(buildDraft)drawBuildGrid();
+ else if(!furniture.length)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
+ for(const item of [...furniture].sort((a,b) => (a.row+furnitureFootprint(a).h)-(b.row+furnitureFootprint(b).h)))drawFurniture(ctx,item);
+ if(buildDraft){drawBuildPreview();return}
  avatar({...me,name:ownProfile.displayName},now,true)
 }
 function avatar(p,now,local){
@@ -341,10 +550,11 @@ function avatar(p,now,local){
   round(x-62,y-65,124,20,9,local?'#fff2cf':'#effff5');text(name,x,y-50,11,'#30454b');
   if(p.text&&p.until>Date.now()){const msg=String(p.text).slice(0,40);round(x-119,y-107,238,31,11,'#fff8e9');text(msg,x,y-86,12,'#304849')}
 }
-function background(now){ctx.fillStyle='#6b985e';ctx.fillRect(0,0,w,h);const camera=scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)};
+function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRect(0,0,w,h);const camera=buildDraft?roomBuildCamera():scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)};
  renderedCamera={...camera,scene,w,h};
- ctx.save();ctx.translate(w/2,h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
- if(scene==='outside')worldDraw(now);else indoors(now);ctx.restore();
+ ctx.save();ctx.translate(w/2,camera.centerY??h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
+ if(scene==='outside'&&!buildDraft)worldDraw(now);else indoors(now);ctx.restore();
+ if(buildDraft)return;
  const minute=(now/1000)%720,night=minute>540||minute<120;
  if(night){ctx.fillStyle='rgba(13,24,54,.25)';ctx.fillRect(0,0,w,h)}
  if(scene==='outside'){const ev=['🌤️ อากาศแจ่มใส','🌧️ ฝนพรำ','🌻 ผลผลิตอุดมสมบูรณ์','🎊 กิจกรรมชุมชน','🍃 ลมเย็นสบาย'][Math.floor(now/84000)%5];round(13,76,230,30,11,'#1e4c3ddc');text(ev,128,97,13,'#efffe9')}
@@ -365,7 +575,7 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
  if(active){
   let dx=joyX+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
   let dy=joyY+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
-  const m=Math.hypot(dx,dy);me.walking=m>.07&&!el('dialog').open;
+  const m=Math.hypot(dx,dy);me.walking=m>.07&&!buildDraft&&!el('dialog').open;
    if(me.walking&&me.pose!=='stand'){me.pose='stand';me.onBed=false}
   if(me.walking){dx/=m;dy/=m;const speed=174;
     if(canMove(me.x+dx*speed*dt,me.y))me.x+=dx*speed*dt;
@@ -394,7 +604,7 @@ function publishMovement(now){
 }
 c.addEventListener('pointerup',e=>{
  const camera=renderedCamera;
- if(!active||el('dialog').open||!camera||camera.scene!==scene||camera.w!==w||camera.h!==h)return;
+ if(!active||buildDraft||el('dialog').open||!camera||camera.scene!==scene||camera.w!==w||camera.h!==h)return;
  const bounds=c.getBoundingClientRect();
  const x=((e.clientX-bounds.left)*w/bounds.width-w/2)/camera.zoom+camera.x;
  const y=((e.clientY-bounds.top)*h/bounds.height-h/2)/camera.zoom+camera.y;
@@ -421,7 +631,3 @@ try{el('nickname').value=localStorage.getItem('v5_nickname')||'ผู้เล�
 el('nickname').addEventListener('input',()=>{try{localStorage.setItem('v5_nickname',el('nickname').value)}catch{}});
 buildAppearanceEditor(el('avatarFields'),applyAvatarAppearance,{lobby:true});
 refreshRooms();setInterval(()=>{if(!active)refreshRooms()},12000);
-
-
-
-

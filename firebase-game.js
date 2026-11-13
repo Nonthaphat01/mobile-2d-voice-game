@@ -99,7 +99,7 @@ export class FirebaseGame {
  }
  async action(action){
   const uid=this.uid;
-  if(!uid||this.ended)return;
+  if(!uid||this.ended)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
   const slotRef=this.slotRef;
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
@@ -113,7 +113,11 @@ export class FirebaseGame {
       return r.ok?state:undefined;
     },{applyLocally:false});
     if(this.slotRef!==slotRef)return;
-    if(!result.committed||!result.snapshot.exists()){this.emit({type:'notice',message:lastResult.message});return lastResult}
+    if(!result.committed||!result.snapshot.exists()){
+      const failure={ok:false,message:lastResult.ok?'บันทึกข้อมูลไม่สำเร็จ':lastResult.message};
+      this.emit({type:'notice',message:failure.message});
+      return failure;
+    }
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
     this.emit({type:'profile',profile,notice:lastResult.message});
     try{
@@ -121,7 +125,12 @@ export class FirebaseGame {
     }catch(e){
       if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ: '+e.message});
     }
-  }catch(e){if(this.slotRef===slotRef)this.emit({type:'error',message:'บันทึกข้อมูลไม่สำเร็จ: '+e.message})}
+    return lastResult;
+  }catch(e){
+    const failure={ok:false,message:'บันทึกข้อมูลไม่สำเร็จ: '+e.message};
+    if(this.slotRef===slotRef)this.emit({type:'error',message:failure.message});
+    return failure;
+  }
  }
  async setAppearance(value){
   if(!this.uid||!this.slotRef||this.ended)return;
@@ -141,7 +150,3 @@ export class FirebaseGame {
   if(slot){try{await onDisconnect(slot).cancel()}catch{};try{await remove(slot)}catch{}}
  }
 }
-
-
-
-
