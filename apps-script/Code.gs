@@ -28,17 +28,17 @@ function hungerOffset(elapsed, fullness) {
 
 
 const GARDENER_PLANS = Object.freeze({
-  short: {label:'10 นาที',duration:600_000,cost:100},
-  hour: {label:'1 ชั่วโมง',duration:3_600_000,cost:500},
-  day: {label:'24 ชั่วโมง',duration:86_400_000,cost:3000}
+  short: {label:'10 นาที',duration:600000,cost:100},
+  hour: {label:'1 ชั่วโมง',duration:3600000,cost:500},
+  day: {label:'24 ชั่วโมง',duration:86400000,cost:3000}
 });
-const GARDENER_HEARTBEAT = 15_000;
+const GARDENER_HEARTBEAT = 15000;
 const GARDENER_OFFLINE_RATE = .8;
 const gardenerPost = lot => ({x:lot.x+164,y:lot.y+280});
 const GARDEN_STEP_MS = 4500;
-const MAX_MONEY = 100_000_000;
+const MAX_MONEY = 100000000;
 const MAX_PRODUCE = 99999;
-const MARKET_HOUR_MS = 600_000;
+const MARKET_HOUR_MS = 600000;
 const GRADES = [
   {name:'C', chance:68, min:100, max:100, color:'#d8e4c3'},
   {name:'B', chance:23, min:150, max:150, color:'#8ce0b2'},
@@ -150,7 +150,7 @@ function gardenerPosition(lot, worker, now) {
 const MAX_PLAYERS = 8;
 const PLOT_COUNT = 10;
 const ROOM_IDS = ['001', '002', '003'];
-const GROW_MS = 60_000;
+const GROW_MS = 60000;
 const WORLD = {w:2400,h:1290};
 const HOME_GRID = Object.freeze({x:36,y:106,cols:12,rows:6,tile:48});
 const FURNITURE_TYPES = Object.freeze({
@@ -471,7 +471,7 @@ function applyAction(s,action,now=Date.now(),random=Math.random) {
 
 
 
-const LISTING_DURATION = 86_400_000;
+const LISTING_DURATION = 86400000;
 const MAX_LISTINGS = 80;
 const MAX_PER_SELLER = 5;
 const fail = message => ({ok:false,message});
@@ -651,7 +651,7 @@ function doPost(event) {
   function json(result){return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON)}
   try {
     const body=event?.postData?.contents;
-    if(!body||body.length>12_000)return json(failure('คำขอร้านค้าไม่ถูกต้อง'));
+    if(!body||body.length>12000)return json(failure('คำขอร้านค้าไม่ถูกต้อง'));
     const {token,request}=JSON.parse(body);
     if(!request||!VALID_ACTIONS.has(request.type))return json(failure('คำขอร้านค้าไม่ถูกต้อง'));
     const config=settings_();
@@ -662,3 +662,4 @@ function doPost(event) {
     return json(failure('ติดต่อร้านค้าไม่สำเร็จ กรุณาลองใหม่'));
   }
 }
+
