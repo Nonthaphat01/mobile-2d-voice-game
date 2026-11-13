@@ -1,15 +1,18 @@
 import {initializeApp} from 'firebase-admin/app';
 import {getDatabase} from 'firebase-admin/database';
+import {getFirestore} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {createHmac, randomBytes} from 'node:crypto';
-import {applyAction, sanitizeState, starter, lots} from './shared/rules.js?v=v5-gardener-1';
+import {applyAction, lots} from './shared/rules.js?v=v5-gardener-1';
 import {gardenerPost} from './shared/farming.js?v=v5-gardener-1';
-import {trade} from './shared/market-trade.js';
+import {firestoreMarket, MARKET_PATH} from './firestore-market.js';
 
 initializeApp({databaseURL:'https://gamesurvival-58e92-default-rtdb.asia-southeast1.firebasedatabase.app'});
 const ROOT = 'little-neighborhood-v5';
 const db = getDatabase();
 const game = db.ref(ROOT);
+const firestore = getFirestore();
+const market = firestoreMarket(firestore,async uid=>(await game.child('profiles').child(uid).get()).val());
 const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','gardenerStep','gardenerResume','needsTick','eat']);
 const nearMarket = player => player.scene==='outside' &&
   Math.hypot(Math.max(1136-player.x,0,player.x-1264),Math.max(588-player.y,0,player.y-699))<=82;
@@ -17,11 +20,11 @@ const nearMarket = player => player.scene==='outside' &&
 export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:4},async request=>{
   const uid=request.auth?.uid;
   if(!uid)throw new HttpsError('unauthenticated','กรุณาเข้าสู่ระบบ');
+  if((await firestore.doc(MARKET_PATH).get()).get('enabled')!==true)
+    throw new HttpsError('failed-precondition','ร้านออนไลน์ยังไม่เปิดให้บริการ');
   const data=request.data || {};
-  const profileRef=game.child('profiles').child(uid);
   if(data.type==='load'){
-    await profileRef.transaction(current=>current ?? starter(String(data.name||'ผู้เล่น')));
-    return {profile:sanitizeState((await profileRef.get()).val())};
+    return {profile:await market.load(uid,String(data.name||'ผู้เล่น'))};
   }
   const {room,slot}=data;
   if(!['001','002','003'].includes(room)||!Number.isInteger(slot)||!lots[slot])
@@ -32,14 +35,9 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
 
   if(data.type==='browse'){
     if(!nearMarket(player))throw new HttpsError('failed-precondition','เดินไปที่ตลาดกลางก่อน');
-    const listings=(await game.child('marketListings').get()).val() || {};
-    const now=Date.now();
-    return {listings:Object.entries(listings).filter(([,row])=>row.expiresAt>now||row.seller===uid)
-      .map(([id,row])=>({id,own:row.seller===uid,name:row.name,key:row.key,quantity:row.quantity,unitPrice:row.unitPrice,expired:row.expiresAt<=now})),
-      profile:sanitizeState((await profileRef.get()).val())};
+    return market.browse(uid,Date.now());
   }
   const now=Date.now();
-  let result={ok:false,message:'ทำรายการไม่สำเร็จ'};
   if(data.type==='action'){
     const action={...data.action,slot};
     if(!allowedActions.has(action.type))throw new HttpsError('invalid-argument','คำสั่งไม่ถูกต้อง');
@@ -51,23 +49,12 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
         return {ok:false,message:'เดินไปที่จุดจ้างคนสวนหน้าบ้านก่อน'};
     }
     const seed=randomBytes(32);
-    const saved=await profileRef.transaction(current=>{
-      if(!current)return null;
-      const state=sanitizeState(current);
+    return market.action(uid,state=>{
       let cursor=0;
-      result=applyAction(state,action,now,()=>createHmac('sha256',seed).update(String(cursor++)).digest().readUInt32BE()/0x100000000);
-      return result.ok?state:undefined;
-    },undefined,false);
-    return saved.committed&&saved.snapshot.exists()?{...result,profile:sanitizeState(saved.snapshot.val())}:{...result,ok:false};
+      return applyAction(state,action,now,()=>createHmac('sha256',seed).update(String(cursor++)).digest().readUInt32BE()/0x100000000);
+    });
   }
   if(!['list','buy','cancel'].includes(data.type))throw new HttpsError('invalid-argument','คำสั่งไม่ถูกต้อง');
   if(!nearMarket(player))return {ok:false,message:'เดินไปที่ตลาดกลางก่อน'};
-  const saved=await game.transaction(current=>{
-    if(!current)return null;
-    const position=current.rooms?.[room]?.slots?.[slot];
-    if(position?.uid!==uid||!nearMarket(position)){result={ok:false,message:'เดินไปที่ตลาดกลางก่อน'};return}
-    result=trade(current,uid,data,now);
-    return result.ok?current:undefined;
-  },undefined,false);
-  return saved.committed&&saved.snapshot.exists()?{...result,profile:sanitizeState(saved.snapshot.child('profiles/'+uid).val())}:{...result,ok:false};
+  return market.transact(uid,data,now);
 });

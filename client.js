@@ -184,7 +184,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=v5-gardener-1');
+   const {FirebaseGame}=await import('./firebase-game.js?v=v5-hoodgame-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true);
    await adapter.ready();
    return adapter;
@@ -762,7 +762,7 @@ async function onlineMarket(){
  });
  if(!online||cfg.onlineMarket!==true)return;
  const panel=el('dialogContent').lastElementChild;
- const response=await fbGame.market({type:'browse'});
+ const response=await fbGame.requestMarket({type:'browse'});
  if(dialogType!=='onlineMarket'||!el('dialog').open||!panel.isConnected)return;
  panel.remove();
  const d=el('dialogContent');
@@ -812,7 +812,7 @@ async function marketRequest(request){
  if(marketBusy)return;
  marketBusy=true;
  try{
-   const result=await fbGame.market(request);
+   const result=await fbGame.requestMarket(request);
    if(!active||!online)return;
    if(result.profile){ownProfile=sanitizeState(result.profile);hud()}
    if(result.ok&&dialogType==='onlineMarket'&&el('dialog').open)await onlineMarket();

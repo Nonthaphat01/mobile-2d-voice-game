@@ -79,11 +79,6 @@ export class FirebaseGame {
     await onDisconnect(slotRef).remove();
     this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.profile=profile;this.ended=false;
     this.profileWrites=Promise.resolve();
-    if(this.marketEnabled)this.unsubProfile=onValue(ref(this.db,`${ROOT}/profiles/${uid}`),snapshot=>{
-      if(this.slotRef!==slotRef||!snapshot.exists())return;
-      this.profile=sanitizeState(snapshot.val());
-      this.emit({type:'profile',profile:this.profile,background:true});
-    });
     this.unsubscribe=onValue(slotsRef,snap=>{
       const v=snap.val()||{};const players=Object.values(v).filter(p=>p&&p.uid!==uid).map(p=>({id:p.uid,...p}));
       this.emit({type:'players',players});
@@ -125,7 +120,8 @@ export class FirebaseGame {
       if(result.message)this.emit({type:'notice',message:result.message});
       return result;
     }
-    this.emit({type:'profile',profile:result.profile,notice:result.message,background});
+    this.profile=result.profile;
+    this.emit({type:'profile',profile:this.profile,notice:result.message,background});
     if(action.type==='needsTick')return result;
     try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,updatedAt:Date.now()})}
     catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
@@ -171,12 +167,29 @@ export class FirebaseGame {
   const profileRef=ref(this.db,`${ROOT}/profiles/${this.uid}`);
   if(this.marketEnabled){
     const result=await this.market({type:'action',action:{type:'appearance',appearance}});
-    if(!result.ok)return;
-  }else await update(profileRef,{appearance});
+    if(!result.ok){this.emit({type:'notice',message:result.message});return}
+    if(this.slotRef!==slotRef)return;
+    this.profile=result.profile;
+  }else{
+    await update(profileRef,{appearance});
+    if(this.slotRef!==slotRef)return;
+    this.profile={...this.profile,appearance};
+  }
   if(this.slotRef!==slotRef)return;
-  this.profile={...this.profile,appearance};
   this.emit({type:'profile',profile:this.profile,notice:'🎨 บันทึกตัวละครเดิมจาก V4 ลง Firebase แล้ว'});
   await update(slotRef,{appearance,updatedAt:Date.now()});
+ }
+ requestMarket(request){
+  const slotRef=this.slotRef;
+  const pending=this.profileWrites.then(async ()=>{
+    if(!slotRef||this.slotRef!==slotRef)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
+    const result=await this.market(request);
+    if(this.slotRef!==slotRef)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
+    if(result.profile)this.profile=result.profile;
+    return result;
+  });
+  this.profileWrites=pending.catch(()=>{});
+  return pending;
  }
  async market(request){
   if(!this.marketCall||!this.slotRef||this.ended)return {ok:false,message:'ร้านออนไลน์ยังไม่เปิดให้บริการ'};
@@ -189,7 +202,7 @@ export class FirebaseGame {
  }
  async leave(){
   const slot=this.slotRef;this.ended=true;
-  this.unsubscribe?.();this.unsubConnected?.();this.unsubProfile?.();this.unsubscribe=null;this.unsubConnected=null;this.unsubProfile=null;
+  this.unsubscribe?.();this.unsubConnected?.();this.unsubscribe=null;this.unsubConnected=null;
   this.slotRef=null;this.uid='';this.room='';this.slot=-1;
   if(slot){try{await onDisconnect(slot).cancel()}catch{};try{await remove(slot)}catch{}}
  }

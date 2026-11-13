@@ -52,11 +52,11 @@ The appearance editor is available at the lobby and in the in-game **☰ menu �
 
 ### เปิดร้านค้าออนไลน์ใน Firebase
 
-ทดสอบ callable function `neighborhoodMarket` บน Emulator หรือโปรเจกต์ทดสอบก่อนเปิดร้านในโปรเจกต์จริง ฟังก์ชันอยู่ในภูมิภาค `asia-southeast1` และต้องใช้โปรเจกต์บนแผน Blaze
+ร้านใช้ Firestore ฐาน `(default)` ในโปรเจกต์ `gamesurvival-58e92` ประกาศอยู่ใต้ `HOODGAME/market/listings` และเซฟออนไลน์อยู่ใต้ `HOODGAME/market/profiles` เมื่อเปิดบริการ เพื่อให้ประกาศ เงิน และกระเป๋าเปลี่ยนในธุรกรรมเดียวกัน ห้อง การเดิน และแชทยังใช้ Realtime Database
 
-1. ตรวจว่ากำหนด URL ฐานข้อมูลใน `market-functions.js` ตรงกับโปรเจกต์ที่จะเผยแพร่ รวมกฎของส่วนอื่นในโปรเจกต์จาก Firebase Console เข้ากับ `database.market.rules.json` ก่อนเผยแพร่กฎทั้งชุด
-2. ติดตั้งแพ็กเกจด้วย `npm install` แล้วเผยแพร่ด้วย `npx -y firebase-tools@latest deploy --only functions:neighborhood,database --project gamesurvival-58e92`
-3. ตั้ง `window.GAME_CONFIG.onlineMarket = true` ใน `config.js` แล้วเผยแพร่ไฟล์เกมใหม่ ให้ผู้เล่นโหลดหน้าเกมใหม่ กฎสำหรับตลาดจะให้เซิร์ฟเวอร์เป็นผู้เขียนเซฟและรายการขาย
-4. ทดสอบด้วยสองบัญชีและผลผลิตทดสอบ ตรวจว่าผู้ขายได้รับเงิน ผู้ซื้อได้รับของ และกดซื้อซ้ำไม่ได้
+1. ทดสอบ callable function `neighborhoodMarket` ใน Emulator หรือโปรเจกต์ทดสอบก่อน ฟังก์ชันใช้ภูมิภาค `asia-southeast1` และการเผยแพร่ต้องใช้แผน Blaze ให้ Firestore ปิดการเข้าถึงจากแอปโดยตรง เนื่องจากฟังก์ชันใช้ Firebase Admin SDK
+2. ติดตั้งแพ็กเกจด้วย `npm install` ตรวจว่าฟังก์ชันและฐานข้อมูลชี้ไปโปรเจกต์ที่ต้องการ แล้วเผยแพร่ฟังก์ชันด้วย `npx -y firebase-tools@latest deploy --only functions:neighborhood --project gamesurvival-58e92`
+3. นัดช่วงเปลี่ยนระบบ ตรวจและรวมกฎ Realtime Database ของโปรเจกต์เข้ากับ `database.market.rules.json` แล้วปิดการเขียนเซฟจากหน้าเกมเดิม จากนั้นตั้งฟิลด์ Boolean `enabled` เป็น `true` ในเอกสาร Firestore `HOODGAME/market` แล้วเปิดสวิตช์ `onlineMarket` ใน `config.js` เซฟจะคัดลอกตาม UID เมื่อเข้าระบบครั้งแรก และการเข้าซ้ำจะใช้เซฟ Firestore เดิม
+4. ทดสอบด้วยสองบัญชีและผลผลิตทดสอบ ตรวจว่าผู้ขายได้รับเงิน ผู้ซื้อได้รับของ กดซื้อซ้ำไม่ได้ และเซฟเดิมกลับมาเมื่อเข้าเล่นอีกครั้ง
 
 ขณะที่ยังไม่เปิดร้านออนไลน์ ตลาดกลางและคนสวนทำงานผ่านระบบเซฟเดิมได้
