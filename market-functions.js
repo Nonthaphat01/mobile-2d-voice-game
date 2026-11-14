@@ -2,6 +2,7 @@ import {initializeApp} from 'firebase-admin/app';
 import {getDatabase} from 'firebase-admin/database';
 import {getFirestore} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
+import {onSchedule} from 'firebase-functions/v2/scheduler';
 import {createHmac, randomBytes} from 'node:crypto';
 import {applyAction, lots} from './shared/rules.js?v=town-1';
 import {gardenerPost,gardenBoxPosition} from './shared/farming.js?v=v5-neighbors-1';
@@ -72,4 +73,59 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
   if(!['list','buy','cancel'].includes(data.type))throw new HttpsError('invalid-argument','คำสั่งไม่ถูกต้อง');
   if(!nearMarket(player))return {ok:false,message:'เดินไปที่ตลาดกลางก่อน'};
   return market.transact(uid,data,now);
+});
+
+
+/**
+ * Secure server-side AFK sweeper (deploy with Firebase CLI).
+ * Session-presence entries are removed by onDisconnect. Only slots created
+ * with presenceMode=session are eligible; older versions keep their original
+ * onDisconnect behavior until they reconnect with the updated client.
+ *
+ * Deletes occupancy ONLY, not player profiles, homes, balances or inventory.
+ */
+export const evictIdlePlayers = onSchedule({
+  schedule: 'every 1 minutes',
+  region: 'asia-southeast1',
+  timeZone: 'Asia/Bangkok',
+  maxInstances: 1
+}, async () => {
+  const now=Date.now(), timeoutMs=30*60*1000;
+  let cleared=0, failures=0;
+  for(const roomId of ['001','002','003']){
+    const roomRef=game.child('rooms').child(roomId);
+    const [slotsSnap,connectionsSnap]=await Promise.all([
+      roomRef.child('slots').get(),
+      roomRef.child('connections').get()
+    ]);
+    const slots=slotsSnap.val()||{},connections=connectionsSnap.val()||{};
+    for(const [slotId,occupied] of Object.entries(slots)){
+      if(!/^[0-7]$/.test(slotId)||!occupied||occupied.presenceMode!=='session')continue;
+      if(typeof occupied.uid!=='string'||typeof occupied.sessionId!=='string')continue;
+      const recent=Number(occupied.lastActivityAt||occupied.updatedAt||0);
+      const expired=recent>0&&now-recent>=timeoutMs;
+      const hadPresence=connections[occupied.uid]?.sessionId===occupied.sessionId;
+      if(!expired&&hadPresence)continue;
+      const slotRef=roomRef.child('slots').child(slotId);
+      try{
+        // Avoid removing a slot taken over by another session, or a player
+        // who interacted after the room snapshot was read.
+        const connectedNow=await roomRef.child('connections').child(occupied.uid).get();
+        const stillConnected=connectedNow.val()?.sessionId===occupied.sessionId;
+        if(!expired&&stillConnected)continue;
+        const result=await slotRef.transaction(current=>{
+          if(!current||current.presenceMode!=='session')return;
+          if(current.uid!==occupied.uid||current.sessionId!==occupied.sessionId)return;
+          const lastActive=Number(current.lastActivityAt||current.updatedAt||0);
+          if(lastActive>now-timeoutMs&&stillConnected)return;
+          return null;
+        },undefined,false);
+        if(result.committed)cleared++;
+      }catch(error){
+        failures++;
+        console.error('AFK cleanup failed for room',roomId,'slot',slotId,error?.code||error?.message||String(error));
+      }
+    }
+  }
+  console.info('Room AFK cleanup', {cleared,failures});
 });
