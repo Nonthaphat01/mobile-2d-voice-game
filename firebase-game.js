@@ -3,6 +3,7 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
+import {collectGardenBox} from './shared/collect-garden-box.js?v=box-1';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=town-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=town-1';
@@ -144,6 +145,7 @@ export class FirebaseGame {
     catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
     return result;
   }
+  if(action.type==='collectGardenBox')return this.collectBox(uid,slotRef);
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
   try{
@@ -201,6 +203,23 @@ export class FirebaseGame {
     if(this.slotRef===slotRef)this.emit({type:'error',message:failure.message});
     return failure;
   }
+ }
+ async collectBox(uid,slotRef){
+  let result;
+  try{
+    const token=await this.currentUser()?.getIdToken();
+    if(this.slotRef!==slotRef||this.ended)return;
+    result=token?await collectGardenBox(this.config.databaseURL,ROOT,uid,token)
+      :{ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
+  }catch{
+    result={ok:false,message:'ตรวจผลการรับผลผลิตไม่ได้ กรุณาเปิดกล่องใหม่เพื่อตรวจยอด'};
+  }
+  if(this.slotRef!==slotRef||this.ended)return;
+  if(result.profile){
+    this.profile=result.profile;
+    this.emit({type:'profile',profile:result.profile,notice:result.message});
+  }else if(result.message)this.emit({type:'notice',message:result.message});
+  return result;
  }
  async setAppearance(value){
   if(!this.uid||!this.slotRef||this.ended)return;

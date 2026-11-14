@@ -204,7 +204,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=txnfix-20261114');
+   const {FirebaseGame}=await import('./firebase-game.js?v=box-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
