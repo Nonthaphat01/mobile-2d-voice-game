@@ -1,7 +1,7 @@
 import {playerCard,uidPattern} from './shared/social.js?v=v5-neighbors-1';
 
 export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,notice,currentPlayers,open,isOnline}){
- let adapter, ownId, contacts={}, requests={}, unsub=[], stopMessages, pane, updateList, generation=0, unavailable=false;
+ let adapter, ownId, contacts={}, requests={}, unsub=[], pane, updateList, renderConversation, generation=0, unavailable=false;
  const inbox=new Map(), unread=new Map(), messageStops=new Map(), readByPeer=new Map();
  let toastTimer, toastPeer=null;
  const titleFor=id=>adapter?.directory.get(id)?.name||contacts[id]?.name||'ผู้เล่น '+id.slice(0,6);
@@ -51,22 +51,27 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
      messageStops.set(peer,adapter.watchMessages(peer,items=>{
        if(generation!==current||!contacts[peer])return;
        const received=items.filter(message=>message.sender===peer);
-       const latest=received.at(-1),previous=inbox.get(peer);
-       inbox.set(peer,latest?stamp(latest):[0,'']);
-       if(pane===peer&&el('dialog').open&&el('dialogContent').querySelector('.dm-log')){
+       const latest=received.at(-1),previous=inbox.get(peer)?.filter(message=>message.sender===peer).at(-1);
+       const loaded=inbox.has(peer);
+       inbox.set(peer,items);
+       if(pane===peer&&el('dialog').open&&renderConversation){
          markRead(peer,items);
+         renderConversation(items);
        }else{
          const unseen=received.filter(message=>newer(stamp(message),lastRead(peer))).length;
          if(unseen)unread.set(peer,unseen);else unread.delete(peer);
-         if(unseen&&latest&&(previous?newer(stamp(latest),previous):Date.now()-latest.at<60000))showToast(peer);
+         if(unseen&&latest&&(loaded?(!previous||newer(stamp(latest),stamp(previous))):Date.now()-latest.at<60000))showToast(peer);
        }
        refreshBadge();updateList?.();
+     },()=>{
+       if(generation===current&&pane===peer&&el('dialog').open)
+         addText(el('dialogContent').querySelector('.dm-log')||el('dialogContent'),'อ่านประวัติข้อความไม่ได้');
      }));
    }
  }
  const text=(tag,value,style='')=>{const node=document.createElement(tag);node.className=style;node.textContent=value;return node};
  const setPane=(name,title,draw)=>{
-   stopMessages?.();stopMessages=null;updateList=null;pane=name;
+   renderConversation=null;updateList=null;pane=name;
    open();
    showDialog(title,draw);
  };
@@ -169,9 +174,7 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
        await tryAction(async()=>{await adapter.sendMessage(peer,field.value);field.value=''},field)();
        send.disabled=false;
      };
-     stopMessages=adapter.watchMessages(peer,items=>{
-       if(!log.isConnected||!el('dialog').open)return;
-       markRead(peer,items);
+     renderConversation=items=>{
        log.replaceChildren();
        for(const message of items){
          const owner=message.sender===ownId;
@@ -181,13 +184,15 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
          log.append(row);
        }
        log.scrollTop=log.scrollHeight;
-     },()=>addText(log,'อ่านประวัติข้อความไม่ได้'));
+     };
      addButton(d,'กลับหน้ารายชื่อ',phone);
    });
+   const items=inbox.get(peer);
+   if(items){markRead(peer,items);renderConversation(items)}
  }
  function disconnect(){
    generation++;
-   stopMessages?.();stopMessages=null;
+   renderConversation=null;
    unsub.forEach(stop=>stop());unsub=[];
    messageStops.forEach(stop=>stop());messageStops.clear();
    inbox.clear();unread.clear();readByPeer.clear();dismissToast();
@@ -216,7 +221,7 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
      },fail));
    if(reopenPhone)phone();
  }
- el('dialog').addEventListener('close',()=>{stopMessages?.();stopMessages=null;updateList=null;pane=null});
+ el('dialog').addEventListener('close',()=>{if(!el('dialog').open){renderConversation=null;updateList=null;pane=null}});
  el('friendsBtn').onclick=friends;
  el('phoneBtn').onclick=()=>{dismissToast();phone()};
  el('phoneToast').onclick=()=>{const peer=toastPeer;dismissToast();if(peer&&contacts[peer])conversation(peer);else phone()};
