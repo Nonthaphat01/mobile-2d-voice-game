@@ -1,7 +1,7 @@
 import {estateBounds,estateFenceBlocks,estateFenceSegments,estateGardenFields,estatePlotRect,estatePlotIndex,estateWorld,estateFromWire,estateToWire,mapEstateLot} from './shared/estate-layout.js?v=estate-guide-1';
 import {roomVoice} from './game-voice.js?v=estate-1';
 import {CROPS,cropStock,seedKey,roomSize,houseExpansionLevel,gardenExpansionLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=house-reset-1';
-import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=town-1';
+import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=profile-save-1';
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=town-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
@@ -206,7 +206,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=garden-save-2');
+   const {FirebaseGame}=await import('./firebase-game.js?v=profile-save-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
@@ -378,9 +378,16 @@ function onNetwork(m){if(!active&&!['rooms','players','social'].includes(m.type)
    }
  }
  else if(m.type==='profile'){
+   const previous=ownProfile;
    ownProfile=sanitizeState(m.profile);useSavedAppearance(ownProfile.appearance);hud();
-   const gardenDialogOpen=el('dialog').open&&['garden','box','plot'].includes(dialogType);
-   if(!m.background||m.background==='gardenerStep'&&['inventory','garden'].includes(dialogType)){
+   const gardenDialogOpen=el('dialog').open&&['garden','box','plot','shop'].includes(dialogType);
+   const gardenerChangedDialog={
+     inventory:()=>true,
+     garden:()=>true,
+     box:()=>JSON.stringify(previous.home.gardenBox)!==JSON.stringify(ownProfile.home.gardenBox),
+     plot:()=>JSON.stringify(previous.home.plots[dialogPlot])!==JSON.stringify(ownProfile.home.plots[dialogPlot])
+   }[dialogType];
+   if(!m.background||m.background==='gardenerStep'&&el('dialog').open&&gardenerChangedDialog?.()){
      const status=el('dialogStatus').textContent;
      drawOpenDialog();
      if(m.background&&gardenDialogOpen)el('dialogStatus').textContent=status;
@@ -801,9 +808,9 @@ function openPlot(i){if(i<0||i>=ownProfile.home.plots.length)return;dialogType='
  addText(d,def?def.icon+' '+def.name+(p.watered?' · รดน้ำแล้ว':' · ต้องรดน้ำ'):'แปลงว่าง');
  if(!p.crop)for(const [crop,type] of Object.entries(CROPS)){
    const count=ownProfile.inventory[seedKey(crop)];
-   addButton(d,type.icon+' ปลูก'+type.name+' · มี '+count,()=>action({type:'plant',plot:i,crop}),!count);
+   addButton(d,type.icon+' ปลูก'+type.name+' · มี '+count,()=>runGardenAction({type:'plant',plot:i,crop}),!count||Boolean(pendingGardenAction));
  }
- else if(!p.watered)addButton(d,'💦 รดน้ำ',()=>action({type:'water',plot:i}));
+ else if(!p.watered)addButton(d,'💦 รดน้ำ',()=>runGardenAction({type:'water',plot:i}),Boolean(pendingGardenAction));
  else {
    const harvest=addButton(d,def.icon+' เก็บเกี่ยว +3 ผล / +10 EXP',()=>runGardenAction({type:'harvest',plot:i}),remaining>0||Boolean(pendingGardenAction));
    if(remaining>0){
@@ -851,7 +858,7 @@ function appendProduce(parent, atMarket=false){
    row.append('× '+count);
    if(atMarket){
      const total=marketPrice(key,Date.now(),crop)*count;
-     addButton(row,'ขาย '+total.toLocaleString('th-TH')+' บาท',()=>action({type:'sell',grade:key,crop}));
+     addButton(row,'ขาย '+total.toLocaleString('th-TH')+' บาท',()=>runGardenAction({type:'sell',grade:key,crop}),Boolean(pendingGardenAction));
    }
    list.append(row);
  }
@@ -911,7 +918,7 @@ function shopDialog(){
      row.append(def.icon+' '+def.name);
      for(const quantity of [1,10,100]){
        const price=def.seed*quantity;
-       addButton(row,quantity+' · '+price+' บาท',()=>action({type:'seed',crop,quantity}),ownProfile.money<price);
+       addButton(row,quantity+' · '+price+' บาท',()=>runGardenAction({type:'seed',crop,quantity}),ownProfile.money<price||Boolean(pendingGardenAction));
      }
      d.append(row);
    }

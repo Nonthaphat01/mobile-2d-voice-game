@@ -3,8 +3,8 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {GARDEN_ACTIONS,saveGardenAction} from './shared/garden-save.js?v=garden-save-2';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=town-1';
+import {saveProfileAction} from './shared/profile-save.js?v=profile-save-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=profile-save-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=town-1';
 
@@ -127,126 +127,37 @@ export class FirebaseGame {
   const uid=this.uid;
   if(!uid||this.ended)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
   const slotRef=this.slotRef;
-  if(this.marketEnabled){
-    const result=await this.market({type:'action',action});
-    if(this.slotRef!==slotRef)return;
-    const background=backgroundAction(action.type);
-    if(!result.ok){
-      if(result.message)this.emit({type:'notice',message:result.message});
-      return result;
-    }
-    this.profile=result.profile;
-    this.emit({type:'profile',profile:this.profile,notice:result.message,background});
-    if(action.type==='needsTick'){
-      await update(slotRef,publicStats(result.profile)).catch(()=>{});
-      return result;
-    }
-    try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,appearance:result.profile.appearance,...publicStats(result.profile),updatedAt:Date.now()})}
-    catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
-    return result;
-  }
-  if(GARDEN_ACTIONS.has(action.type))return this.saveGarden(uid,slotRef,action);
-  const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
-  let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
-  try{
-    // A harvest or garden-box transfer must be atomic. Under concurrent writes
-    // (for example an open second tab and the automated gardener), Firebase can
-    // exhaust its internal transaction retries. Refresh the profile and retry
-    // the WHOLE transaction with bounded backoff; never overwrite the save.
-    let result;
-    for(let attempt=0;attempt<4;attempt++){
-      try{
-        result=await runTransaction(profileRef,current=>{
-          // A cold local cache can initially be null. Let the database compare
-          // this read with the server value instead of overwriting saved data.
-          if(current==null)return null;
-          const state=sanitizeState(current);
-          const r=applyAction(state,action,Date.now());
-          lastResult=r;
-          return r.ok?state:undefined;
-        },{applyLocally:false});
-        break;
-      }catch(error){
-        const conflict=/maxretry/i.test(String(error?.code||'')+' '+String(error?.message||''));
-        if(!conflict||attempt===3)throw error;
-        if(this.slotRef!==slotRef||this.ended)return;
-        await new Promise(resolve=>setTimeout(resolve,250*Math.pow(2,attempt)+Math.floor(Math.random()*150)));
-        // Refresh stale data before attempting the transaction again.
-        await get(profileRef);
-        if(this.slotRef!==slotRef||this.ended)return;
-      }
-    }
-    if(this.slotRef!==slotRef)return;
-    if(!result.committed||!result.snapshot.exists()){
-      const failure={ok:false,message:lastResult.ok?'บันทึกข้อมูลไม่สำเร็จ':lastResult.message};
-      if(failure.message)this.emit({type:'notice',message:failure.message});
-      return failure;
-    }
-    const profile=sanitizeState(result.snapshot.val());this.profile=profile;
-    const background=backgroundAction(action.type);
-    this.emit({type:'profile',profile,notice:lastResult.message,background});
-    if(action.type==='needsTick'){
-      await update(slotRef,publicStats(profile)).catch(()=>{});
-      return lastResult;
-    }
-    try{
-      await update(slotRef,{name:profile.displayName,home:profile.home,appearance:profile.appearance,...publicStats(profile),updatedAt:Date.now()});
-    }catch(e){
-      if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ: '+e.message});
-    }
-    return lastResult;
-  }catch(e){
-    const exhausted=/maxretry/i.test(String(e?.code||'')+' '+String(e?.message||''));
-    const failure={ok:false,message:exhausted
-      ?'เซฟกำลังอัปเดตพร้อมกัน กรุณาลองอีกครั้ง'
-      :'บันทึกข้อมูลไม่สำเร็จ: '+e.message};
-    if(this.slotRef===slotRef&&(!exhausted||!backgroundAction(action.type)))this.emit({type:'error',message:failure.message});
-    return failure;
-  }
- }
- async saveGarden(uid,slotRef,action){
   const background=backgroundAction(action.type);
   let result;
   try{
-    const token=await this.currentUser()?.getIdToken();
-    if(this.slotRef!==slotRef||this.ended)return;
-    result=token?await saveGardenAction(this.config.databaseURL,ROOT,uid,token,action)
-      :{ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
+    if(this.marketEnabled)result=await this.market({type:'action',action});
+    else{
+      const token=await this.currentUser()?.getIdToken();
+      if(this.slotRef!==slotRef||this.ended)return;
+      result=token?await saveProfileAction(this.config.databaseURL,ROOT,uid,token,action)
+        :{ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
+    }
   }catch{
-    result={ok:false,message:'ตรวจผลการบันทึกงานสวนไม่ได้ กรุณาเข้าเกมใหม่เพื่อตรวจยอดก่อนลองอีกครั้ง'};
+    result={ok:false,message:'ยังยืนยันผลการบันทึกไม่ได้ กรุณาเข้าเกมใหม่เพื่อตรวจยอดก่อนลองอีกครั้ง'};
   }
   if(this.slotRef!==slotRef||this.ended)return;
   if(result.profile){
-    this.profile=result.profile;
-    this.emit({type:'profile',profile:result.profile,notice:result.message,background});
+    this.profile=sanitizeState(result.profile);
+    this.emit({type:'profile',profile:this.profile,notice:result.message,background});
     if(result.ok){
-      // Presence uses the same SDK connection. Queue the update immediately
-      // without delaying the result of an already committed profile write.
-      update(slotRef,{home:result.profile.home,...publicStats(result.profile),updatedAt:Date.now()}).catch(()=>{
+      const profile=this.profile;
+      const fields=action.type==='needsTick'?publicStats(profile):
+        {name:profile.displayName,home:profile.home,appearance:profile.appearance,...publicStats(profile),updatedAt:Date.now()};
+      // Presence can wait for reconnection independently of the committed save.
+      update(slotRef,fields).catch(()=>{
         if(this.slotRef===slotRef&&!background)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ',chatOnly:true});
       });
     }
   }else if(result.message&&!background)this.emit({type:'notice',message:result.message});
   return result;
  }
- async setAppearance(value){
-  if(!this.uid||!this.slotRef||this.ended)return;
-  const slotRef=this.slotRef;
-  const appearance=sanitizeAppearance(value);
-  const profileRef=ref(this.db,`${ROOT}/profiles/${this.uid}`);
-  if(this.marketEnabled){
-    const result=await this.market({type:'action',action:{type:'appearance',appearance}});
-    if(!result.ok){this.emit({type:'notice',message:result.message});return}
-    if(this.slotRef!==slotRef)return;
-    this.profile=result.profile;
-  }else{
-    await update(profileRef,{appearance});
-    if(this.slotRef!==slotRef)return;
-    this.profile={...this.profile,appearance};
-  }
-  if(this.slotRef!==slotRef)return;
-  this.emit({type:'profile',profile:this.profile,notice:'🎨 บันทึกตัวละครเดิมจาก V4 ลง Firebase แล้ว'});
-  await update(slotRef,{appearance,updatedAt:Date.now()});
+ setAppearance(value){
+  return this.action({type:'appearance',appearance:sanitizeAppearance(value)});
  }
  requestMarket(request){
   const slotRef=this.slotRef;

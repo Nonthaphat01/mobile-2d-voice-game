@@ -122,6 +122,8 @@ export function sanitizeState(s,name='ผู้เล่น') {
   o.needsAt=Number.isFinite(s.needsAt)?Math.max(0,s.needsAt):0;
   o.playSeconds=Number.isSafeInteger(s.playSeconds)?Math.max(0,s.playSeconds):0;
   for(const key of ['hoe','watering_can','tomato_seed'])o.inventory[key]=clampCount(s.inventory?.[key]);
+  // The watering can is starter equipment. No action can spend or remove it.
+  o.inventory.watering_can=Math.max(1,o.inventory.watering_can);
   o.inventory.tomatoGrades=normalizeProduce(s.inventory);
   o.inventory.tomato=Object.values(o.inventory.tomatoGrades).reduce((sum,count)=>sum+count,0);
   for(const type of Object.keys(FURNITURE_TYPES))o.inventory.furniture[type]=clampCount(s.inventory?.furniture?.[type]);
@@ -276,7 +278,9 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
       plot.crop=crop;plot.plantedAt=now;plot.watered=false;items[seedKey(crop)]--;status='ปลูก'+CROPS[crop].name+'แล้ว';break;
     }
     case 'water':
-      if(!plot || !plot.crop || plot.watered || !items.watering_can)return {ok:false,message:'ไม่สามารถรดน้ำแปลงนี้ได้'};
+      if(!plot?.crop)return {ok:false,message:'แปลงนี้ว่างแล้ว'};
+      if(plot.watered)return {ok:false,message:'แปลงนี้รดน้ำแล้ว'};
+      if(!items.watering_can)return {ok:false,message:'ไม่พบบัวรดน้ำในกระเป๋า'};
       plot.watered=true;status='รดน้ำเรียบร้อย';break;
     case 'harvest': {
       if(!plot?.crop || !plot.watered || now-plot.plantedAt<CROPS[plot.crop].grow)return {ok:false,message:'ต้นไม้ยังไม่พร้อมเก็บเกี่ยว'};
