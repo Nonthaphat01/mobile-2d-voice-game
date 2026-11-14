@@ -1,12 +1,14 @@
-import {estateBounds,estateFenceBlocks,estateFenceSegments,estatePlotRect,estatePlotIndex} from './shared/estate-layout.js?v=estate-frontage-1';
+import {estateBounds,estateFenceBlocks,estateFenceSegments,estatePlotRect,estatePlotIndex,estateWorld,estateFromWire,estateToWire,mapEstateLot} from './shared/estate-layout.js?v=estate-full-1';
 import {roomVoice} from './game-voice.js?v=estate-1';
 import {CROPS,cropStock,seedKey,roomSize,estateLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=estate-1';
-import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
+import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=estate-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
-import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-frontage-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-full-1';
+
+const lots=baseLots.map(mapEstateLot);
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
 import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
@@ -333,6 +335,7 @@ function trackRemote(player,now){
  const previous=remote.get(player.id);
  if(active&&player.text&&player.until>Date.now()&&(player.until!==previous?.until||player.text!==previous?.text))
    appendChat(player.name||'เพื่อนบ้าน',player.text);
+ if(player.scene==='outside')player={...player,...estateFromWire(player.x,player.y)};
  const motion=updateRemoteMotion(previous?.motion,player,now);
  remote.set(player.id,{...player,motion});
 }
@@ -944,7 +947,7 @@ function estateDialog(){
      notice('ขยายสำเร็จ · เพิ่มแปลง '+(oldCount+1)+'–'+ownProfile.home.plots.length+' บนที่ดิน');
    },ownProfile.money<price);
    else addText(d,'ขยายครบแล้ว');
-   addText(d,'ขยายรั้วด้านข้างและด้านหลัง เพิ่มพื้นที่เดินและแปลงสวน');
+   addText(d,'แปลงใหม่ขนาดเท่าเดิมและอยู่ด้านหลังบ้าน เดินอ้อมบ้านไปที่สวนส่วนขยาย');
  });
 }
 const market={x:WORLD.w/2-64,y:588,w:128,h:111};
@@ -975,7 +978,7 @@ function nearestInteract(){
      const entry=doorPos(lots[p.slot]);
      targets.push({...point('visit',entry.x,entry.y,75),owner:p.id});
    }
-   for(let plot=0;plot<ownProfile.home.plots.length;plot++)targets.push(area('plot',estatePlotRect(lot,plot,ownProfile.home.expansion),{plot}));
+   for(let plot=0;plot<ownProfile.home.plots.length;plot++)targets.push(area('plot',estatePlotRect(lot,plot),{plot}));
  }
  return targets.reduce((best,target)=>target.distance<=target.reach&&(!best||target.distance<best.distance)?target:best,null);
 }
@@ -1103,11 +1106,24 @@ function round(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRec
 function line(x,y,x2,y2,color,width=2){ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x2,y2);ctx.stroke()}
 function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
 function text(t,x,y,size=13,col='#fff',align='center'){ctx.textAlign=align;ctx.font=`600 ${size}px system-ui`;ctx.fillStyle=col;ctx.fillText(t,x,y)}
-function road(now){round(0,0,WORLD.w,WORLD.h,0,'#77a65c');grassTexture(ctx,0,0,WORLD.w,WORLD.h,.8);for(let x=0;x<WORLD.w;x+=110)for(let y=0;y<WORLD.h;y+=110){circle(x+((y/110)%2)*33,y,3,'#689a52')}
- round(0,560,WORLD.w,176,0,'#4e6564');round(0,575,WORLD.w,146,0,'#657578');roadTexture(ctx,0,575,WORLD.w,146,.9);for(let x=10;x<WORLD.w;x+=130)round(x,646,72,6,3,'#f7e6ae');
- line(0,559,WORLD.w,559,'#d7c2a3',10);line(0,735,WORLD.w,735,'#d7c2a3',10);
- round(market.x,market.y,market.w,market.h,10,'#3e5549');text('🏪',WORLD.w/2,625,26);text('ตลาดกลาง',WORLD.w/2,652,16);text('ร้านค้าออนไลน์',WORLD.w/2,675,11,'#b0e9d5');
- for(let x=54;x<WORLD.w;x+=235){const bend=sway(now,x,weather);circle(x+bend,566,19,'#597d4c');circle(x-7+bend*1.6,552,12,'#7fa85a');circle(x+bend,737,16,'#6d8e51')}
+function road(now,view){
+ const {left,right,top,bottom}=estateWorld;
+ round(left,top,right-left,bottom-top,0,'#77a65c');
+ grassTexture(ctx,left,top,right-left,bottom-top,.8);
+ const startX=Math.max(left,view.left-40),endX=Math.min(right,view.right+40);
+ const startY=Math.max(top,view.top-40),endY=Math.min(bottom,view.bottom+40);
+ for(let x=Math.ceil(startX/110)*110;x<=endX;x+=110)
+   for(let y=Math.ceil(startY/110)*110;y<=endY;y+=110)circle(x+Math.abs(y/110%2)*33,y,3,'#689a52');
+ if(endY<535||startY>763)return;
+ round(left,560,right-left,176,0,'#4e6564');round(left,575,right-left,146,0,'#657578');
+ roadTexture(ctx,left,575,right-left,146,.9);
+ for(let x=Math.floor(startX/130)*130+10;x<=endX;x+=130)round(x,646,72,6,3,'#f7e6ae');
+ line(left,559,right,559,'#d7c2a3',10);line(left,735,right,735,'#d7c2a3',10);
+ round(market.x,market.y,market.w,market.h,10,'#3e5549');
+ text('🏪',WORLD.w/2,625,26);text('ตลาดกลาง',WORLD.w/2,652,16);text('ร้านค้าออนไลน์',WORLD.w/2,675,11,'#b0e9d5');
+ for(let x=Math.floor(startX/235)*235+54;x<=endX;x+=235){
+   const bend=sway(now,x,weather);circle(x+bend,566,19,'#597d4c');circle(x-7+bend*1.6,552,12,'#7fa85a');circle(x+bend,737,16,'#6d8e51');
+ }
 }
 function fence(l,level){
  for(const [x,y,right,bottom] of estateFenceSegments(l,level)){
@@ -1125,26 +1141,41 @@ function drawHouse(l,p,now){const h=houseRect(l);round(h.x+4,h.y+10,h.w,h.h,10,'
  const door=doorPos(l);round(door.x-13,door.y-12,26,18,5,'#a17d5a');
  text('🚪',door.x,door.y+8,19);text(p.name||'ผู้เล่น',l.x+l.w/2,l.y+31,15,'#f2fbec');
 }
-function drawPlot(l,i,plot,now,level){
- const r=estatePlotRect(l,i,level);
- const detail=r.w>=34&&r.h>=29;
- round(r.x,r.y,r.w,r.h,detail?8:3,'#60482f');
- if(detail){
+function drawPlot(r,i,plot,now){
+ round(r.x,r.y,r.w,r.h,8,'#60482f');
    soilTexture(ctx,r.x+2,r.y+2,r.w-4,r.h-4,.9);
    for(const row of [.22,.50,.78])line(r.x+5,r.y+r.h*row,r.x+r.w-5,r.y+r.h*row,'#82613d',2);
- }
  if(plot?.crop){
    const grow=plot.watered?Math.min(1,(Date.now()-plot.plantedAt)/(CROPS[plot.crop]?.grow||GROW_MS)):.17;
    const x=r.x+r.w/2,y=r.y+r.h*.64;
    const radius=Math.min(r.w*.17,r.h*.23)*(0.65+grow*.35);
-   circle(x+(detail?sway(now,x,weather):0),y,radius,'#6cad45');
-   if(grow>.92&&detail)text(CROPS[plot.crop]?.icon||'🍅',x,y+4,Math.min(14,r.h*.32));
+   circle(x+sway(now,x,weather),y,radius,'#6cad45');
+   if(grow>.92)text(CROPS[plot.crop]?.icon||'🍅',x,y+4,Math.min(14,r.h*.32));
  }
- if(detail)text(String(i+1),r.x+10,r.y+13,10,'#dccfb6');
+ text(String(i+1),r.x+10,r.y+13,10,'#dccfb6');
 }
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
-function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
- for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}const plots=u.home?.plots,level=estateLevel(u.home?.expansion);const bounds=estateBounds(l,level);const backY=l.slot<4?bounds.y:bounds.y+bounds.h,stepY=bounds.gateY+(l.slot<4?-24:24);round(l.x,Math.min(backY,bounds.gateY),l.w,bounds.h,0,'#8faf6a');round(bounds.x,Math.min(backY,stepY),bounds.w,Math.abs(backY-stepY),0,'#8faf6a');for(let i=0;i<plotCount(level);i++)drawPlot(l,i,plots?.[i],now,level);drawHouse(l,u,now);fence(l,level)}
+function worldDraw(now,camera,preview=false){
+ const halfW=w/(2*camera.zoom),halfH=h/(2*camera.zoom);
+ const view={left:camera.x-halfW,right:camera.x+halfW,top:camera.y-halfH,bottom:camera.y+halfH};
+ const visible=r=>r.x+r.w>=view.left-30&&r.x<=view.right+30&&r.y+r.h>=view.top-30&&r.y<=view.bottom+30;
+ road(now,view);
+ const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);
+ for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
+ for(const l of lots){
+   const u=lotsUsed.get(l.slot),level=estateLevel(u?.home?.expansion),bounds=estateBounds(l,level);
+   if(!visible(bounds))continue;
+   if(!u){drawEmpty(l);continue}
+   const backY=l.slot<4?bounds.y:bounds.y+bounds.h;
+   const stepY=bounds.gateY+(l.slot<4?-24:24);
+   round(l.x,Math.min(backY,bounds.gateY),l.w,bounds.h,0,'#8faf6a');
+   round(bounds.x,Math.min(backY,stepY),bounds.w,Math.abs(backY-stepY),0,'#8faf6a');
+   for(let i=0;i<plotCount(level);i++){
+     const r=estatePlotRect(l,i);
+     if(visible(r))drawPlot(r,i,u.home?.plots?.[i],now);
+   }
+   drawHouse(l,u,now);fence(l,level);
+ }
  if(preview)return;
  drawGardenerPost(now);
  const sign=estateSign(localLot());text('🪧',sign.x,sign.y,22);text('ขยายที่ดิน',sign.x,sign.y+18,11,'#fff4ce');
@@ -1158,7 +1189,7 @@ function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{n
    for(const [n,worker] of workersOf(player.home).entries()){
    const visualId=index*MAX_GARDENERS+n;
    if(!worker||worker.slot!==index||worker.contractUntil&&Date.now()>=worker.contractUntil)continue;
-   const p=gardenerPosition(lots[index],worker,Date.now(),player.home?.expansion);
+   const p=gardenerPosition(lots[index],worker,Date.now());
    if(p){
      p.x+=n*9;p.y+=n*6;
      const old=gardenerVisuals.get(visualId);
@@ -1268,13 +1299,13 @@ function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRe
    const door=doorPos(lots[visiting?.slot]||localLot());
    ctx.save();
    ctx.translate(w/2-door.x,h/2-door.y);
-   worldDraw(now,true);
+   worldDraw(now,{...door,zoom:1},true);
    ctx.restore();
    ctx.fillStyle='#08111cba';ctx.fillRect(0,0,w,h);
  }
  renderedCamera={...camera,scene,w,h};
  ctx.save();ctx.translate(w/2,camera.centerY??h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
- if(scene==='outside'&&!buildDraft)worldDraw(now);else indoors(now);ctx.restore();
+ if(scene==='outside'&&!buildDraft)worldDraw(now,camera);else indoors(now);ctx.restore();
  if(buildDraft)return;
  const minute=(now/1000)%720,night=minute>540||minute<120;
  if(night){ctx.fillStyle='rgba(13,24,54,.25)';ctx.fillRect(0,0,w,h)}
@@ -1316,7 +1347,7 @@ function tickGardener(now){
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)gardenerResume=true});
 function canMove(x,y){if(scene==='inside'){const r=interior();return x>22&&y>55&&x<r.w-22&&y<r.h-31;}
- if(x<22||y<22||x>WORLD.w-22||y>WORLD.h-22)return false;
+ if(x<estateWorld.left+22||y<estateWorld.top+22||x>estateWorld.right-22||y>estateWorld.bottom-22)return false;
  for(const l of lots){
    const house=houseRect(l);
    if(x>house.x-14&&x<house.x+house.w+14&&y>house.y-15&&y<house.y+house.h+10)return false;
@@ -1365,7 +1396,8 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
 requestAnimationFrame(tick);
 function publishMovement(now){
  const pose=me.pose||'stand';
- const x=Math.round(me.x),y=Math.round(me.y);
+ const mapX=Math.round(me.x),mapY=Math.round(me.y);
+ const {x,y}=scene==='outside'?estateToWire(mapX,mapY):{x:mapX,y:mapY};
  const house=scene==='inside'?(visiting?.id||myId):null;
  const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose||house!==sentMovement?.house;
  if(!changedSceneOrPose&&(now-lastMove<MOVE_INTERVAL_MS||(x===sentMovement.x&&y===sentMovement.y)))return;
@@ -1389,7 +1421,7 @@ c.addEventListener('pointerup',e=>{
  if(target&&['visit','box','estate'].includes(target.type)&&Math.hypot(x-target.x,y-target.y)<34){interact(target);return}
  const plot=estatePlotIndex(l,x,y,ownProfile.home.expansion);
  if(plot>=0){
-   if(plotInReach(estatePlotRect(l,plot,ownProfile.home.expansion)))openPlot(plot);
+   if(plotInReach(estatePlotRect(l,plot)))openPlot(plot);
    else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
    return;
  }

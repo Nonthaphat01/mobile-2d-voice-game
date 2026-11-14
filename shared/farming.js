@@ -87,9 +87,9 @@ export function gardenerTravelMs(lot) {
   return Math.ceil(distance / 105 * 1000);
 }
 
-export function gardenerPosition(lot, worker, now, level=0) {
+export function gardenerPosition(lot, worker, now) {
   const plotAt = i => {
-    const r=estatePlotRect(lot,i,level);
+    const r=estatePlotRect(lot,i);
     return {x:r.x+r.w/2,y:r.y+r.h*.82};
   };
   const route = gardenerRoute(lot);
@@ -123,6 +123,6 @@ export function gardenerPosition(lot, worker, now, level=0) {
     distance -= len;
   }
 }
-import {estatePlotRect} from './estate-layout.js?v=estate-frontage-1';
+import {estatePlotRect} from './estate-layout.js?v=estate-full-1';
 import {CROPS} from './estate.js?v=estate-1';
 
