@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="ui-v4.css?v=v4-model-20261112-5">
 <link rel="stylesheet" href="build-mode.css?v=town-1">
 <link rel="stylesheet" href="farm-market.css?v=v5-farm-1">
-<link rel="stylesheet" href="lobby.css?v=cottage-3-20261114">
+<link rel="stylesheet" href="lobby.css?v=lights-20261114">
 <link rel="stylesheet" href="game-hud.css?v=v5-gardener-1">
 <link rel="stylesheet" href="neighbors.css?v=effects-1">
 <link rel="stylesheet" href="community-map.css?v=garden-save-2">
@@ -16,9 +16,11 @@
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
 <section id="lobby" class="lobby entry-lobby" aria-label="หน้าเข้าเกม">
+  <canvas id="lobbyLights" class="lobby-lights" aria-hidden="true"></canvas>
   <div class="entry-shell">
     <section class="entry-brand" aria-labelledby="gameTitle">
       <div class="entry-landscape" aria-hidden="true"></div>
+      <div class="entry-light-rays" aria-hidden="true"></div>
       <div class="entry-edition"><span aria-hidden="true">✿</span> MY LITTLE NEIGHBORHOOD <b>V5</b></div>
       <div class="entry-story">
         <span class="entry-story-kicker">✦ YOUR COZY LITTLE WORLD</span>
@@ -132,6 +134,7 @@
   </div>
 </section>
 <script src="config.js?v=v5-sheets-1"></script>
+<script src="lobby-effects.js?v=lights-20261114" defer></script>
 <script type="module" src="client.js?v=cottage-1"></script>
 </body>
 </html>
