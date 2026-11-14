@@ -16,7 +16,14 @@
             ".read": "auth != null && ($room === '001' || $room === '002' || $room === '003')",
             "$slot": {
               ".write": "auth != null && ($room === '001' || $room === '002' || $room === '003') && ($slot === '0' || $slot === '1' || $slot === '2' || $slot === '3' || $slot === '4' || $slot === '5' || $slot === '6' || $slot === '7') && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.child('uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)))",
-              ".validate": "newData.hasChildren(['uid','name','slot','x','y','scene','updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length <= 18 && newData.child('x').isNumber() && newData.child('x').val() >= 0 && newData.child('x').val() <= 2400 && newData.child('y').isNumber() && newData.child('y').val() >= 0 && newData.child('y').val() <= 1290 && newData.child('scene').isString() && (newData.child('scene').val() === 'inside' || newData.child('scene').val() === 'outside')"
+              ".validate": "newData.hasChildren(['uid','name','slot','x','y','scene','updatedAt']) && newData.child('uid').val() === auth.uid && newData.child('name').isString() && newData.child('name').val().length <= 18 && newData.child('x').isNumber() && newData.child('x').val() >= 0 && newData.child('x').val() <= 2400 && newData.child('y').isNumber() && newData.child('y').val() >= 0 && newData.child('y').val() <= 1290 && newData.child('scene').isString() && (newData.child('scene').val() === 'inside' || newData.child('scene').val() === 'outside') && (!newData.child('lastActivityAt').exists() || (newData.child('lastActivityAt').isNumber() && newData.child('lastActivityAt').val() <= now + 60000)) && (!newData.child('presenceMode').exists() || newData.child('presenceMode').val() === 'session')"
+            }
+          },
+          "connections": {
+            ".read": "auth != null && ($room === '001' || $room === '002' || $room === '003')",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && ($room === '001' || $room === '002' || $room === '003')",
+              ".validate": "newData.hasChildren(['sessionId','connectedAt']) && newData.child('sessionId').isString() && newData.child('sessionId').val().length > 8 && newData.child('sessionId').val().length <= 64 && newData.child('connectedAt').isNumber() && newData.child('connectedAt').val() <= now + 60000"
             }
           }
         }
