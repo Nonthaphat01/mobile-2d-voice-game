@@ -14,9 +14,10 @@ const lots=baseLots.map(mapEstateLot);
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
 import {renderClassicAvatar} from './v4-character.js?v=town-1';
-import {installSocialUI} from './social-ui.js?v=v5-neighbors-2';
+import {installSocialUI} from './social-ui.js?v=effects-1';
 import {weatherAt, drawWeather, sway} from './weather.js?v=v5-farm-1';
 import {fatigueOpacity,hungerOffset,LOW_NEED,NEEDS_STEP_MS} from './shared/needs.js?v=v5-hud-1';
+import {walkFootprints,drawFootprints} from './shared/footprints.js?v=effects-1';
 import {VEHICLES,HOME_FINISHES,sanitizeArchitecture,partitionKey,partitionLine,partitionBlocks} from './shared/town.js?v=town-1';
 
 const el=id=>document.getElementById(id);
@@ -24,6 +25,8 @@ const c=el('game'),ctx=c.getContext('2d');
 const cfg=window.GAME_CONFIG||{};
 const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
+const footprints=walkFootprints();
+const footprintPlace=()=>scene==='outside'?'outside':visiting?.id||myId;
 const gardenerVisuals=new Map();
 let visiting=null, houseEnteredAt=0, HOME_GRID=BASE_GRID;
 const interior=()=>roomSize(visiting?.expansion??houseExpansionLevel(ownProfile.home));
@@ -206,7 +209,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=profile-save-1');
+   const {FirebaseGame}=await import('./firebase-game.js?v=effects-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
@@ -325,6 +328,7 @@ function onJoined(){
  el('microphone').hidden=!online;
  const l=lots[slot];
  scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();
+ footprints.reset();
  visiting=null;gardenerVisuals.clear();
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
  setRiding(false);
@@ -346,7 +350,8 @@ function trackRemote(player,now){
    appendChat(player.name||'เพื่อนบ้าน',player.text);
  if(player.scene==='outside')player={...player,...estateFromWire(player.x,player.y)};
  const motion=updateRemoteMotion(previous?.motion,player,now);
- remote.set(player.id,{...player,motion});
+ const hungrySince=player.hungry===true?(previous?.hungrySince??now):null;
+ remote.set(player.id,{...player,motion,hungrySince});
 }
 function onNetwork(m){if(!active&&!['rooms','players','social'].includes(m.type))return;
  if(m.type==='social'&&active&&online){socialUI.connect(fbGame.social,myId);return}
@@ -1379,6 +1384,7 @@ function worldDraw(now,camera,preview=false){
    drawHouse(l,u,now);fence(l,level);
  }
  if(preview)return;
+ drawFootprints(ctx,footprints.visible(now,'outside'),now);
  drawGardenerPost(now);
  const sign=estateSign(localLot());text('🪧',sign.x,sign.y,22);text('ขยายที่ดิน',sign.x,sign.y+18,11,'#fff4ce');
  const box=gardenBoxPosition(localLot());
@@ -1512,6 +1518,7 @@ function indoors(now){const room=interior(),mid=room.w/2;
  const architecture=interiorArchitecture(),grid=interiorGrid(),night=isNight();
  drawArchitecture(architecture,grid,night,'floor');
  drawArchitecture(architecture,grid,night,'light');
+ if(!buildDraft)drawFootprints(ctx,footprints.visible(now,footprintPlace()),now);
  text('บ้านของ '+(visiting?.name||ownProfile.displayName),325,90,22,'#4b443a');
  if(buildDraft)drawBuildGrid();
  else if(!furniture.length&&!architecture.walls.length&&!architecture.tiles.length)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
@@ -1522,12 +1529,13 @@ function indoors(now){const room=interior(),mid=room.w/2;
  avatar({...me,name:ownProfile.displayName},now,true)
 }
 function avatar(p,now,local){
-  const jitter=local&&hungrySince!==null&&!reducedEffects.matches&&p.pose!=='sleep'
-    ?hungerOffset(now-hungrySince,ownProfile.needs.fullness):0;
+  const onset=local?hungrySince:p.hungrySince;
+  const jitter=onset!=null&&!reducedEffects.matches&&p.pose!=='sleep'
+    ?hungerOffset(now-onset,local?ownProfile.needs.fullness:0):0;
   ctx.save();
   ctx.translate(jitter,0);
   const actor={...p,scene:local?scene:p.scene,face:local?me.face:p.face,
-    onBed:p.pose==='sleep',unhappy:local&&ownProfile.needs.happiness<LOW_NEED};
+    onBed:p.pose==='sleep',unhappy:local?ownProfile.needs.happiness<LOW_NEED:p.unhappy===true};
   const {x,y}=drawClassicActor(ctx,actor,now,local,ownProfile.displayName,ownProfile.appearance);
   ctx.restore();
   const vehicleId=local?(me.riding?ownProfile.garage.equipped:null):p.vehicle;
@@ -1632,6 +1640,12 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
     if(!me.riding&&now-lastStep>210){lastStep=now;playV4Footstep()}
   }
   if(online)publishMovement(now);
+  const place=footprintPlace();
+  footprints.sample(myId,me,now,{place,walking:me.walking&&!me.riding,weather});
+  for(const player of nearbyPeople()){
+    const sample=sampleRemoteMotion(player.motion,now);
+    footprints.sample(player.id,sample,now,{place,walking:sample.walking&&!player.vehicle&&player.pose==='stand',weather});
+  }
   playAmbient(now);
   background(now);
   refreshCommunityMap(now);

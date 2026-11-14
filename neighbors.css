@@ -1,6 +1,7 @@
 .social-shortcuts { position:fixed; left:max(14px,env(safe-area-inset-left)); bottom:max(14px,env(safe-area-inset-bottom)); display:flex; gap:6px; z-index:5; }
 .social-shortcuts button { width:46px; height:46px; position:relative; border:1px solid #aac8ca; border-radius:11px; color:#f2fffb; font-size:22px; background:#183749ed; }
 #friendBadge { position:absolute; right:0; top:0; min-width:16px; border-radius:12px; background:#edba7e; color:#152632; font:bold 11px system-ui; }
+.social-shortcuts #phoneToast { position:absolute; bottom:calc(100% + 8px); left:52px; width:max-content; max-width:min(240px, calc(100vw - 86px)); height:auto; min-height:38px; padding:7px 10px; background:#183749; color:#f2fffb; font:700 13px system-ui; }
 body.building .social-shortcuts { display:none; }
 @media(pointer:coarse) { .social-shortcuts { bottom:calc(150px + env(safe-area-inset-bottom)); } }
 .inventory-cells { display:grid; grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); gap:5px; max-height:250px; overflow:auto; padding:5px; background:#102631; border:1px solid #729b9e; }

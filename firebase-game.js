@@ -5,13 +5,15 @@ import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDiscon
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import {saveProfileAction} from './shared/profile-save.js?v=profile-save-1';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=profile-save-1';
-import {gameSocial} from './game-social.js?v=v5-neighbors-1';
+import {gameSocial} from './game-social.js?v=effects-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=town-1';
+import {LOW_NEED} from './shared/needs.js?v=v5-hud-1';
 
 const backgroundAction = type => type==='gardenerResume'?'gardenerStep':['gardenerStep','needsTick'].includes(type)?type:false;
 
 const ROOT='little-neighborhood-v5';
-const publicStats=p=>({level:p.level,money:p.money,playSeconds:p.playSeconds});
+const publicStats=p=>({level:p.level,money:p.money,playSeconds:p.playSeconds,
+  unhappy:p.needs.happiness<LOW_NEED,hungry:p.needs.fullness<LOW_NEED});
 export class FirebaseGame {
  constructor(config,emit,marketEnabled=false,sheetsMarketUrl=''){
   this.config=config;this.emit=emit;this.app=null;this.auth=null;this.db=null;this.uid='';this.room='';this.slot=-1;

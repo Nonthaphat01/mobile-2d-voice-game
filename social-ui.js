@@ -2,7 +2,68 @@ import {playerCard,uidPattern} from './shared/social.js?v=v5-neighbors-1';
 
 export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,notice,currentPlayers,open,isOnline}){
  let adapter, ownId, contacts={}, requests={}, unsub=[], stopMessages, pane, updateList, generation=0, unavailable=false;
+ const inbox=new Map(), unread=new Map(), messageStops=new Map(), readByPeer=new Map();
+ let toastTimer, toastPeer=null;
  const titleFor=id=>adapter?.directory.get(id)?.name||contacts[id]?.name||'ผู้เล่น '+id.slice(0,6);
+ const readKey=peer=>'v5_phone_read_'+ownId+'_'+peer;
+ const stamp=message=>[Number(message.at)||0,message.id??''];
+ const newer=([at,id],[seenAt,seenId])=>at>seenAt||(at===seenAt&&id>seenId);
+ function lastRead(peer){
+   if(!readByPeer.has(peer)){
+     let seen=[0,''];
+     try{const stored=JSON.parse(localStorage.getItem(readKey(peer)));if(Array.isArray(stored))seen=stored}catch{}
+     readByPeer.set(peer,seen);
+   }
+   return readByPeer.get(peer);
+ }
+ function refreshBadge(){
+   const count=Object.keys(requests).filter(peer=>!contacts[peer]).length+
+     [...unread.values()].reduce((total,n)=>total+n,0);
+   const badge=el('friendBadge');
+   badge.hidden=!count;badge.textContent=count>99?'99+':String(count);
+   el('phoneBtn').setAttribute('aria-label',count?'โทรศัพท์ · การติดต่อใหม่ '+count:'โทรศัพท์');
+ }
+ function dismissToast(){
+   clearTimeout(toastTimer);toastPeer=null;el('phoneToast').hidden=true;
+ }
+ function showToast(peer,request=false){
+   clearTimeout(toastTimer);toastPeer=request?null:peer;
+   const bubble=el('phoneToast');
+   bubble.textContent=titleFor(peer)+(request?' ขอเป็นเพื่อน':' ส่งข้อความถึงคุณ');
+   bubble.hidden=false;
+   toastTimer=setTimeout(dismissToast,6000);
+ }
+ function markRead(peer,items){
+   const latest=items.filter(message=>message.sender===peer).at(-1);
+   if(latest&&newer(stamp(latest),lastRead(peer))){
+     const value=stamp(latest);readByPeer.set(peer,value);
+     try{localStorage.setItem(readKey(peer),JSON.stringify(value))}catch{}
+   }
+   unread.delete(peer);refreshBadge();
+ }
+ function watchInbox(){
+   for(const [peer,stop] of messageStops)if(!contacts[peer]){
+     stop();messageStops.delete(peer);inbox.delete(peer);unread.delete(peer);
+   }
+   const current=generation;
+   for(const peer of Object.keys(contacts)){
+     if(!uidPattern.test(peer)||messageStops.has(peer))continue;
+     messageStops.set(peer,adapter.watchMessages(peer,items=>{
+       if(generation!==current||!contacts[peer])return;
+       const received=items.filter(message=>message.sender===peer);
+       const latest=received.at(-1),previous=inbox.get(peer);
+       inbox.set(peer,latest?stamp(latest):[0,'']);
+       if(pane===peer&&el('dialog').open&&el('dialogContent').querySelector('.dm-log')){
+         markRead(peer,items);
+       }else{
+         const unseen=received.filter(message=>newer(stamp(message),lastRead(peer))).length;
+         if(unseen)unread.set(peer,unseen);else unread.delete(peer);
+         if(unseen&&latest&&(previous?newer(stamp(latest),previous):Date.now()-latest.at<60000))showToast(peer);
+       }
+       refreshBadge();updateList?.();
+     }));
+   }
+ }
  const text=(tag,value,style='')=>{const node=document.createElement(tag);node.className=style;node.textContent=value;return node};
  const setPane=(name,title,draw)=>{
    stopMessages?.();stopMessages=null;updateList=null;pane=name;
@@ -83,7 +144,8 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
        for(const peer of ids){
          const live=adapter.directory.get(peer);
          const person=live||{id:peer,name:titleFor(peer)};
-         list.append(card(person,live?'ออนไลน์ · ชุมชน '+live.room:'ออฟไลน์',()=>conversation(peer)));
+         const status=live?'ออนไลน์ · ชุมชน '+live.room:'ออฟไลน์';
+         list.append(card(person,unread.has(peer)?status+' · '+unread.get(peer)+' ข้อความใหม่':status,()=>conversation(peer)));
        }
        if(!list.childElementCount)addText(list,'ยังไม่มีรายชื่อเพื่อน');
      };
@@ -92,7 +154,7 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
  }
  function conversation(peer){
    if(!contacts[peer])return;
-   setPane('conversation',titleFor(peer),d=>{
+   setPane(peer,titleFor(peer),d=>{
      const log=text('div','','dm-log');
      log.setAttribute('role','log');log.setAttribute('aria-label','ประวัติข้อความส่วนตัว');d.append(log);
      const form=document.createElement('form');form.className='dm-form';
@@ -108,7 +170,8 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
        send.disabled=false;
      };
      stopMessages=adapter.watchMessages(peer,items=>{
-       if(!log.isConnected)return;
+       if(!log.isConnected||!el('dialog').open)return;
+       markRead(peer,items);
        log.replaceChildren();
        for(const message of items){
          const owner=message.sender===ownId;
@@ -126,8 +189,10 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
    generation++;
    stopMessages?.();stopMessages=null;
    unsub.forEach(stop=>stop());unsub=[];
+   messageStops.forEach(stop=>stop());messageStops.clear();
+   inbox.clear();unread.clear();readByPeer.clear();dismissToast();
    adapter=null;contacts={};requests={};unavailable=false;updateList=null;pane=null;
-   el('friendBadge').hidden=true;
+   refreshBadge();
  }
  function connect(next,id){
    const reopenPhone=pane==='phone'&&el('dialog').open;
@@ -137,18 +202,23 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
    const fail=()=>{if(generation===current){unavailable=true;updateList?.()}};
    const render=()=>{
      if(generation!==current)return;
-     const count=Object.keys(requests).filter(peer=>!contacts[peer]).length;
-     el('friendBadge').hidden=!count;
-     el('friendBadge').textContent=String(count);
+     refreshBadge();
      updateList?.();
    };
    unsub.push(adapter.watchDirectory(render),
-     adapter.watchList('contacts',list=>{if(generation===current){contacts=list;render()}},fail),
-     adapter.watchList('requests',list=>{if(generation===current){requests=list;render()}},fail));
+     adapter.watchList('contacts',list=>{if(generation===current){contacts=list;watchInbox();render()}},fail),
+     adapter.watchList('requests',list=>{
+       if(generation!==current)return;
+       const incoming=Object.keys(list).find(peer=>uidPattern.test(peer)&&!requests[peer]&&!contacts[peer]);
+       requests=list;
+       if(incoming)showToast(incoming,true);
+       render();
+     },fail));
    if(reopenPhone)phone();
  }
  el('dialog').addEventListener('close',()=>{stopMessages?.();stopMessages=null;updateList=null;pane=null});
  el('friendsBtn').onclick=friends;
- el('phoneBtn').onclick=phone;
+ el('phoneBtn').onclick=()=>{dismissToast();phone()};
+ el('phoneToast').onclick=()=>{const peer=toastPeer;dismissToast();if(peer&&contacts[peer])conversation(peer);else phone()};
  return {connect,disconnect,refresh:()=>updateList?.(),player:id=>adapter?.directory.get(id)};
 }

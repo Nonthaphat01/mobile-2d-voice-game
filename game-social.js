@@ -37,7 +37,7 @@ export function gameSocial(db,uid,ownName){
  const decline=peer=>{messagePair(uid,peer);return set(at('requests/'+uid+'/'+peer),null)};
  const watchMessages=(peer,notify,fail)=>onValue(query(at('messages/'+messagePair(uid,peer)),orderByChild('at'),limitToLast(SOCIAL_LIMIT)),snap=>{
    const messages=[];
-   snap.forEach(child=>{messages.push(child.val())});
+   snap.forEach(child=>{messages.push({...child.val(),id:child.key})});
    notify(messages);
  },fail);
  const sendMessage=async (peer,text)=>{
