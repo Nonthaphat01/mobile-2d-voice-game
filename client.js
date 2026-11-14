@@ -173,15 +173,23 @@ function renderRooms(){
    button.className='server'+(selectedRoom===id?' selected':'');
    button.setAttribute('aria-pressed',String(selectedRoom===id));
    const icon=document.createElement('span');
-   icon.className='sicon';icon.textContent='🏘️';icon.setAttribute('aria-hidden','true');
+   icon.className='sicon';icon.textContent=['🏡','🏠','🏘️'][ROOM_IDS.indexOf(id)];icon.setAttribute('aria-hidden','true');
    const body=document.createElement('span');body.className='sbody';
    const title=document.createElement('strong');title.textContent='ชุมชน '+id;
    const hint=document.createElement('small');
    hint.textContent=!room?'รอตรวจจำนวนผู้เล่น':room.count>=room.capacity?'เซิร์ฟเวอร์เต็ม':'ว่าง '+(room.capacity-room.count)+' ที่';
    body.append(title,hint);
+   const capacity=document.createElement('span');capacity.className='entry-capacity';
    const count=document.createElement('span');count.className='count';
    count.textContent=room?room.count+'/'+room.capacity:'—/'+MAX_PLAYERS;
-   button.append(icon,body,count);
+   const slots=document.createElement('span');slots.className='entry-room-slots';slots.setAttribute('aria-hidden','true');
+   for(let i=0;i<(room?.capacity??MAX_PLAYERS);i++){
+     const tile=document.createElement('i');
+     if(i<(room?.count??0))tile.className='occupied';
+     slots.append(tile);
+   }
+   capacity.append(count,slots);
+   button.append(icon,body,capacity);
    button.onclick=()=>{selectedRoom=id;lobbyError();renderRooms()};
    list.append(button);
  }

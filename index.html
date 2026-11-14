@@ -2,13 +2,13 @@
 <html lang="th">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#101a2b">
+<meta name="theme-color" content="#172e24">
 <link rel="icon" href="legacy/assets/images/home.png" type="image/png"><title>My Little Neighborhood V5 | ชุมชน 002</title>
 <link rel="stylesheet" href="style.css?v=ui-v4-20261112">
 <link rel="stylesheet" href="ui-v4.css?v=v4-model-20261112-5">
 <link rel="stylesheet" href="build-mode.css?v=town-1">
 <link rel="stylesheet" href="farm-market.css?v=v5-farm-1">
-<link rel="stylesheet" href="lobby.css?v=v5-account-1">
+<link rel="stylesheet" href="lobby.css?v=cottage-1">
 <link rel="stylesheet" href="game-hud.css?v=v5-gardener-1">
 <link rel="stylesheet" href="neighbors.css?v=effects-1">
 <link rel="stylesheet" href="community-map.css?v=garden-save-2">
@@ -17,12 +17,12 @@
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
 <section id="lobby" class="lobby entry-lobby" aria-label="หน้าเข้าเกม">
   <div class="entry-shell">
-    <div class="entry-brand">
-      <img src="legacy/assets/images/home.png" width="44" height="44" alt="">
-      <h1>My Little <br>Neighborhood</h1>
-      <p>ปลูกสวน แต่งบ้าน และพบเพื่อนบ้านในชุมชนของคุณ</p>
+    <section class="entry-brand" aria-labelledby="gameTitle">
       <div class="entry-landscape" aria-hidden="true"></div>
-    </div>
+      <div class="entry-edition"><span aria-hidden="true">✿</span> MY LITTLE NEIGHBORHOOD <b>V5</b></div>
+      <h1 id="gameTitle">My Little<br>Neighborhood</h1>
+      <p>ปลูกสวน แต่งบ้าน และพบเพื่อนบ้าน<br>ในชุมชนของคุณ</p>
+    </section>
     <div class="entry-card">
       <section id="accountScreen" aria-labelledby="accountTitle">
         <div class="entry-modes" aria-label="เลือกประเภทบัญชี">
@@ -45,7 +45,7 @@
         <button id="guestAccount" class="entry-text" type="button">เข้าด้วยบัญชีชั่วคราว</button>
       </section>
       <section id="serverScreen" aria-labelledby="serverTitle" hidden>
-        <div class="entry-session"><span id="accountIdentity"></span><button id="logoutAccount" class="entry-text" type="button">ออกจากระบบ</button></div>
+        <div class="entry-session"><span id="accountIdentity"></span><button id="logoutAccount" class="entry-text" type="button">ออกจากระบบ ↗</button></div>
         <h2 id="serverTitle" tabindex="-1">เลือกเซิร์ฟเวอร์</h2>
         <p class="entry-note">เลือกชุมชนเพื่อเข้าเกม เซฟออนไลน์ติดตามบัญชีของคุณ</p>
         <div class="entry-server-heading"><strong>ชุมชนออนไลน์</strong><button id="refreshRooms" class="entry-text" type="button">↻ รีเฟรช</button></div>
@@ -54,13 +54,13 @@
         <label for="nickname">ชื่อตัวละคร <small>ใช้เมื่อเริ่มเซฟใหม่</small></label>
         <input id="nickname" maxlength="18" placeholder="ผู้เล่น" value="ผู้เล่น" autocomplete="nickname">
         <details class="avatar-customizer" id="avatarCustomizer">
-          <summary>ปรับแต่งตัวละคร</summary>
+          <summary><span aria-hidden="true">✿</span> ปรับแต่งตัวละคร <b aria-hidden="true">›</b></summary>
           <div id="avatarFields" class="avatar-editor" aria-label="ปรับแต่งตัวละคร 2 มิติ"></div>
         </details>
         <button id="joinOnline" class="entry-primary" type="button" disabled>เข้าชุมชน 002</button>
       </section>
       <p id="lobbyError" class="entry-message" role="status" hidden></p>
-      <button id="playDemo" class="entry-demo" type="button">ทดลองเล่นคนเดียว <small>เซฟในเครื่อง</small></button>
+      <button id="playDemo" class="entry-demo" type="button"><span aria-hidden="true">☀</span> เล่นคนเดียว <small>เซฟในเครื่อง</small></button>
     </div>
   </div>
 </section>
@@ -128,6 +128,6 @@
   </div>
 </section>
 <script src="config.js?v=v5-sheets-1"></script>
-<script type="module" src="client.js?v=effects-2"></script>
+<script type="module" src="client.js?v=cottage-1"></script>
 </body>
 </html>
