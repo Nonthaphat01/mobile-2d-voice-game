@@ -13,7 +13,9 @@ export const emptyPlot = () => ({crop:null,plantedAt:0,watered:false});
 export const roomSize = level => ({w:650+96*estateLevel(level),h:430+48*estateLevel(level)});
 export const seedKey = crop => crop+'_seed';
 export function cropStock(inventory,crop) {
-  return crop==='tomato' ? inventory : (inventory.crops[crop] ??= {tomato:0,tomatoGrades:{}});
+  if(crop==='tomato')return inventory;
+  if(!inventory.crops[crop])inventory.crops[crop]={tomato:0,tomatoGrades:{}};
+  return inventory.crops[crop];
 }
 export const workersOf = home => [home?.gardener,...(Array.isArray(home?.extraGardeners)?home.extraGardeners:[])].filter(Boolean).slice(0,MAX_GARDENERS);
 export function setWorkers(home,workers) {

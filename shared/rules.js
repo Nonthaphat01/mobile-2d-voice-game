@@ -281,7 +281,7 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
       let collected=0, available=false;
       for(const crop of Object.keys(CROPS)){
       const box=cropStock(s.home.gardenBox,crop), stock=cropStock(items,crop);
-      available||=box.tomato>0;
+      available=available||box.tomato>0;
       let space=MAX_PRODUCE-stock.tomato;
       for(const [key,quantity] of Object.entries(box.tomatoGrades)){
         const count=Math.min(space,quantity);

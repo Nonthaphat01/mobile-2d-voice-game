@@ -13,7 +13,9 @@ const emptyPlot = () => ({crop:null,plantedAt:0,watered:false});
 const roomSize = level => ({w:650+96*estateLevel(level),h:430+48*estateLevel(level)});
 const seedKey = crop => crop+'_seed';
 function cropStock(inventory,crop) {
-  return crop==='tomato' ? inventory : (inventory.crops[crop] ??= {tomato:0,tomatoGrades:{}});
+  if(crop==='tomato')return inventory;
+  if(!inventory.crops[crop])inventory.crops[crop]={tomato:0,tomatoGrades:{}};
+  return inventory.crops[crop];
 }
 const workersOf = home => [home?.gardener,...(Array.isArray(home?.extraGardeners)?home.extraGardeners:[])].filter(Boolean).slice(0,MAX_GARDENERS);
 function setWorkers(home,workers) {
@@ -489,7 +491,7 @@ function applyAction(s,action,now=Date.now(),random=Math.random) {
       let collected=0, available=false;
       for(const crop of Object.keys(CROPS)){
       const box=cropStock(s.home.gardenBox,crop), stock=cropStock(items,crop);
-      available||=box.tomato>0;
+      available=available||box.tomato>0;
       let space=MAX_PRODUCE-stock.tomato;
       for(const [key,quantity] of Object.entries(box.tomatoGrades)){
         const count=Math.min(space,quantity);
