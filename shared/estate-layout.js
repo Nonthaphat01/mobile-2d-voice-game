@@ -1,6 +1,7 @@
 import {estateLevel,plotCount} from './estate.js?v=estate-1';
 
 const BED_WIDTH=78,BED_HEIGHT=53,COLUMN_STEP=94,ROW_STEP=65;
+const FIELD_COLUMN_STEP=86,AISLE_WIDTH=36;
 const columnsByTier=[2,4,6,8,12,16];
 const sides=[0,48,78,150,332,520];
 const rowsByTier=columnsByTier.map((columns,tier)=>tier?Math.ceil((plotCount(tier)-plotCount(tier-1))/columns):0);
@@ -70,33 +71,52 @@ export function estateFenceBlocks(lot,x,y,level){
 }
 
 
-function gardenGrid(lot,tier){
- if(!tier)return {x:lot.x+269,y:lot.y+53,columns:2,first:0,count:10};
- const columns=columnsByTier[tier],first=plotCount(tier-1),count=plotCount(tier)-first;
- const width=(columns-1)*COLUMN_STEP+BED_WIDTH;
- const x=lot.x+(lot.w-width)/2;
- const nearEdge=(tier===1?24:rearByTier[tier-1]-36)+12;
- const y=lot.slot<4?lot.y-nearEdge-BED_HEIGHT:lot.y+lot.h+nearEdge;
- return {x,y,columns,first,count};
+const fields=columnsByTier.slice(1).map((columns,i)=>{
+ const first=plotCount(i),pairs=first/2,rows=rowsByTier[i+1];
+ const pairsPerRow=Math.floor(pairs/rows),extras=pairs%rows;
+ let offset=first;
+ const beds=Array.from({length:rows},(_,row)=>{
+   // Give the outer rows any extra pairs while keeping both sides of the path balanced.
+   const rank=Math.min(row,rows-1-row)*2+(row>=rows/2?1:0);
+   const half=pairsPerRow+Number(rank<extras);
+   const band={first:offset,count:half*2,half};
+   offset+=band.count;
+   return band;
+ });
+ return {first,end:first*2,depth:i===0?36:rearByTier[i]-24,rows:beds};
+});
+
+export function estateGardenFields(lot,level){
+ const centre=lot.x+lot.w/2;
+ const rear=lot.slot<4?lot.y:lot.y+lot.h;
+ return fields.slice(0,estateLevel(level)).map(field=>{
+   const width=(Math.max(...field.rows.map(row=>row.half))-1)*FIELD_COLUMN_STEP*2+BED_WIDTH*2+AISLE_WIDTH;
+   const h=(field.rows.length-1)*ROW_STEP+BED_HEIGHT;
+   return {x:centre-width/2,y:lot.slot<4?rear-field.depth-h:rear+field.depth,w:width,h,centre};
+ });
 }
+
 export function estatePlotRect(lot,index){
- let tier=0;
- while(tier<5&&index>=plotCount(tier))tier++;
- const g=gardenGrid(lot,tier),offset=index-g.first,row=Math.floor(offset/g.columns);
- return {
-   x:g.x+(offset%g.columns)*COLUMN_STEP,
-   y:g.y+row*ROW_STEP*(tier&&lot.slot<4?-1:1),
-   w:BED_WIDTH,h:BED_HEIGHT
- };
+ if(index<10){
+   return {x:lot.x+269+(index%2)*COLUMN_STEP,y:lot.y+53+Math.floor(index/2)*ROW_STEP,w:BED_WIDTH,h:BED_HEIGHT};
+ }
+ const field=fields.find(field=>index<field.end);
+ const row=field.rows.findIndex(row=>index<row.first+row.count);
+ const band=field.rows[row],col=index-band.first;
+ const centre=lot.x+lot.w/2;
+ const x=col<band.half
+   ?centre-AISLE_WIDTH/2-BED_WIDTH-(band.half-1-col)*FIELD_COLUMN_STEP
+   :centre+AISLE_WIDTH/2+(col-band.half)*FIELD_COLUMN_STEP;
+ const y=lot.slot<4
+   ?lot.y-field.depth-BED_HEIGHT-row*ROW_STEP
+   :lot.y+lot.h+field.depth+row*ROW_STEP;
+ return {x,y,w:BED_WIDTH,h:BED_HEIGHT};
 }
+
 export function estatePlotIndex(lot,x,y,level){
- for(let tier=0;tier<=estateLevel(level);tier++){
-   const g=gardenGrid(lot,tier),backward=tier>0&&lot.slot<4;
-   const col=Math.floor((x-g.x)/COLUMN_STEP);
-   const row=backward?Math.floor((g.y+BED_HEIGHT-y)/ROW_STEP):Math.floor((y-g.y)/ROW_STEP);
-   const offset=row*g.columns+col;
-   if(col<0||col>=g.columns||row<0||offset>=g.count)continue;
-   const index=g.first+offset,r=estatePlotRect(lot,index);
+ const total=plotCount(level);
+ for(let index=0;index<total;index++){
+   const r=estatePlotRect(lot,index);
    if(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h)return index;
  }
  return -1;

@@ -1,4 +1,4 @@
-import {estateBounds,estateFenceBlocks,estateFenceSegments,estatePlotRect,estatePlotIndex,estateWorld,estateFromWire,estateToWire,mapEstateLot} from './shared/estate-layout.js?v=estate-full-1';
+import {estateBounds,estateFenceBlocks,estateFenceSegments,estateGardenFields,estatePlotRect,estatePlotIndex,estateWorld,estateFromWire,estateToWire,mapEstateLot} from './shared/estate-layout.js?v=estate-guide-1';
 import {roomVoice} from './game-voice.js?v=estate-1';
 import {CROPS,cropStock,seedKey,roomSize,estateLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=estate-1';
 import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
@@ -6,7 +6,9 @@ import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppear
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
-import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-full-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-guide-1';
+
+import {drawCommunityMap} from './community-map.js?v=estate-guide-1';
 
 const lots=baseLots.map(mapEstateLot);
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
@@ -350,6 +352,8 @@ function onNetwork(m){if(!active&&!['rooms','players','social'].includes(m.type)
    if(visiting&&!remote.has(visiting.id)){interact({type:'exit'});notice('เจ้าของบ้านออกจากชุมชนแล้ว')}
    hud()
    socialUI.refresh();
+   const map=el('dialogContent').querySelector('.community-map');
+   if(el('dialog').open&&map)refreshCommunityMap(map);
  }
  else if(m.type==='disconnected'){leaveGame('Firebase ขาดการเชื่อมต่อ กรุณาเข้าห้องใหม่')}
  else if(m.type==='player'){trackRemote(m.player,performance.now());hud()}
@@ -952,6 +956,44 @@ function estateDialog(){
 }
 const market={x:WORLD.w/2-64,y:588,w:128,h:111};
 const plotReach=75;
+function openCommunityMap(){
+ if(!active||buildDraft||el('dialog').open)return;
+ keys.clear();joyReset();
+ dialogType='communityMap';
+ showDialog('แผนที่ชุมชน '+room,d=>{
+   const canvas=document.createElement('canvas');
+   canvas.className='community-map';
+   canvas.width=960;canvas.height=470;
+   canvas.setAttribute('role','img');
+   canvas.setAttribute('aria-label','แผนที่ชุมชน แสดงบ้านทั้งแปดหลัง ตลาดกลาง และตำแหน่งผู้เล่น');
+   d.append(canvas);
+   const legend=document.createElement('div');
+   legend.className='community-map-legend';
+   for(const [label,color] of [['คุณ','#9cf2da'],['บ้านของคุณ','#f4bf73'],['ตลาดกลาง','#f5cd74'],['เพื่อนบ้าน','#a9c6ff']]){
+     const item=document.createElement('span'),dot=document.createElement('i');
+     dot.style.backgroundColor=color;
+     item.append(dot,label);legend.append(item);
+   }
+   d.append(legend);
+   const location=addText(d,scene==='inside'
+     ?'คุณอยู่ในบ้านแปลง '+((visiting?.slot??slot)+1)
+     :'บ้านของคุณคือแปลง '+(slot+1)+' · ตลาดกลางอยู่กลางถนน');
+   location.className='muted';
+   refreshCommunityMap(canvas);
+ });
+}
+function refreshCommunityMap(canvas){
+ const owners=new Set([slot]),levels=new Map([[slot,ownProfile.home.expansion]]);
+ const others=[];
+ for(const p of remote.values()){
+   owners.add(p.slot);levels.set(p.slot,p.home?.expansion);
+   if(p.scene==='outside')others.push(p);
+ }
+ const house=lots[visiting?.slot??slot];
+ const player=scene==='outside'?me:{x:house.x+131,y:house.y+189};
+ drawCommunityMap(canvas,{lots,levels,owners,ownSlot:slot,player,market,others});
+}
+el('mapBtn').onclick=openCommunityMap;
 function distanceToRect(x,y,r){return Math.hypot(Math.max(r.x-x,0,x-r.x-r.w),Math.max(r.y-y,0,y-r.y-r.h))}
 function plotInReach(r){return distanceToRect(me.x,me.y,r)<=plotReach}
 function houseRect(l){return {x:l.x+35,y:l.y+55,w:192,h:165}}
@@ -1096,6 +1138,7 @@ addEventListener('keydown',e=>{
  if(e.key==='/'){e.preventDefault();setChatOpen(true);el('chatInput').focus()}
  if(e.key.toLowerCase()==='e'){interact();e.preventDefault()}
  if(e.key.toLowerCase()==='i'){inventory();e.preventDefault()}
+ if(e.key.toLowerCase()==='m'){openCommunityMap();e.preventDefault()}
 });
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();joyReset()});
 const joy=el('joystick'),stick=el('stick');
@@ -1170,6 +1213,12 @@ function worldDraw(now,camera,preview=false){
    const stepY=bounds.gateY+(l.slot<4?-24:24);
    round(l.x,Math.min(backY,bounds.gateY),l.w,bounds.h,0,'#8faf6a');
    round(bounds.x,Math.min(backY,stepY),bounds.w,Math.abs(backY-stepY),0,'#8faf6a');
+   for(const field of estateGardenFields(l,level)){
+     if(!visible(field))continue;
+     round(field.x-9,field.y-8,field.w+18,field.h+16,9,'#7f9659');
+     round(field.centre-15,field.y-8,30,field.h+16,5,'#c2b58b');
+     line(field.centre-10,field.y,field.centre-10,field.y+field.h,'#d2c69f',2);
+   }
    for(let i=0;i<plotCount(level);i++){
      const r=estatePlotRect(l,i);
      if(visible(r))drawPlot(r,i,u.home?.plots?.[i],now);

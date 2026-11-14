@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  estateBounds, estateFenceBlocks, estateFenceSegments, estatePlotIndex, estatePlotRect,
+  estateBounds, estateFenceBlocks, estateFenceSegments, estateGardenFields, estatePlotIndex, estatePlotRect,
   estateFromWire, estateToWire, estateWorld, mapEstateLot
 } from '../shared/estate-layout.js';
 import {plotCount} from '../shared/estate.js';
@@ -67,6 +67,25 @@ test('larger map positions round-trip within the existing Firebase movement limi
         assert.ok(encoded.x>=0&&encoded.x<=2400&&encoded.y>=0&&encoded.y<=1290);
         const decoded=estateFromWire(encoded.x,encoded.y);
         assert.ok(Math.abs(x-decoded.x)<1e-8&&Math.abs(y-decoded.y)<1e-8);
+      }
+    }
+  }
+});
+
+
+test('each garden bank mirrors its partner across an uninterrupted walking aisle',()=>{
+  for(const lot of lots){
+    const centre=lot.x+lot.w/2;
+    const fields=estateGardenFields(lot,5);
+    assert.equal(fields.length,5);
+    for(let tier=1;tier<=5;tier++){
+      const field=fields[tier-1];
+      const beds=Array.from({length:plotCount(tier-1)},(_,i)=>estatePlotRect(lot,plotCount(tier-1)+i));
+      for(const bed of beds){
+        assert.ok(bed.x>=field.x&&bed.x+bed.w<=field.x+field.w);
+        assert.ok(bed.y>=field.y&&bed.y+bed.h<=field.y+field.h);
+        assert.ok(beds.some(other=>other.y===bed.y&&other.x===2*centre-bed.x-bed.w));
+        assert.equal(estatePlotIndex(lot,centre,bed.y+bed.h/2,tier),-1);
       }
     }
   }

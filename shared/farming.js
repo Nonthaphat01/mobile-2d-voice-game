@@ -123,6 +123,6 @@ export function gardenerPosition(lot, worker, now) {
     distance -= len;
   }
 }
-import {estatePlotRect} from './estate-layout.js?v=estate-full-1';
+import {estatePlotRect} from './estate-layout.js?v=estate-guide-1';
 import {CROPS} from './estate.js?v=estate-1';
 

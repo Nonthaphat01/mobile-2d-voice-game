@@ -1,0 +1,37 @@
+.game-dialog:has(.community-map) {
+  width: min(720px, 94vw);
+  max-width: 94vw;
+}
+.community-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #719583;
+  border-radius: 12px;
+}
+.community-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  color: #e8f2ec;
+  font-size: 12px;
+}
+.community-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.community-map-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.community-map-legend span:nth-child(2) i {
+  border-radius: 2px;
+}
+.community-map-legend span:nth-child(3) i {
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+

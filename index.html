@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="lobby.css?v=v5-account-1">
 <link rel="stylesheet" href="game-hud.css?v=v5-gardener-1">
 <link rel="stylesheet" href="neighbors.css?v=estate-2">
+<link rel="stylesheet" href="community-map.css?v=estate-guide-1">
 </head>
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
@@ -76,6 +77,7 @@
 <div id="joystick" class="joystick" hidden><div id="stick" class="stick"></div></div>
 <button id="bagBtn" class="bag-shortcut" type="button" aria-label="เปิดกระเป๋า" title="เปิดกระเป๋า (I)" hidden>🎒</button>
 <div id="socialButtons" class="social-shortcuts" hidden>
+  <button id="mapBtn" type="button" aria-label="แผนที่ชุมชน" title="แผนที่ชุมชน (M)">🗺️</button>
   <button id="friendsBtn" type="button" aria-label="เพื่อนและผู้เล่น" title="เพื่อนและผู้เล่น">👥</button>
   <button id="phoneBtn" type="button" aria-label="โทรศัพท์" title="โทรศัพท์">📱<span id="friendBadge" hidden></span></button>
 </div>
@@ -108,7 +110,7 @@
   </div>
 </section>
 <script src="config.js?v=v5-sheets-1"></script>
-<script type="module" src="client.js?v=estate-full-1"></script>
+<script type="module" src="client.js?v=estate-guide-1"></script>
 </body>
 </html>
 
