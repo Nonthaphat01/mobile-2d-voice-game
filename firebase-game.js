@@ -88,9 +88,21 @@ export class FirebaseGame {
     // A per-session connection marker is removed on disconnect, NOT the slot.
     // This prevents a kicked old tab from removing a new occupant of its slot.
     // The scheduled server sweeper releases abandoned slots within ~1 minute.
-    await onDisconnect(connectionRef).remove();
-    await set(connectionRef,{sessionId,connectedAt:serverTimestamp()});
-    this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.connectionRef=connectionRef;this.profile=profile;this.ended=false;
+    let sessionPresence=false;
+    try{
+      await onDisconnect(connectionRef).remove();
+      await set(connectionRef,{sessionId,connectedAt:serverTimestamp()});
+      // Only session-based occupants may be removed by the scheduled sweeper.
+      await update(slotRef,{presenceMode:'session'});
+      sessionPresence=true;
+    }catch(error){
+      // Until new Firebase rules are deployed, preserve the original
+      // disconnect behavior instead of breaking the online Join flow.
+      await onDisconnect(connectionRef).cancel().catch(()=>{});
+      await remove(connectionRef).catch(()=>{});
+      await onDisconnect(slotRef).remove();
+    }
+    this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.connectionRef=sessionPresence?connectionRef:null;this.profile=profile;this.ended=false;
     this.profileWrites=Promise.resolve();
     const contactProbe=ref(this.db,`${ROOT}/social/contacts/_privacy_probe`);
     this.social=null;
@@ -220,6 +232,9 @@ export class FirebaseGame {
   this.unsubscribe?.();this.unsubConnected?.();this.unsubscribe=null;this.unsubConnected=null;
   this.slotRef=null;this.connectionRef=null;this.uid='';this.room='';this.slot=-1;this.social=null;
   if(connection){try{await onDisconnect(connection).cancel()}catch{};try{await remove(connection)}catch{}}
-  if(slot){try{await remove(slot)}catch{}}
+  if(slot){
+    if(!connection)try{await onDisconnect(slot).cancel()}catch{}
+    try{await remove(slot)}catch{}
+  }
  }
 }
