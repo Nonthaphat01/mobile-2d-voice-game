@@ -3,7 +3,7 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {collectGardenBox} from './shared/collect-garden-box.js?v=box-1';
+import {GARDEN_ACTIONS,saveGardenAction} from './shared/garden-save.js?v=garden-save-1';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=town-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=town-1';
@@ -145,7 +145,7 @@ export class FirebaseGame {
     catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
     return result;
   }
-  if(action.type==='collectGardenBox')return this.collectBox(uid,slotRef);
+  if(GARDEN_ACTIONS.has(action.type))return this.saveGarden(uid,slotRef,action);
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
   try{
@@ -198,27 +198,32 @@ export class FirebaseGame {
   }catch(e){
     const exhausted=/maxretry/i.test(String(e?.code||'')+' '+String(e?.message||''));
     const failure={ok:false,message:exhausted
-      ?'เซฟกำลังถูกเขียนพร้อมกันหลายรายการ กรุณาปิดแท็บเกมที่เปิดซ้ำ แล้วลองเก็บผลผลิตอีกครั้ง'
+      ?'เซฟกำลังอัปเดตพร้อมกัน กรุณาลองอีกครั้ง'
       :'บันทึกข้อมูลไม่สำเร็จ: '+e.message};
-    if(this.slotRef===slotRef)this.emit({type:'error',message:failure.message});
+    if(this.slotRef===slotRef&&(!exhausted||!backgroundAction(action.type)))this.emit({type:'error',message:failure.message});
     return failure;
   }
  }
- async collectBox(uid,slotRef){
+ async saveGarden(uid,slotRef,action){
+  const background=backgroundAction(action.type);
   let result;
   try{
     const token=await this.currentUser()?.getIdToken();
     if(this.slotRef!==slotRef||this.ended)return;
-    result=token?await collectGardenBox(this.config.databaseURL,ROOT,uid,token)
+    result=token?await saveGardenAction(this.config.databaseURL,ROOT,uid,token,action)
       :{ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
   }catch{
-    result={ok:false,message:'ตรวจผลการรับผลผลิตไม่ได้ กรุณาเปิดกล่องใหม่เพื่อตรวจยอด'};
+    result={ok:false,message:'ตรวจผลการบันทึกงานสวนไม่ได้ กรุณาเข้าเกมใหม่เพื่อตรวจยอดก่อนลองอีกครั้ง'};
   }
   if(this.slotRef!==slotRef||this.ended)return;
   if(result.profile){
     this.profile=result.profile;
-    this.emit({type:'profile',profile:result.profile,notice:result.message});
-  }else if(result.message)this.emit({type:'notice',message:result.message});
+    this.emit({type:'profile',profile:result.profile,notice:result.message,background});
+    if(result.ok){
+      try{await update(slotRef,{home:result.profile.home,...publicStats(result.profile),updatedAt:Date.now()})}
+      catch(e){if(this.slotRef===slotRef&&!background)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ'})}
+    }
+  }else if(result.message&&!background)this.emit({type:'notice',message:result.message});
   return result;
  }
  async setAppearance(value){
