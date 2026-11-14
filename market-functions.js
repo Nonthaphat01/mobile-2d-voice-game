@@ -3,7 +3,7 @@ import {getDatabase} from 'firebase-admin/database';
 import {getFirestore} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {createHmac, randomBytes} from 'node:crypto';
-import {applyAction, lots} from './shared/rules.js?v=house-reset-1';
+import {applyAction, lots} from './shared/rules.js?v=town-1';
 import {gardenerPost,gardenBoxPosition} from './shared/farming.js?v=v5-neighbors-1';
 import {firestoreMarket, MARKET_PATH} from './firestore-market.js';
 

@@ -2,8 +2,8 @@
  * V4->V5 avatar adapter. The model/animation is imported verbatim from the user's V4 game.js.
  * The bridge retains stable actors across Firebase updates and provides an accessible appearance editor.
  */
-import {renderClassicAvatar,V4_APPEARANCE_OPTIONS} from './v4-character.js?v=v5-neighbors-1';
-import {sanitizeAppearance} from './shared/rules.js?v=v5-hud-1';
+import {renderClassicAvatar,V4_APPEARANCE_OPTIONS} from './v4-character.js?v=town-1';
+import {sanitizeAppearance} from './shared/rules.js?v=town-1';
 
 const actors=new Map();
 const STORAGE='v5_v4_appearance';
@@ -33,7 +33,7 @@ export function drawClassicActor(ctx,p,now,local,profileName,localAppearance){
  return renderClassicAvatar(ctx,actor,now,{speaking:p.voiceTalking===true||!!(p.text&&p.until>Date.now())});
 }
 
-function appearancePreview(canvas){
+function appearancePreview(canvas,look=chosen){
  if(!canvas)return;
  const ctx=canvas.getContext('2d');if(!ctx)return;
  ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -43,11 +43,12 @@ function appearancePreview(canvas){
  ctx.save();ctx.translate(canvas.width/2,canvas.height*.65);ctx.scale(2.35,2.35);
  // One-off actor avoids preview's motion state from leaking into game models.
  renderClassicAvatar(ctx,{x:0,y:0,scene:'preview',face:Math.PI/2,
-   pose:'stand',walking:false,appearance:chosen},performance.now());
+   pose:'stand',walking:false,appearance:look},performance.now());
  ctx.restore();
 }
-export function buildAppearanceEditor(host,onApply,{lobby=false}={}){
+export function buildAppearanceEditor(host,onApply,{lobby=false,initial=chosen,storePreview=true}={}){
  if(!host)return;
+ let draft=sanitizeAppearance(initial);
  host.replaceChildren();
  const preview=document.createElement('canvas');
  preview.width=150;preview.height=146;
@@ -55,17 +56,18 @@ export function buildAppearanceEditor(host,onApply,{lobby=false}={}){
  preview.setAttribute('aria-label','ตัวอย่างโมเดลตัวละครจากเกม V4');
  host.append(preview);
  const grid=document.createElement('div');grid.className='avatar-fields';
- const titles={gender:'รูปร่าง',skin:'สีผิว',hair:'สีผม',style:'ทรงผม',outfit:'สีเสื้อผ้า',accessory:'เครื่องประดับ'};
+ const titles={gender:'รูปร่าง',skin:'สีผิว',hair:'สีผม',style:'ทรงผม',outfit:'เสื้อ',pants:'กางเกง',shoes:'รองเท้า',accessory:'เครื่องประดับ'};
  for(const [key,names] of Object.entries(V4_APPEARANCE_OPTIONS)){
    const label=document.createElement('label');const title=document.createElement('span');
    title.textContent=titles[key]||key;label.append(title);
    const select=document.createElement('select');
    select.setAttribute('aria-label',title.textContent);
    names.forEach((name,i)=>{const option=document.createElement('option');option.value=String(i);option.textContent=name;select.append(option)});
-   select.value=String(chosen[key]);
+   select.value=String(draft[key]);
    select.onchange=()=>{
-     chosen=sanitizeAppearance({...chosen,[key]:Number(select.value)});
-     touched=true;persist();appearancePreview(preview);
+     draft=sanitizeAppearance({...draft,[key]:Number(select.value)});
+     if(storePreview){chosen=draft;touched=true;persist()}
+     appearancePreview(preview,draft);
    };
    label.append(select);grid.append(label);
  }
@@ -73,7 +75,7 @@ export function buildAppearanceEditor(host,onApply,{lobby=false}={}){
  const button=document.createElement('button');button.type='button';
  button.className=lobby?'mini avatar-apply':'dialog-action avatar-apply';
  button.textContent=lobby?'💾 ใช้ตัวละครนี้':'💾 บันทึกรูปลักษณ์ตัวละคร';
- button.onclick=()=>{touched=true;persist();onApply?.(getChosenAppearance())};
+ button.onclick=()=>{if(storePreview){chosen=draft;touched=true;persist()}onApply?.(draft)};
  host.append(button);
- appearancePreview(preview);
+ appearancePreview(preview,draft);
 }

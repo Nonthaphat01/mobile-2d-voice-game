@@ -1,6 +1,40 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {starter,applyAction,lots,PLOT_COUNT,GROW_MS,sanitizeState,HOME_GRID} from '../shared/rules.js';
+import {partitionBlocks,partitionKey,partitionLine,VEHICLES} from '../shared/town.js';
+
+test('house layout validates, saves, and restores door state and finishes',()=>{
+ const state=starter();
+ const door={col:4,row:4,edge:'south',kind:'door',finish:2};
+ const wall={col:3,row:4,edge:'south',kind:'wall',finish:1};
+ const window={col:0,row:2,edge:'west',kind:'window',finish:3};
+ const tile={col:3,row:3,finish:4};
+ const action={type:'saveHome',furniture:[],inventoryFurniture:{},architecture:{walls:[wall,door,window],tiles:[tile]}};
+ assert.equal(applyAction(state,action).ok,true);
+ assert.equal(applyAction(state,{...action,architecture:{walls:[door,door],tiles:[]}}).ok,false);
+ const [x,y]=partitionLine(door,HOME_GRID);
+ assert.equal(partitionBlocks(state.home.architecture.walls[1],HOME_GRID,x+12,y),true);
+ assert.equal(applyAction(state,{type:'toggleInteriorDoor',key:partitionKey(door)}).ok,true);
+ const saved=sanitizeState(state);
+ assert.equal(partitionBlocks(saved.home.architecture.walls[1],HOME_GRID,x+12,y),false);
+ assert.deepEqual(saved.home.architecture.tiles,[tile]);
+ assert.equal(saved.home.architecture.walls[2].finish,3);
+});
+
+test('vehicle purchase debits once and appearance and garage persist',()=>{
+ const state=starter();
+ state.money=15000;
+ assert.deepEqual(state.garage.owned,['bicycle']);
+ assert.deepEqual(Object.values(VEHICLES).slice(1).map(vehicle=>vehicle.price),[15000,10000,100000,250000,150000]);
+ assert.equal(applyAction(state,{type:'equipVehicle',vehicle:'car'}).ok,false);
+ assert.equal(applyAction(state,{type:'buyVehicle',vehicle:'motorcycle'}).ok,true);
+ assert.equal(applyAction(state,{type:'buyVehicle',vehicle:'motorcycle'}).ok,false);
+ assert.equal(state.money,0);
+ assert.equal(applyAction(state,{type:'appearance',appearance:{gender:1,skin:9,hair:9,style:9,outfit:9,pants:9,shoes:9}}).ok,true);
+ const saved=sanitizeState(state);
+ assert.equal(saved.garage.equipped,'motorcycle');
+ assert.deepEqual(saved.appearance,{gender:1,skin:9,hair:9,style:9,outfit:9,pants:9,shoes:9,accessory:0});
+});
 
 test('starter home: 100 baht, empty home, ten plots, starter tools',()=>{
  const s=starter('นนท์');

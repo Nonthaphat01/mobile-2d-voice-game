@@ -3,9 +3,9 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=house-reset-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=town-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
-import {requestSheetsMarket} from './shared/sheets-market-client.js?v=v5-sheets-1';
+import {requestSheetsMarket} from './shared/sheets-market-client.js?v=town-1';
 
 const backgroundAction = type => type==='gardenerResume'?'gardenerStep':['gardenerStep','needsTick'].includes(type)?type:false;
 
@@ -106,7 +106,7 @@ export class FirebaseGame {
  }
  send(m){
   if(!this.slotRef||this.ended)return;
-  if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,house:m.house??null,restAngle:m.restAngle??null,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
+  if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,house:m.house??null,restAngle:m.restAngle??null,vehicle:m.scene==='outside'&&this.profile?.garage?.owned.includes(m.vehicle)?m.vehicle:null,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
   if(m.type==='voice')return update(this.slotRef,m.fields);
   if(m.type==='say'){
     const now=Date.now();if(now-this.lastChat<850)return;
@@ -140,7 +140,7 @@ export class FirebaseGame {
       await update(slotRef,publicStats(result.profile)).catch(()=>{});
       return result;
     }
-    try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,...publicStats(result.profile),updatedAt:Date.now()})}
+    try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,appearance:result.profile.appearance,...publicStats(result.profile),updatedAt:Date.now()})}
     catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
     return result;
   }
@@ -169,7 +169,7 @@ export class FirebaseGame {
       return lastResult;
     }
     try{
-      await update(slotRef,{name:profile.displayName,home:profile.home,...publicStats(profile),updatedAt:Date.now()});
+      await update(slotRef,{name:profile.displayName,home:profile.home,appearance:profile.appearance,...publicStats(profile),updatedAt:Date.now()});
     }catch(e){
       if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ: '+e.message});
     }

@@ -3,7 +3,7 @@
   top: max(10px, env(safe-area-inset-top));
   right: max(10px, env(safe-area-inset-right));
   z-index: 5;
-  width: clamp(132px, 21vw, 250px);
+  width: clamp(155px, 23vw, 300px);
   padding: 5px;
   border: 1px solid #719583;
   border-radius: 11px;
@@ -11,6 +11,20 @@
   pointer-events: none;
 }
 .community-map-panel canvas { display: block; width: 100%; height: auto; border-radius: 6px; }
+.map-travel { display: flex; gap: 4px; margin-top: 4px; pointer-events: auto; }
+.map-travel button { flex: 1; min-height: 34px; padding: 2px; border: 1px solid #719583; border-radius: 6px; color: #efffed; background: #284c42; font: 700 clamp(11px,1.1vw,14px) system-ui; }
+body.building #mapPanel { display: none; }
+div.nearby-action { left: 50%; top: auto; bottom: max(68px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(450px, 68vw); display: grid; gap: 5px; padding: 5px; }
+div.nearby-action[hidden] { display: none; }
+.nearby-tabs { display: flex; gap: 4px; overflow-x: auto; }
+.nearby-tabs:empty { display: none; }
+.nearby-tabs button, #nearbyUse, #hireShortcut, #rideShortcut {
+  border: 1px solid #779b90; border-radius: 7px; padding: 6px; background: #203c3b; color: #effff0; font-weight: 700; white-space: nowrap;
+}
+.nearby-tabs button[aria-pressed=true] { background: #b2dfad; color: #192b21; }
+.map-actions { display: flex; gap: 4px; margin-top: 4px; pointer-events: auto; }
+.map-actions button { min-width: 0; flex: 1; font-size: clamp(11px,1.15vw,13px); }
+@media (pointer:coarse) { div.nearby-action { bottom: max(134px, calc(env(safe-area-inset-bottom) + 134px)); } }
 .community-map-legend { display: flex; justify-content: space-between; gap: 2px; padding: 2px 2px 0; font-size: clamp(9px, 1vw, 12px); }
 .community-map-legend span:nth-child(1) { color: #9cf2da; }
 .community-map-legend span:nth-child(2) { color: #f4bf73; }

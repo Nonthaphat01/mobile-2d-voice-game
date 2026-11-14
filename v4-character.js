@@ -5,28 +5,38 @@
  */
 const appearanceOptions = {
  gender:['ชาย','หญิง','ไม่ระบุ'],
- skin:['ขาวอมชมพู','สีน้ำผึ้งอ่อน','สีน้ำผึ้ง','น้ำตาล','น้ำตาลเข้ม'],
- hair:['ดำ','น้ำตาล','ทอง','แดงเข้ม','เทาเงิน'],
- style:['ผมสั้น','ผมยาว','ผมหยิก','ผมมัด'],
- outfit:['ฟ้าคราม','ส้มอิฐ','เขียวใบไม้','ม่วงลาเวนเดอร์','เหลืองมัสตาร์ด','ชมพูกุหลาบ'],
+ skin:['ขาวอมชมพู','สีน้ำผึ้งอ่อน','สีน้ำผึ้ง','น้ำตาล','น้ำตาลเข้ม','พอร์ซเลน','เบจทอง','แทนอมแดง','น้ำตาลมะกอก','โกโก้'],
+ hair:['ดำ','น้ำตาล','ทอง','แดงเข้ม','เทาเงิน','น้ำเงิน','เขียวเข้ม','ม่วง','ชมพู','ทองแดง'],
+ style:['ผมสั้น','ผมยาว','ผมหยิก','ผมมัด','รองทรง','แสกข้าง','บ๊อบ','หางม้า','มัดสองข้าง','ตั้งปัด'],
+ outfit:['ฟ้าคราม','ส้มอิฐ','เขียวใบไม้','ม่วงลาเวนเดอร์','เหลืองมัสตาร์ด','ชมพูกุหลาบ','เชิ้ตขาว','เสื้อดำ','เสื้อลายทาง','เสื้อแจ็กเก็ต'],
+ pants:['ยีนส์น้ำเงิน','ดำ','เทา','กากี','เขียวมะกอก','ขาว','แดงเข้ม','ยีนส์ฟอก','ม่วง','น้ำตาล'],
+ shoes:['กรมท่า','ขาว','แดง','ฟ้า','เขียว','ดำ','ครีม','ม่วง','ส้ม','น้ำตาล'],
  accessory:['ไม่มี','แว่นตา','หมวกแก๊ป']
 };
-const baseAppearance={gender:2,skin:1,hair:1,style:0,outfit:0,accessory:0};
+const baseAppearance={gender:2,skin:1,hair:1,style:0,outfit:0,pants:0,shoes:0,accessory:0};
 const skinTones=[
  ['#fff0dc','#efc1a1','#cc8e7c'],['#ffe3bb','#e5ab7f','#b5755b'],
  ['#f5d298','#c78c5e','#975839'],['#dba474','#a76a47','#794332'],
- ['#b87e5e','#81503c','#55332b']
+ ['#b87e5e','#81503c','#55332b'],['#fff7e7','#f2ccba','#dcb3a9'],
+ ['#fce4b2','#d9ae7e','#bf865a'],['#f1c09b','#c88a71','#925745'],
+ ['#d39766','#9a6e51','#684b39'],['#9d6957','#644039','#492d2a']
 ];
 const hairTones=[
  ['#586278','#283244','#151b2c'],['#9e7356','#614534','#382b25'],
  ['#ffe9a2','#cda063','#8d613c'],['#c9695a','#843c35','#482b2f'],
- ['#e1e9ed','#a6aebd','#626d84']
+ ['#e1e9ed','#a6aebd','#626d84'],['#92b5ed','#4f6ba4','#283f6c'],
+ ['#729b79','#3f654f','#273d36'],['#be92cc','#7d5596','#463052'],
+ ['#ffbdcd','#dd83a1','#8d4f6d'],['#ffc185','#bd7243','#713d2d']
 ];
 const outfitTones=[
  ['#a2e0e8','#4f9aa9','#30707b'],['#ffc196','#d47c5e','#9a493b'],
  ['#d6e899','#7ca464','#436d4e'],['#d1c0f1','#9075b6','#604b83'],
- ['#ffe4a1','#cd9e46','#906632'],['#f7b7c6','#c97792','#8d4964']
+ ['#ffe4a1','#cd9e46','#906632'],['#f7b7c6','#c97792','#8d4964'],
+ ['#fffcf3','#d7e0dc','#96a7a6'],['#7c838d','#424650','#222631'],
+ ['#f3efdc','#72a1ba','#3d607b'],['#efb590','#97694e','#583c34']
 ];
+const pantsTones=['#52647c','#35353f','#89929a','#b4a378','#71815c','#e3dfd3','#973e50','#7eacc6','#7c638e','#8b6046'];
+const shoeTones=['#2e3c50','#f2efe7','#bf5261','#619cca','#639c7e','#25242a','#d9c8a1','#8b69b5','#e99054','#986a4b'];
 const bodyProfiles=[
  {shoulder:16.5,waist:12.4,hips:11.2,neck:5,headY:-27,headWidth:13.5,jaw:10.4},
  {shoulder:12.2,waist:8.5,hips:12.1,neck:3.8,headY:-25.7,headWidth:12.4,jaw:7.3},
@@ -214,6 +224,9 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now,unhappy=fa
  const headX=lookX*2, headY=profile.headY;
  c.save();c.translate(headX,headY);
  const hairFill=lightGradient(c,-9,-13,10,12,hair);
+ if(a.style===6)shapeRound(c,-14,-10,28,24,7,hair[2]);
+ if(a.style===7)shapeEllipse(c,-14,0,6,15,hair[2],.2);
+ if(a.style===8){shapeEllipse(c,-13,9,5,12,hair[2],.3);shapeEllipse(c,13,9,5,12,hair[2],-.3)}
  if(a.style===1||a.style===3){
    shapeEllipse(c,a.style===1?0:-7,-1,a.style===1?15:8,a.style===1?19:11,hair[2],.28);
    shapeEllipse(c,-9,4,3,9,hair[1],.22);
@@ -315,6 +328,9 @@ function drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now,unhappy=fa
    if(!back)shapeEllipse(c,lookX*4,-9,12.5,3.4,shirt[0],lookX*.12);
    shapeEllipse(c,-1.5,-19,2.2,1.2,shirt[0]);
  }
+ if(a.style===4)shapeEllipse(c,-1,-14,11,3.8,hair[2],-.1);
+ if(a.style===5)shapeEllipse(c,5,-10,9,4.5,hairFill,.38);
+ if(a.style===9)for(const x of [-6,0,6])shapeEllipse(c,x,-17,3,6,hairFill,.42);
  c.restore();
  c.restore();
 }
@@ -436,7 +452,7 @@ function drawSwimmer(c,p,now,a,skin,hair,shirt,face,speaking,swing){
  }
 }
 function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1:0){
- const a=characterAppearance(p);
+ const a=cleanAppearance(characterAppearance(p));
  const skin=skinTones[a.skin],hair=hairTones[a.hair],shirt=outfitTones[a.outfit];
  const profile=bodyProfiles[a.gender];
  const motion=activityPose(p.action,now);
@@ -482,10 +498,10 @@ function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1
    const kneeX=(hipX+footX)*.5+walkX*(lift*2.7+seat*2.9)+side*squat*1.7;
    const kneeY=(chestY+footY)*.5+2+walkY*(seat*2.4+squat*1.7);
    const farther=side===legOrder[0],legWidth=7.6-sideView*(farther?1.8:0);
-   shapeLine(c,[[hipX,chestY+5],[kneeX,kneeY],[footX,footY]],farther?'#37465e':'#52647c',legWidth);
+   shapeLine(c,[[hipX,chestY+5],[kneeX,kneeY],[footX,footY]],farther&&a.pants===0?'#37465e':pantsTones[a.pants],legWidth);
    shapeLine(c,[[hipX-.5,chestY+7],[kneeX-.4,kneeY]],'#ffffff27',1.55);
    c.save();c.translate(footX,footY);c.rotate(walkX*(.19+lift*.30-reach*.17));
-   shapeRound(c,-5+walkX*1.9,-2.25,10,5.7,2.3,'#2e3c50');
+   shapeRound(c,-5+walkX*1.9,-2.25,10,5.7,2.3,shoeTones[a.shoes]);
    shapeRound(c,-4.7+walkX*1.9,1.05,9.4,1.9,1,shirt[0]);
    c.restore();
  }
@@ -531,6 +547,8 @@ function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1
  const sideOn=sideView>.30;
  if(sideOn)drawArm(legOrder[0]);
  drawShirt(c,profile,a,shirt,skin,narrow,walkY<-.65);
+ if(a.outfit===8)for(const y of [-8,-3,2])shapeLine(c,[[-6*narrow,y],[6*narrow,y]],shirt[0],1.5);
+ if(a.outfit===9)shapeLine(c,[[0,-10],[0,5]],shirt[0],1.3);
  if(!sideOn)drawArm(legOrder[0]);
  drawArm(legOrder[1]);
  drawHead(c,lookX,lookY,a,skin,hair,shirt,speaking,motion,now,p.unhappy);

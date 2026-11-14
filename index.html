@@ -6,12 +6,12 @@
 <link rel="icon" href="legacy/assets/images/home.png" type="image/png"><title>My Little Neighborhood V5 | ชุมชน 002</title>
 <link rel="stylesheet" href="style.css?v=ui-v4-20261112">
 <link rel="stylesheet" href="ui-v4.css?v=v4-model-20261112-5">
-<link rel="stylesheet" href="build-mode.css?v=v5-build-room-2">
+<link rel="stylesheet" href="build-mode.css?v=town-1">
 <link rel="stylesheet" href="farm-market.css?v=v5-farm-1">
 <link rel="stylesheet" href="lobby.css?v=v5-account-1">
 <link rel="stylesheet" href="game-hud.css?v=v5-gardener-1">
 <link rel="stylesheet" href="neighbors.css?v=estate-2">
-<link rel="stylesheet" href="community-map.css?v=estate-split-1">
+<link rel="stylesheet" href="community-map.css?v=town-1">
 </head>
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
@@ -77,6 +77,8 @@
 <aside id="mapPanel" class="community-map-panel" aria-label="แผนที่ชุมชน" hidden>
   <canvas id="communityMap" width="960" height="470" role="img" aria-label="แผนที่แสดงตำแหน่งของคุณ บ้าน ตลาดกลาง และเพื่อนบ้าน"></canvas>
   <div class="community-map-legend"><span>● คุณ</span><span>■ บ้าน</span><span>◆ ตลาด</span><span>● เพื่อน</span></div>
+  <div class="map-travel"><button id="travelHome" type="button">⌂ กลับบ้าน</button><button id="travelMarket" type="button">↪ ตลาดกลาง</button></div>
+  <div class="map-actions"><button id="hireShortcut" type="button">จ้างคนสวน</button><button id="rideShortcut" type="button" aria-pressed="false">ขึ้นรถ</button></div>
 </aside>
 <div id="joystick" class="joystick" hidden><div id="stick" class="stick"></div></div>
 <button id="bagBtn" class="bag-shortcut" type="button" aria-label="เปิดกระเป๋า" title="เปิดกระเป๋า (I)" hidden>🎒</button>
@@ -84,7 +86,10 @@
   <button id="friendsBtn" type="button" aria-label="เพื่อนและผู้เล่น" title="เพื่อนและผู้เล่น">👥</button>
   <button id="phoneBtn" type="button" aria-label="โทรศัพท์" title="โทรศัพท์">📱<span id="friendBadge" hidden></span></button>
 </div>
-<button id="nearbyAction" class="nearby-action" type="button" hidden><span id="nearbyIcon" aria-hidden="true"></span><span id="nearbyLabel"></span><kbd>E</kbd></button>
+<div id="nearbyAction" class="nearby-action" hidden>
+  <div id="nearbyTabs" class="nearby-tabs" role="group" aria-label="สิ่งที่อยู่ใกล้"></div>
+  <button id="nearbyUse" type="button"><span id="nearbyIcon" aria-hidden="true"></span> <span id="nearbyLabel"></span> <kbd>E</kbd></button>
+</div>
 <section id="chatPanel" class="chat-panel" aria-label="แชทและการแจ้งเตือน" hidden>
   <button id="chatToggle" class="chat-toggle" type="button" aria-expanded="true" aria-controls="chatFeed">แชทและแจ้งเตือน <span id="chatBadge" hidden></span></button>
   <div id="chatFeed">
@@ -103,6 +108,15 @@
   <div id="buildFloor" role="group" aria-label="ช่องวางบนพื้นห้อง ใช้ปุ่มลูกศรเพื่อเลือกช่อง"></div>
   <div id="buildDock" class="build-dock">
     <p id="buildStatus" role="status"></p>
+    <div id="buildMaterials" class="build-materials">
+      <label>เครื่องมือ <select id="buildTool">
+        <option value="furniture">เฟอร์นิเจอร์</option><option value="wall">กำแพง</option><option value="door">ประตู</option>
+        <option value="window">หน้าต่าง</option><option value="tile">กระเบื้องพื้น</option>
+        <option value="eraseWall">ลบกำแพง / ประตู / หน้าต่าง</option><option value="eraseTile">ลบกระเบื้อง</option>
+      </select></label>
+      <label id="buildEdgeLabel">ขอบ <select id="buildEdge"><option value="east">ขวา</option><option value="south">ล่าง</option><option value="north">บน</option><option value="west">ซ้าย</option></select></label>
+      <label id="buildFinishLabel">สี <select id="buildFinish"><option value="0">ไม้</option><option value="1">ครีม</option><option value="2">เขียว</option><option value="3">น้ำเงิน</option><option value="4">อิฐ</option><option value="5">ทราย</option></select></label>
+    </div>
     <div id="buildStock" class="build-stock" role="group" aria-label="เฟอร์นิเจอร์ในกระเป๋า"></div>
     <div class="build-controls">
       <button id="buildRotate" type="button">↻ หมุน</button>
@@ -113,6 +127,6 @@
   </div>
 </section>
 <script src="config.js?v=v5-sheets-1"></script>
-<script type="module" src="client.js?v=house-reset-1"></script>
+<script type="module" src="client.js?v=town-1"></script>
 </body>
 </html>

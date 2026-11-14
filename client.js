@@ -1,22 +1,23 @@
 import {estateBounds,estateFenceBlocks,estateFenceSegments,estateGardenFields,estatePlotRect,estatePlotIndex,estateWorld,estateFromWire,estateToWire,mapEstateLot} from './shared/estate-layout.js?v=estate-guide-1';
 import {roomVoice} from './game-voice.js?v=estate-1';
 import {CROPS,cropStock,seedKey,roomSize,houseExpansionLevel,gardenExpansionLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=house-reset-1';
-import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=house-reset-1';
-import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=estate-1';
+import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=town-1';
+import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=town-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
 import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-guide-1';
 
-import {drawCommunityMap} from './community-map.js?v=estate-guide-1';
+import {drawCommunityMap} from './community-map.js?v=town-1';
 
 const lots=baseLots.map(mapEstateLot);
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
-import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
+import {renderClassicAvatar} from './v4-character.js?v=town-1';
 import {installSocialUI} from './social-ui.js?v=v5-neighbors-2';
 import {weatherAt, drawWeather, sway} from './weather.js?v=v5-farm-1';
 import {fatigueOpacity,hungerOffset,LOW_NEED,NEEDS_STEP_MS} from './shared/needs.js?v=v5-hud-1';
+import {VEHICLES,HOME_FINISHES,sanitizeArchitecture,partitionKey,partitionLine,partitionBlocks} from './shared/town.js?v=town-1';
 
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
@@ -26,6 +27,9 @@ const remote=new Map();
 const gardenerVisuals=new Map();
 let visiting=null, houseEnteredAt=0, HOME_GRID=BASE_GRID;
 const interior=()=>roomSize(visiting?.expansion??houseExpansionLevel(ownProfile.home));
+const interiorGrid=()=>homeGrid(visiting?.expansion??houseExpansionLevel(ownProfile.home));
+const interiorArchitecture=()=>buildDraft?.architecture??visiting?.architecture??ownProfile.home.architecture;
+const isNight=()=>{const minute=Math.floor(Date.now()/1000)%720;return minute>540||minute<120};
 const produceEntries=inventory=>Object.keys(CROPS).flatMap(crop=>Object.entries(cropStock(inventory,crop).tomatoGrades).map(([key,count])=>[crop,key,count]));
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
 let sentMovement;
@@ -34,7 +38,7 @@ let selectedRoom='002',room='002',slot=0,myId='local',ownProfile=starter(),serve
 let me={x:0,y:0,face:1,walking:false,text:'',until:0};
 let joyX=0,joyY=0,joyId=null,sound=false,soundCtx=null,lastStep=0,ambientAt=0;
 let plotReadyTimer,renderedCamera;
-let gardenerPending=false, gardenerRetryAt=0, gardenerResume=false, receiptSeen=0, enteredGardenerPost=false;
+let gardenerPending=false, gardenerRetryAt=0, gardenerResume=false, receiptSeen=0;
 let marketEpoch=-1, weather=weatherAt(Date.now());
 let nextNeedsAt=0, needsPending=false, tiredSince=null, hungrySince=null, unread=0;
 const reducedEffects=matchMedia('(prefers-reduced-motion: reduce)');
@@ -200,7 +204,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=house-reset-1');
+   const {FirebaseGame}=await import('./firebase-game.js?v=town-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
@@ -321,8 +325,9 @@ function onJoined(){
  scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();
  visiting=null;gardenerVisuals.clear();
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
+ setRiding(false);
  active=true;nextNeedsAt=Date.now()+NEEDS_STEP_MS;needsPending=false;tiredSince=hungrySince=null;
- gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;enteredGardenerPost=false;receiptSeen=0;
+ gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;receiptSeen=0;selectedTarget=null;
  el('lobby').hidden=true;
  for(const id of ['hud','joystick','chatPanel','bagBtn','socialButtons','mapPanel'])el(id).hidden=false;
  if(online)socialUI.connect(fbGame.social,myId);
@@ -350,6 +355,12 @@ function onNetwork(m){if(!active&&!['rooms','players','social'].includes(m.type)
    for(const p of players)trackRemote(p,now);
    if(active&&online)voice.sync(players);
    if(visiting&&!remote.has(visiting.id)){interact({type:'exit'});notice('เจ้าของบ้านออกจากชุมชนแล้ว')}
+   if(visiting){
+     const host=remote.get(visiting.id),level=houseExpansionLevel(host.home);
+     visiting.expansion=level;
+     visiting.furniture=sanitizeFurniture(host.home?.furniture,level);
+     visiting.architecture=sanitizeArchitecture(host.home?.architecture,homeGrid(level));
+   }
    hud()
    socialUI.refresh();
  }
@@ -503,6 +514,7 @@ const buildPanel = el('buildMode');
 const buildFloor = el('buildFloor');
 const buildTiles = [];
 const stockButtons = new Map();
+const buildTool=el('buildTool'),buildEdge=el('buildEdge'),buildFinish=el('buildFinish');
 let hoverTile, savingBuild = false;
 let focusedTile = 0;
 
@@ -546,6 +558,7 @@ for (const type of Object.keys(FURNITURE_TYPES)) {
   const button = document.createElement('button');
   button.type = 'button';
   button.onclick = () => {
+    buildTool.value='furniture';
     buildSelection = {kind: 'new', type, rotation: 0};
     updateBuildControls();
   };
@@ -556,13 +569,16 @@ el('buildRotate').onclick = rotateSelected;
 el('buildStore').onclick = removeSelected;
 el('buildCancel').onclick = cancelBuild;
 el('buildSave').onclick = saveBuild;
+buildTool.onchange=()=>{buildSelection=null;updateBuildControls()};
 new ResizeObserver(() => { buildCamera = null; }).observe(el('buildDock'));
 
 function buildHome() {
   if(visiting){notice('ออกจากบ้านเพื่อนก่อนเข้าโหมดสร้างบ้าน');return}
   if (!active || buildDraft) return;
   populateBuildGrid();
-  buildDraft = {furniture: cloneFurniture(ownProfile.home.furniture), inventory: furnitureInventory()};
+  buildTool.value='furniture';
+  buildDraft = {furniture: cloneFurniture(ownProfile.home.furniture), inventory: furnitureInventory(),
+    architecture:sanitizeArchitecture(ownProfile.home.architecture,HOME_GRID)};
   dialogClose();
   dialogType = null;
   keys.clear();
@@ -600,6 +616,7 @@ function placementAt(col, row) {
 }
 function buildTileClick(col, row) {
   if (savingBuild) return;
+  if (buildTool.value!=='furniture'){editArchitecture(col,row);return}
   const item = furnitureAt(col, row);
   if (item && buildSelection?.kind !== 'new') {
     buildSelection = {kind: 'existing', id: item.id};
@@ -626,6 +643,26 @@ function buildTileClick(col, row) {
     buildSelection = {kind: 'existing', id: candidate.id};
   }
   updateBuildControls();
+}
+function editArchitecture(col,row){
+  const kind=buildTool.value,finish=Number(buildFinish.value);
+  const layout=buildDraft.architecture;
+  if(kind==='tile'||kind==='eraseTile'){
+    layout.tiles=layout.tiles.filter(tile=>tile.col!==col||tile.row!==row);
+    if(kind==='tile')layout.tiles.push({col,row,finish});
+    return;
+  }
+  let edge=buildEdge.value;
+  if(edge==='north'&&row>0){row--;edge='south'}
+  if(edge==='west'&&col>0){col--;edge='east'}
+  const part={col,row,edge,kind,finish,open:false};
+  const key=partitionKey(part);
+  if(kind!=='eraseWall'&&!sanitizeArchitecture({walls:[part]},HOME_GRID).walls.length){
+    notice(kind==='window'?'วางหน้าต่างที่ขอบนอกของห้อง':'วางประตูกั้นห้องที่ขอบระหว่างช่อง');
+    return;
+  }
+  layout.walls=layout.walls.filter(wall=>partitionKey(wall)!==key);
+  if(kind!=='eraseWall')layout.walls.push(part);
 }
 function rotateSelected() {
   const current = selectedFurniture();
@@ -655,7 +692,7 @@ function removeSelected() {
 async function saveBuild() {
   if (!buildDraft || savingBuild) return;
   const draft = buildDraft;
-  const payload = {type: 'saveHome', furniture: draft.furniture, inventoryFurniture: draft.inventory};
+  const payload = {type: 'saveHome', furniture: draft.furniture, inventoryFurniture: draft.inventory, architecture:draft.architecture};
   savingBuild = true;
   updateBuildControls();
   let result;
@@ -686,6 +723,12 @@ function cancelBuild() {
 }
 function updateBuildControls() {
   const selected = selectedFurniture() || buildSelection;
+  const furnitureMode=buildTool.value==='furniture';
+  el('buildStock').hidden=!furnitureMode;
+  el('buildEdgeLabel').hidden=furnitureMode||['tile','eraseTile'].includes(buildTool.value);
+  el('buildFinishLabel').hidden=furnitureMode||['eraseTile','eraseWall'].includes(buildTool.value);
+  for(const input of [buildTool,buildEdge,buildFinish])input.disabled=savingBuild;
+  buildCamera=null;
   for (const [type, button] of stockButtons) {
     button.hidden=buildDraft.inventory[type]===0;
     button.textContent = FURNITURE_TYPES[type].label + ' × ' + buildDraft.inventory[type];
@@ -703,7 +746,7 @@ function updateBuildControls() {
     tile.setAttribute('aria-label', item ? label + ' ' + FURNITURE_TYPES[item.type].label : label + ' ว่าง');
   }
   buildTiles[focusedTile].tabIndex = 0;
-  notice(savingBuild ? 'กำลังบันทึก…' : selected
+  notice(savingBuild ? 'กำลังบันทึก…' : !furnitureMode?'เลือกสีหรือขอบ แล้วแตะช่องบนพื้น': selected
     ? FURNITURE_TYPES[selected.type].label + ' · ' + selected.rotation + '° · แตะช่องว่างเพื่อจัดวาง'
     : 'เลือกของจากกระเป๋า หรือแตะเฟอร์นิเจอร์บนพื้นห้อง');
 }
@@ -963,7 +1006,59 @@ function estateDialog(){
    }
  });
 }
-const market={x:WORLD.w/2-64,y:588,w:128,h:111};
+const market={type:'shop',name:'ตลาดกลาง',short:'ตลาด',icon:'🏪',color:'#e9c66d',x:WORLD.w/2-72,y:583,w:144,h:98};
+const salon={type:'salon',name:'ร้านแต่งตัว',short:'แต่งตัว',icon:'✂️',color:'#cf93b0',x:market.x-174,y:583,w:144,h:98};
+const vehicleShop={type:'vehicles',name:'ร้านรถ',short:'ร้านรถ',icon:'🚗',color:'#8cbcdf',x:market.x+174,y:583,w:144,h:98};
+const townShops=[salon,market,vehicleShop];
+function travelTo(destination){
+ if(!active||buildDraft||el('dialog').open)return;
+ scene='outside';visiting=null;me.pose='stand';me.onBed=false;me.walking=false;me.action=null;
+ Object.assign(me,destination);keys.clear();joyReset();selectedTarget=null;sentMovement=null;resetAvatarMotion();
+ if(online)publishMovement(performance.now());
+}
+el('travelHome').onclick=()=>{const door=doorPos(localLot());travelTo({x:door.x,y:door.y+45})};
+el('travelMarket').onclick=()=>travelTo({x:market.x+market.w/2,y:market.y+market.h+31});
+el('hireShortcut').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)gardenDialog()};
+function setRiding(status){
+ me.riding=status;sentMovement=null;
+ el('rideShortcut').setAttribute('aria-pressed',String(status));
+ el('rideShortcut').textContent=status?'ลงรถ':'ขึ้นรถ';
+}
+el('rideShortcut').onclick=()=>{
+ if(!active||buildDraft||el('dialog').open)return;
+ if(scene!=='outside'){notice('ออกมาข้างนอกก่อนขึ้นรถ');return}
+ setRiding(!me.riding);
+};
+function salonDialog(){
+ dialogType='salon';
+ showDialog(salon.name,d=>{
+   const host=document.createElement('div');d.append(host);
+   buildAppearanceEditor(host,async appearance=>{
+     const result=await action({type:'appearance',appearance});
+     if(result?.ok)resetAvatarMotion();
+   },{initial:ownProfile.appearance,storePreview:false});
+   addButton(d,'ดาวน์โหลดรูปลักษณ์ (.json)',()=>{
+     const url=URL.createObjectURL(new Blob([JSON.stringify({version:1,appearance:ownProfile.appearance},null,2)],{type:'application/json'}));
+     const link=document.createElement('a');
+     link.href=url;link.download='neighborhood-appearance.json';link.click();
+     setTimeout(()=>URL.revokeObjectURL(url),1000);
+   });
+ });
+}
+function vehiclesDialog(){
+ dialogType='vehicles';
+ showDialog(vehicleShop.name,d=>{
+   for(const [id,vehicle] of Object.entries(VEHICLES)){
+     const {owned,equipped}=ownProfile.garage;
+     const inGarage=owned.includes(id);
+     const label=vehicle.icon+' '+vehicle.name+(equipped===id?' · เลือกอยู่':inGarage?' · เลือกใช้':' · '+vehicle.price.toLocaleString('th-TH')+' บาท');
+     addButton(d,label,async()=>{
+       const result=await action({type:inGarage?'equipVehicle':'buyVehicle',vehicle:id});
+       if(result?.ok&&el('dialog').open&&dialogType==='vehicles')vehiclesDialog();
+     },equipped===id||(!inGarage&&ownProfile.money<vehicle.price));
+   }
+ });
+}
 const plotReach=75;
 let lastMapFrame=-Infinity;
 function refreshCommunityMap(now){
@@ -978,30 +1073,33 @@ function refreshCommunityMap(now){
  }
  const house=lots[visiting?.slot??slot];
  const player=scene==='outside'?me:{x:house.x+131,y:house.y+189};
- drawCommunityMap(canvas,{lots,levels,owners,ownSlot:slot,player,market,others});
+ drawCommunityMap(canvas,{lots,levels,owners,ownSlot:slot,player,shops:townShops,others});
 }
 
 function distanceToRect(x,y,r){return Math.hypot(Math.max(r.x-x,0,x-r.x-r.w),Math.max(r.y-y,0,y-r.y-r.h))}
 function plotInReach(r){return distanceToRect(me.x,me.y,r)<=plotReach}
 function houseRect(l){return {x:l.x+35,y:l.y+55,w:192,h:165}}
 function doorPos(l){return {x:l.x+131,y:l.y+237}}
-function nearestInteract(){
+function nearbyTargets(){
  const targets=[];
  const point=(type,x,y,reach)=>({type,x,y,distance:Math.hypot(me.x-x,me.y-y),reach});
  const area=(type,r,extra={})=>({...extra,type,x:r.x+r.w/2,y:r.y+r.h/2,distance:distanceToRect(me.x,me.y,r),reach:plotReach});
  if(scene==='inside'){
-   if(me.pose==='sit'||me.pose==='sleep')return {type:'stand',x:me.x,y:me.y};
+   if(me.pose==='sit'||me.pose==='sleep')return [{type:'stand',x:me.x,y:me.y,distance:0}];
    const r=interior();targets.push(point('exit',r.w/2,r.h-21,70));
+   for(const door of interiorArchitecture().walls.filter(part=>part.kind==='door')){
+     const [ax,ay,bx,by]=partitionLine(door,interiorGrid());
+     targets.push({...point('interiorDoor',(ax+bx)/2,(ay+by)/2,56),door});
+   }
    for(const item of (visiting?.furniture||ownProfile.home.furniture)){
      const pose=furniturePose(item);
      if(pose)targets.push(area(pose,furnitureRect(item),{rotation:item.rotation}));
    }
  }else{
    const lot=localLot(),door=doorPos(lot);
-   const post=gardenerPost(lot);
    const box=gardenBoxPosition(lot);
    const sign=estateSign(lot);targets.push(point('estate',sign.x,sign.y,45));
-   targets.push(point('door',door.x,door.y,85),point('gardener',post.x,post.y,48),point('box',box.x,box.y,47),area('shop',market));
+   targets.push(point('door',door.x,door.y,85),point('box',box.x,box.y,47),...townShops.map(shop=>area(shop.type,shop)));
    for(const p of remote.values()){
      if(!Number.isInteger(p.slot)||!lots[p.slot])continue;
      const entry=doorPos(lots[p.slot]);
@@ -1009,33 +1107,50 @@ function nearestInteract(){
    }
    for(let plot=0;plot<ownProfile.home.plots.length;plot++)targets.push(area('plot',estatePlotRect(lot,plot),{plot}));
  }
- return targets.reduce((best,target)=>target.distance<=target.reach&&(!best||target.distance<best.distance)?target:best,null);
+ return targets.filter(target=>target.distance<=target.reach).sort((a,b)=>a.distance-b.distance);
 }
+const interactionKey=target=>[target.type,target.plot??target.owner??(target.door?partitionKey(target.door):target.type==='sit'||target.type==='sleep'?target.x+','+target.y:'')].join(':');
+let selectedTarget=null,nearbySignature='';
+const selectedInteract=()=>{const targets=nearbyTargets();return targets.find(target=>interactionKey(target)===selectedTarget)||targets[0]};
 function interactionLabel(target){
  if(target.type==='plot'){
    const p=ownProfile.home.plots[target.plot];
-   if(!p.crop)return ['🌱','ปลูก'];
-   if(!p.watered)return ['💧','รดน้ำ'];
+   if(!p.crop)return ['🌱','ปลูก · แปลง '+(target.plot+1)];
+   if(!p.watered)return ['💧','รดน้ำ · แปลง '+(target.plot+1)];
    const crop=CROPS[p.crop];
-   return crop&&Date.now()-p.plantedAt>=crop.grow?[crop.icon,'เก็บเกี่ยว']:['🌿','ดูแปลง'];
+   return crop&&Date.now()-p.plantedAt>=crop.grow?[crop.icon,'เก็บเกี่ยว · แปลง '+(target.plot+1)]:['🌿','ดูแปลง '+(target.plot+1)];
  }
+ if(target.type==='interiorDoor')return ['🚪',target.door.open?'ปิดประตู':'เปิดประตู'];
+ const shop=townShops.find(shop=>shop.type===target.type);
+ if(shop)return [shop.icon,shop.name];
  return {estate:['🪧','ขยายบ้านและสวน'],stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],gardener:['🌾','จ้างคนสวน'],box:['📦','กล่องผลผลิต'],visit:['🏠','เยี่ยมบ้าน'],
-   shop:['🏪','ตลาดกลาง'],sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
+   sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
 }
 function updateNearby(){
- const button=el('nearbyAction'),camera=renderedCamera;
- const target=!buildDraft&&!el('dialog').open&&camera?.scene===scene?nearestInteract():null;
- button.hidden=!target;
- if(!target)return;
+ const panel=el('nearbyAction');
+ const targets=buildDraft||el('dialog').open?[]:nearbyTargets();
+ const target=targets.find(candidate=>interactionKey(candidate)===selectedTarget)||targets[0];
+ panel.hidden=!target;
+ if(!target){selectedTarget=null;return}
+ const key=interactionKey(target);
+ const signature=JSON.stringify([key,targets.map(candidate=>[interactionKey(candidate),interactionLabel(candidate)])]);
+ if(nearbySignature!==signature){
+   nearbySignature=signature;
+   const tabs=el('nearbyTabs');tabs.replaceChildren();
+   if(targets.length>1)for(const candidate of targets){
+     const tab=document.createElement('button');
+     const id=interactionKey(candidate);
+     tab.type='button';tab.textContent=interactionLabel(candidate).join(' ');
+     tab.setAttribute('aria-pressed',String(id===key));
+     tab.onclick=()=>{selectedTarget=id;updateNearby();el('nearbyUse').focus()};
+     tabs.append(tab);
+   }
+ }
  const [icon,label]=interactionLabel(target);
  if(el('nearbyIcon').textContent!==icon)el('nearbyIcon').textContent=icon;
  if(el('nearbyLabel').textContent!==label)el('nearbyLabel').textContent=label;
- const x=w/2+(target.x-camera.x)*camera.zoom;
- const y=h/2+(target.y-camera.y)*camera.zoom-(target.type==='stand'?86:41)*camera.zoom;
- button.style.left=Math.round(Math.max(58,Math.min(w-58,x)))+'px';
- button.style.top=Math.round(Math.max(35,Math.min(h-32,y)))+'px';
 }
-function interact(act=nearestInteract()){
+function interact(act=selectedInteract()){
  if(!act)return;
  if(act.type==='stand'){me.pose='stand';me.onBed=false;notice('ลุกขึ้นยืนแล้ว');return}
  else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.restAngle=(act.rotation||0)*Math.PI/180;me.face=Math.PI/2+me.restAngle;me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
@@ -1047,17 +1162,27 @@ function interact(act=nearestInteract()){
  else if(act.type==='door'||act.type==='visit'){
    const host=act.type==='visit'?remote.get(act.owner):null;
    if(act.type==='visit'&&(!host||!lots[host.slot]))return;
-   visiting=host?{id:host.id,slot:host.slot,name:host.name,expansion:houseExpansionLevel(host.home),furniture:sanitizeFurniture(host.home?.furniture,houseExpansionLevel(host.home))}:null;
+   const level=houseExpansionLevel(host?.home);
+   visiting=host?{id:host.id,slot:host.slot,name:host.name,expansion:level,furniture:sanitizeFurniture(host.home?.furniture,level),architecture:sanitizeArchitecture(host.home?.architecture,homeGrid(level))}:null;
+   setRiding(false);
    scene='inside';houseEnteredAt=performance.now();me.x=interior().w/2;me.y=interior().h-73;me.pose='stand';
    notice(visiting?'เข้าบ้านของ '+visiting.name:'เข้าบ้านของคุณแล้ว');
  }
  else if(act.type==='plot')openPlot(act.plot);
  else if(act.type==='shop')shopDialog();
- else if(act.type==='gardener')gardenDialog();
+ else if(act.type==='salon')salonDialog();
+ else if(act.type==='vehicles')vehiclesDialog();
+ else if(act.type==='interiorDoor'){
+   if(visiting){notice('เจ้าของบ้านเป็นคนเปิดปิดประตู');return}
+   if(act.door.open&&partitionBlocks({...act.door,open:false},interiorGrid(),me.x,me.y,13)){
+     notice('ถอยออกจากประตูก่อนปิด');return;
+   }
+   action({type:'toggleInteriorDoor',key:partitionKey(act.door),open:!act.door.open});
+ }
  else if(act.type==='box')gardenBoxDialog();
  else if(act.type==='estate')estateDialog();
 }
-el('nearbyAction').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)interact()};
+el('nearbyUse').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)interact()};
 async function toggleSound(){
  if(sound){sound=false;notice('ปิดเสียงแล้ว');return}
  try{
@@ -1148,8 +1273,14 @@ function road(now,view){
  roadTexture(ctx,left,575,right-left,146,.9);
  for(let x=Math.floor(startX/130)*130+10;x<=endX;x+=130)round(x,646,72,6,3,'#f7e6ae');
  line(left,559,right,559,'#d7c2a3',10);line(left,735,right,735,'#d7c2a3',10);
- round(market.x,market.y,market.w,market.h,10,'#3e5549');
- text('🏪',WORLD.w/2,625,26);text('ตลาดกลาง',WORLD.w/2,652,16);text('ร้านค้าออนไลน์',WORLD.w/2,675,11,'#b0e9d5');
+ for(const shop of townShops){
+   const centre=shop.x+shop.w/2;
+   round(shop.x+3,shop.y+7,shop.w,shop.h,10,'#26363880');
+   round(shop.x,shop.y,shop.w,shop.h,10,'#283e39');
+   round(shop.x,shop.y,shop.w,20,8,shop.color);
+   text(shop.icon,centre,shop.y+52,32);
+   text(shop.name,centre,shop.y+78,17,'#fff6db');
+ }
  for(let x=Math.floor(startX/235)*235+54;x<=endX;x+=235){
    const bend=sway(now,x,weather);circle(x+bend,566,19,'#597d4c');circle(x-7+bend*1.6,552,12,'#7fa85a');circle(x+bend,737,16,'#6d8e51');
  }
@@ -1252,17 +1383,6 @@ function drawGardenerPost(now){
  text('🌾',x,y+6,22);
  text('จ้างคนสวน',x,y+31,12,'#fff2b6');
 }
-function checkGardenerPost(){
- const post=gardenerPost(localLot());
- const inside=scene==='outside'&&Math.hypot(me.x-post.x,me.y-post.y)<24;
- if(inside&&!enteredGardenerPost&&!el('dialog').open&&!buildDraft){
-   keys.clear();
-   joyReset();
-   gardenDialog();
- }
- enteredGardenerPost=inside;
-}
-
 function drawBuildGrid() {
  const {x, y, tile, cols, rows} = HOME_GRID;
  const selectedId=selectedFurniture()?.id;
@@ -1270,7 +1390,7 @@ function drawBuildGrid() {
    const item=furnitureAt(col,row);
    const selected=item && item.id===selectedId;
    const tx=x+col*tile+1, ty=y+row*tile+1;
-   round(tx,ty,tile-2,tile-2,4,selected?'#e8e18ba8':item?'#60463664':'#329f6aa3');
+   round(tx,ty,tile-2,tile-2,4,selected?'#e8e18ba8':item?'#60463664':'#329f6a25');
    ctx.strokeStyle=selected?'#ffeaa4':item?'#9b7757':'#b2ffd1';
    ctx.lineWidth=1.25;
    ctx.stroke();
@@ -1279,6 +1399,14 @@ function drawBuildGrid() {
 function drawBuildPreview() {
  if (!hoverTile || savingBuild) return;
  const {col,row}=hoverTile;
+ if(buildTool.value!=='furniture'){
+   if(['tile','eraseTile'].includes(buildTool.value)){
+     round(HOME_GRID.x+col*HOME_GRID.tile,HOME_GRID.y+row*HOME_GRID.tile,HOME_GRID.tile,HOME_GRID.tile,3,'#fff7bc60');
+   }else{
+     line(...partitionLine({col,row,edge:buildEdge.value},HOME_GRID),'#fff4ac',5);
+   }
+   return;
+ }
  const item=furnitureAt(col,row);
  if(item && buildSelection?.kind!=='new')return;
  const candidate=placementAt(col,row);
@@ -1299,16 +1427,60 @@ function drawBuildPreview() {
  }
  ctx.restore();
 }
+function drawArchitecture(layout,grid,night,layer){
+ if(layer==='floor'){
+   for(const tile of layout.tiles){
+     const x=grid.x+tile.col*grid.tile,y=grid.y+tile.row*grid.tile;
+     round(x+1,y+1,grid.tile-2,grid.tile-2,2,HOME_FINISHES.floors[tile.finish]);
+     line(x+4,y+4,x+grid.tile-4,y+4,'#ffffff42',1);
+   }
+   return;
+ }
+ for(const part of layout.walls){
+   const [ax,ay,bx,by]=partitionLine(part,grid),cx=(ax+bx)/2,cy=(ay+by)/2;
+   if(part.kind==='window'){
+     const dx=part.edge==='west'?120:part.edge==='east'?-120:0;
+     const dy=part.edge==='north'?120:part.edge==='south'?-120:0;
+     if(layer==='light'&&!night){
+       const glow=ctx.createLinearGradient(cx,cy,cx+dx,cy+dy);
+       glow.addColorStop(0,'#fff2b78c');glow.addColorStop(1,'#fff2b700');
+       ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);
+       ctx.lineTo(bx+dx+Math.sign(bx-ax)*23,by+dy+Math.sign(by-ay)*23);
+       ctx.lineTo(ax+dx-Math.sign(bx-ax)*23,ay+dy-Math.sign(by-ay)*23);
+       ctx.closePath();ctx.fillStyle=glow;ctx.fill();
+     }
+     if(layer==='wall'){
+       line(ax,ay,bx,by,HOME_FINISHES.walls[part.finish],12);
+       line(ax+(bx-ax)*.12,ay+(by-ay)*.12,bx-(bx-ax)*.12,by-(by-ay)*.12,night?'#0e172a':'#bce6e8',8);
+       circle(cx,cy,2,night?'#3e536d':'#effafb');
+     }
+     continue;
+   }
+   if(layer!=='wall')continue;
+   if(part.kind==='door'&&part.open){
+     line(ax,ay,ax+(by-ay)*.7,ay-(bx-ax)*.7,HOME_FINISHES.walls[part.finish],9);
+     circle(bx,by,3,'#f9d992');
+   }else{
+     line(ax,ay,bx,by,'#3e3029',14);
+     line(ax,ay,bx,by,HOME_FINISHES.walls[part.finish],10);
+     if(part.kind==='door')circle(cx+(bx-ax)*.29,cy+(by-ay)*.29,3,'#f9d992');
+   }
+ }
+}
 function indoors(now){const room=interior(),mid=room.w/2;
  round(0,0,room.w,room.h,0,'#d6b88e');woodTexture(ctx,0,0,room.w,room.h,.87);
  for(let y=36;y<room.h;y+=48)line(15,y,room.w-15,y,'#c29a76',1);
  round(0,0,room.w,43,0,'#836b61');round(0,0,21,room.h,0,'#927566');
  round(room.w-20,0,20,room.h,0,'#927566');round(mid-25,room.h-22,55,22,3,'#634f45');text('🚪',mid,room.h-15,21);
  const furniture=buildDraft?.furniture || visiting?.furniture || ownProfile.home.furniture;
+ const architecture=interiorArchitecture(),grid=interiorGrid(),night=isNight();
+ drawArchitecture(architecture,grid,night,'floor');
+ drawArchitecture(architecture,grid,night,'light');
  text('บ้านของ '+(visiting?.name||ownProfile.displayName),325,90,22,'#4b443a');
  if(buildDraft)drawBuildGrid();
- else if(!furniture.length)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
+ else if(!furniture.length&&!architecture.walls.length&&!architecture.tiles.length)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
  for(const item of [...furniture].sort((a,b) => (a.row+furnitureFootprint(a).h)-(b.row+furnitureFootprint(b).h)))drawFurniture(ctx,item);
+ drawArchitecture(architecture,grid,night,'wall');
  if(buildDraft){drawBuildPreview();return}
  for(const p of nearbyPeople())if(scene==='inside')avatar({...p,...sampleRemoteMotion(p.motion,now),positionInterpolated:true},now,false);
  avatar({...me,name:ownProfile.displayName},now,true)
@@ -1322,6 +1494,9 @@ function avatar(p,now,local){
     onBed:p.pose==='sleep',unhappy:local&&ownProfile.needs.happiness<LOW_NEED};
   const {x,y}=drawClassicActor(ctx,actor,now,local,ownProfile.displayName,ownProfile.appearance);
   ctx.restore();
+  const vehicleId=local?(me.riding?ownProfile.garage.equipped:null):p.vehicle;
+  const vehicle=Object.hasOwn(VEHICLES,vehicleId)?VEHICLES[vehicleId]:null;
+  if(vehicle&&actor.scene==='outside')text(vehicle.icon,x,y+13,32);
   const name=String(local?ownProfile.displayName:(p.name||'ผู้เล่น')).slice(0,18);
   round(x-62,y-65,124,20,9,local?'#fff2cf':'#effff5');text(name,x,y-50,11,'#30454b');
   if(p.text&&p.until>Date.now()){const msg=String(p.text).slice(0,40);round(x-119,y-107,238,31,11,'#fff8e9');text(msg,x,y-86,12,'#304849')}
@@ -1342,8 +1517,7 @@ function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRe
  ctx.save();ctx.translate(w/2,camera.centerY??h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
  if(scene==='outside'&&!buildDraft)worldDraw(now,camera);else indoors(now);ctx.restore();
  if(buildDraft)return;
- const minute=(now/1000)%720,night=minute>540||minute<120;
- if(night){ctx.fillStyle='rgba(13,24,54,.25)';ctx.fillRect(0,0,w,h)}
+ if(isNight()){ctx.fillStyle='rgba(13,24,54,.25)';ctx.fillRect(0,0,w,h)}
  if(scene==='outside')drawWeather(ctx,w,h,now,weather);
  if(tiredSince!==null&&!reducedEffects.matches){
    const opacity=fatigueOpacity(now-tiredSince,ownProfile.needs.energy);
@@ -1381,12 +1555,16 @@ function tickGardener(now){
  }).finally(()=>{if(me===player)gardenerPending=false});
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)gardenerResume=true});
-function canMove(x,y){if(scene==='inside'){const r=interior();return x>22&&y>55&&x<r.w-22&&y<r.h-31;}
+function canMove(x,y){if(scene==='inside'){
+ const r=interior(),grid=interiorGrid();
+ return x>22&&y>55&&x<r.w-22&&y<r.h-31&&!interiorArchitecture().walls.some(part=>partitionBlocks(part,grid,x,y));
+ }
  if(x<estateWorld.left+22||y<estateWorld.top+22||x>estateWorld.right-22||y>estateWorld.bottom-22)return false;
  for(const l of lots){
    const house=houseRect(l);
    if(x>house.x-14&&x<house.x+house.w+14&&y>house.y-15&&y<house.y+house.h+10)return false;
  }
+ if(townShops.some(shop=>distanceToRect(x,y,shop)<9))return false;
  const expansions=new Map([[slot,gardenExpansionLevel(ownProfile.home)]]);
  for(const player of remote.values())expansions.set(player.slot,gardenExpansionLevel(player.home));
  for(const lot of lots)if(estateFenceBlocks(lot,x,y,expansions.get(lot.slot)))return false;
@@ -1407,18 +1585,17 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
   let dy=joyY+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
   const m=Math.hypot(dx,dy);me.walking=m>.07&&!buildDraft&&!el('dialog').open;
    if(me.walking&&me.pose!=='stand'){me.pose='stand';me.onBed=false}
-  if(me.walking){dx/=m;dy/=m;const speed=174;
-    if(canMove(me.x+dx*speed*dt,me.y))me.x+=dx*speed*dt;
-    if(canMove(me.x,me.y+dy*speed*dt))me.y+=dy*speed*dt;
-    me.face=Math.atan2(dy,dx);
-    if(now-lastStep>210){lastStep=now;playV4Footstep()}
-    if(scene==='outside'){
-      const target=nearestInteract();
-      if(target?.type==='visit'&&target.distance<=18)interact(target);
+  if(me.walking){dx/=m;dy/=m;
+    const speed=me.riding&&scene==='outside'?VEHICLES[ownProfile.garage.equipped].speed:174;
+    const step=speed*dt,count=scene==='inside'?Math.max(1,Math.ceil(step/7)):1;
+    for(let i=0;i<count;i++){
+      if(canMove(me.x+dx*step/count,me.y))me.x+=dx*step/count;
+      if(canMove(me.x,me.y+dy*step/count))me.y+=dy*step/count;
     }
+    me.face=Math.atan2(dy,dx);
+    if(!me.riding&&now-lastStep>210){lastStep=now;playV4Footstep()}
   }
   if(online)publishMovement(now);
-  checkGardenerPost();
   playAmbient(now);
   background(now);
   refreshCommunityMap(now);
@@ -1435,9 +1612,10 @@ function publishMovement(now){
  const mapX=Math.round(me.x),mapY=Math.round(me.y);
  const {x,y}=scene==='outside'?estateToWire(mapX,mapY):{x:mapX,y:mapY};
  const house=scene==='inside'?(visiting?.id||myId):null;
- const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose||house!==sentMovement?.house;
+ const vehicle=scene==='outside'&&me.riding?ownProfile.garage.equipped:null;
+ const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose||house!==sentMovement?.house||vehicle!==sentMovement?.vehicle;
  if(!changedSceneOrPose&&(now-lastMove<MOVE_INTERVAL_MS||(x===sentMovement.x&&y===sentMovement.y)))return;
- const movement={type:'move',x,y,scene,pose,house,restAngle:pose==='stand'?null:me.restAngle};
+ const movement={type:'move',x,y,scene,pose,house,vehicle,restAngle:pose==='stand'?null:me.restAngle};
  lastMove=now;sentMovement=movement;
  send(movement);
 }
@@ -1448,12 +1626,12 @@ c.addEventListener('pointerup',e=>{
  const x=((e.clientX-bounds.left)*w/bounds.width-w/2)/camera.zoom+camera.x;
  const y=((e.clientY-bounds.top)*h/bounds.height-h/2)/camera.zoom+camera.y;
  if(scene==='inside'){
-   const target=nearestInteract();
+   const target=nearbyTargets().find(act=>Math.hypot(x-act.x,y-act.y)<38);
    if(target&&Math.hypot(x-target.x,y-target.y)<38)interact(target);
    return;
  }
  const l=localLot();
- const target=nearestInteract();
+ const target=nearbyTargets().find(act=>['visit','box','estate'].includes(act.type)&&Math.hypot(x-act.x,y-act.y)<34);
  if(target&&['visit','box','estate'].includes(target.type)&&Math.hypot(x-target.x,y-target.y)<34){interact(target);return}
  const plot=estatePlotIndex(l,x,y,gardenExpansionLevel(ownProfile.home));
  if(plot>=0){
@@ -1461,8 +1639,9 @@ c.addEventListener('pointerup',e=>{
    else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
    return;
  }
- if(distanceToRect(x,y,market)===0){
-   if(distanceToRect(me.x,me.y,market)<=plotReach)shopDialog();else notice('เดินเข้าใกล้ตลาดก่อนครับ');
+ const shop=townShops.find(shop=>distanceToRect(x,y,shop)===0);
+ if(shop){
+   if(distanceToRect(me.x,me.y,shop)<=plotReach)interact(shop);else notice('เดินเข้าใกล้'+shop.name+'ก่อนครับ');
    return
  }
  const door=doorPos(l);

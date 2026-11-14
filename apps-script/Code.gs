@@ -1,3 +1,74 @@
+const VEHICLES = Object.freeze({
+  bicycle: {name:'จักรยาน',icon:'🚲',price:0,speed:255},
+  motorcycle: {name:'มอเตอร์ไซค์',icon:'🏍️',price:15000,speed:365},
+  car: {name:'รถยนต์',icon:'🚗',price:10000,speed:320},
+  pickup: {name:'รถกระบะ',icon:'🛻',price:100000,speed:350},
+  sport: {name:'รถสปอร์ต',icon:'🏎️',price:250000,speed:475},
+  van: {name:'รถตู้',icon:'🚐',price:150000,speed:340}
+});
+
+const APPEARANCE_LIMITS = Object.freeze({
+  gender:3,skin:10,hair:10,style:10,outfit:10,pants:10,shoes:10,accessory:3
+});
+const APPEARANCE_DEFAULTS = Object.freeze({
+  gender:2,skin:1,hair:1,style:0,outfit:0,pants:0,shoes:0,accessory:0
+});
+
+const HOME_FINISHES = Object.freeze({
+  walls: ['#9d795d','#e4d2b9','#697f73','#526675','#a86459','#dba77d'],
+  floors:['#d8b894','#ebe1d2','#9bb8a5','#7f9aab','#cf9483','#dec78a']
+});
+
+function sanitizeGarage(value){
+  const owned=['bicycle',...Object.keys(VEHICLES).filter(id=>id!=='bicycle'&&
+    ((Array.isArray(value?.owned)&&value.owned.includes(id))||value?.owned?.[id]===true))];
+  return {owned,equipped:owned.includes(value?.equipped)?value.equipped:'bicycle'};
+}
+
+const partitionKey=({col,row,edge})=>col+','+row+','+edge;
+function sanitizeArchitecture(value,grid){
+  const {cols,rows}=grid;
+  const inside=entry=>Number.isInteger(entry?.col)&&entry.col>=0&&entry.col<cols&&
+    Number.isInteger(entry.row)&&entry.row>=0&&entry.row<rows;
+  const walls=[],tiles=[],edges=new Set(),floors=new Set();
+  const validFinish=finish=>Number.isInteger(finish)&&finish>=0&&finish<HOME_FINISHES.walls.length;
+  if(Array.isArray(value?.walls))for(const wall of value.walls.slice(0,cols*rows*2+cols+rows)){
+    if(!inside(wall)||!['east','south','north','west'].includes(wall.edge)||
+      !['wall','door','window'].includes(wall.kind)||!validFinish(wall.finish))continue;
+    const {col,row,edge,kind,finish}=wall;
+    if((edge==='north'&&row!==0)||(edge==='west'&&col!==0))continue;
+    const perimeter=edge==='north'||edge==='west'||(edge==='east'&&col===cols-1)||(edge==='south'&&row===rows-1);
+    if((kind==='door'&&perimeter)||(kind==='window'&&!perimeter))continue;
+    const key=partitionKey(wall);
+    if(edges.has(key))continue;
+    edges.add(key);
+    walls.push({col,row,edge,kind,finish,open:kind==='door'&&wall.open===true});
+  }
+  if(Array.isArray(value?.tiles))for(const tile of value.tiles.slice(0,cols*rows)){
+    if(!inside(tile)||!Number.isInteger(tile.finish)||tile.finish<0||tile.finish>=HOME_FINISHES.floors.length)continue;
+    const key=tile.col+','+tile.row;
+    if(floors.has(key))continue;
+    floors.add(key);
+    tiles.push({col:tile.col,row:tile.row,finish:tile.finish});
+  }
+  return {walls,tiles};
+}
+
+function partitionLine(part,grid){
+  const {tile}=grid;
+  let x=grid.x+part.col*tile,y=grid.y+part.row*tile;
+  if(part.edge==='east')x+=tile;
+  if(part.edge==='south')y+=tile;
+  return part.edge==='east'||part.edge==='west'?[x,y,x,y+tile]:[x,y,x+tile,y];
+}
+
+function partitionBlocks(part,grid,x,y,margin=8){
+  if(part.kind==='door'&&part.open)return false;
+  const [ax,ay,bx,by]=partitionLine(part,grid);
+  const dx=Math.max(ax-x,x-bx,0),dy=Math.max(ay-y,y-by,0);
+  return Math.hypot(dx,dy)<margin;
+}
+
 const EXPANSION_PRICES = [1500, 5000, 20000, 100000, 999999];
 const MAX_GARDENERS = 5;
 const CROPS = Object.freeze({
@@ -237,11 +308,9 @@ const lots = Array.from({length:8}, (_,slot)=> ({
 
 /** Original V4 customizable model, sanitized before storing online. */
 function sanitizeAppearance(value){
-  const defaults={gender:2,skin:1,hair:1,style:0,outfit:0,accessory:0};
-  const ranges={gender:3,skin:5,hair:5,style:4,outfit:6,accessory:3};
-  const clean={...defaults};
+  const clean={...APPEARANCE_DEFAULTS};
   if(!value||typeof value!=='object')return clean;
-  for(const [key,count] of Object.entries(ranges)){
+  for(const [key,count] of Object.entries(APPEARANCE_LIMITS)){
     const n=Number(value[key]);
     if(Number.isInteger(n)&&n>=0&&n<count)clean[key]=n;
   }
@@ -317,9 +386,9 @@ function starter(name='ผู้เล่น') {
   return {
     version:5, displayName:String(name).trim().slice(0,18)||'ผู้เล่น',
     money:100, level:1,xp:0, appearance:sanitizeAppearance(), needs:normalizeNeeds(), needsAt:0,
-    playSeconds:0,
+    playSeconds:0,garage:sanitizeGarage(),
     inventory:{hoe:1,watering_can:1,tomato_seed:3,banana_seed:0,rice_seed:0,watermelon_seed:0,crops:{},tomato:0,tomatoGrades:{},furniture:Object.fromEntries(Object.keys(FURNITURE_TYPES).map(type=>[type,0]))},
-    home:{expansion:0,houseExpansion:0,houseUpgradeReset:1,gardenExpansion:0,furniture:[],gardenBox:{tomato:0,tomatoGrades:{},crops:{}},plots:Array.from({length:PLOT_COUNT},emptyPlot)}
+    home:{expansion:0,houseExpansion:0,houseUpgradeReset:1,gardenExpansion:0,architecture:sanitizeArchitecture(null,HOME_GRID),furniture:[],gardenBox:{tomato:0,tomatoGrades:{},crops:{}},plots:Array.from({length:PLOT_COUNT},emptyPlot)}
   };
 }
 function sanitizeState(s,name='ผู้เล่น') {
@@ -330,6 +399,7 @@ function sanitizeState(s,name='ผู้เล่น') {
   o.level=Math.max(1,Math.min(99,Number(s.level)||1));
   o.xp=Math.max(0,Math.min(1e7,Number(s.xp)||0));
   o.appearance=sanitizeAppearance(s.appearance);
+  o.garage=sanitizeGarage(s.garage);
   o.needs=normalizeNeeds(s.needs);
   o.needsAt=Number.isFinite(s.needsAt)?Math.max(0,s.needsAt):0;
   o.playSeconds=Number.isSafeInteger(s.playSeconds)?Math.max(0,s.playSeconds):0;
@@ -339,6 +409,7 @@ function sanitizeState(s,name='ผู้เล่น') {
   for(const type of Object.keys(FURNITURE_TYPES))o.inventory.furniture[type]=clampCount(s.inventory?.furniture?.[type]);
   o.home.expansion=estateLevel(s.home?.expansion);
   o.home.houseExpansion=houseExpansionLevel(s.home);
+  o.home.architecture=sanitizeArchitecture(s.home?.architecture,homeGrid(o.home.houseExpansion));
   o.home.gardenExpansion=gardenExpansionLevel(s.home);
   if(s.home?.houseUpgradeReset===1){
     o.home.furniture=sanitizeFurniture(s.home.furniture,o.home.houseExpansion);
@@ -578,6 +649,25 @@ function applyAction(s,action,now=Date.now(),random=Math.random) {
       const [removed]=s.home.furniture.splice(index,1);items.furniture[removed.type]=clampCount(items.furniture[removed.type])+1;
       status='เก็บเฟอร์นิเจอร์เข้ากระเป๋าแล้ว';break;
     }
+    case 'buyVehicle': {
+      const id=action.vehicle, vehicle=Object.hasOwn(VEHICLES,id)?VEHICLES[id]:null;
+      if(!vehicle||s.garage.owned.includes(id)||s.money<vehicle.price)return {ok:false,message:'ซื้อรถคันนี้ไม่ได้'};
+      s.money-=vehicle.price;
+      s.garage.owned.push(id);
+      s.garage.equipped=id;
+      status='ซื้อ'+vehicle.name+'แล้ว';break;
+    }
+    case 'equipVehicle': {
+      if(!s.garage.owned.includes(action.vehicle))return {ok:false,message:'ยังไม่มีรถคันนี้'};
+      s.garage.equipped=action.vehicle;
+      status='เลือก'+VEHICLES[action.vehicle].name+'แล้ว';break;
+    }
+    case 'toggleInteriorDoor': {
+      const door=s.home.architecture.walls.find(part=>part.kind==='door'&&partitionKey(part)===action.key);
+      if(!door)return {ok:false,message:'ไม่พบประตู'};
+      door.open=!door.open;
+      status=door.open?'เปิดประตูแล้ว':'ปิดประตูแล้ว';break;
+    }
     case 'saveHome': {
       const furniture=strictFurnitureList(action.furniture,houseExpansionLevel(s.home));
       const proposed={};for(const type of Object.keys(FURNITURE_TYPES))proposed[type]=clampCount(action.inventoryFurniture?.[type]);
@@ -585,6 +675,12 @@ function applyAction(s,action,now=Date.now(),random=Math.random) {
       for(const type of Object.keys(FURNITURE_TYPES)){
         const currentTotal=items.furniture[type]+countFurniture(s.home.furniture,type);
         if(proposed[type]+countFurniture(furniture,type)!==currentTotal)return {ok:false,message:'รายการเฟอร์นิเจอร์เปลี่ยนระหว่างจัดบ้าน กรุณาเปิดโหมดสร้างใหม่'};
+      }
+      if(action.architecture!==undefined){
+        const architecture=sanitizeArchitecture(action.architecture,homeGrid(houseExpansionLevel(s.home)));
+        if(architecture.walls.length!==action.architecture?.walls?.length||architecture.tiles.length!==action.architecture?.tiles?.length)
+          return {ok:false,message:'ตำแหน่งกำแพง ประตู หน้าต่าง หรือพื้นไม่ถูกต้อง'};
+        s.home.architecture=architecture;
       }
       s.home.furniture=furniture;items.furniture=proposed;status='บันทึกการจัดบ้านแล้ว';break;
     }

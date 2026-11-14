@@ -1,14 +1,14 @@
 import {estateWorld,estateBounds,estateFenceSegments,estateGardenFields} from './shared/estate-layout.js?v=estate-guide-1';
 
-export function drawCommunityMap(canvas,{lots,levels,owners,ownSlot,player,market,others}){
+export function drawCommunityMap(canvas,{lots,levels,owners,ownSlot,player,shops,others}){
  const ctx=canvas.getContext('2d');
  const {width:w,height:h}=canvas;
  const {left,right,top,bottom}=estateWorld;
- const scale=Math.min((w-32)/(right-left),(h-32)/(bottom-top));
- const originX=(w-(right-left)*scale)/2;
- const originY=(h-(bottom-top)*scale)/2;
- const x=value=>originX+(value-left)*scale;
- const y=value=>originY+(value-top)*scale;
+ const scale=w/1500;
+ const centreX=Math.min(right-w/(2*scale),Math.max(left+w/(2*scale),player.x));
+ const centreY=Math.min(bottom-h/(2*scale),Math.max(top+h/(2*scale),player.y));
+ const x=value=>w/2+(value-centreX)*scale;
+ const y=value=>h/2+(value-centreY)*scale;
  const rect=(r,color)=>{
    ctx.fillStyle=color;
    ctx.fillRect(x(r.x),y(r.y),r.w*scale,r.h*scale);
@@ -45,13 +45,11 @@ export function drawCommunityMap(canvas,{lots,levels,owners,ownSlot,player,marke
    rect({x:lot.x+35,y:lot.y+55,w:192,h:165},own?'#f4bf73':'#c38c61');
    label(String(lot.slot+1),lot.x+130,lot.y+135);
  }
- const marketX=market.x+market.w/2,marketY=market.y+market.h/2;
- ctx.save();
- ctx.translate(x(marketX),y(marketY));
- ctx.rotate(Math.PI/4);
- ctx.fillStyle='#f5cd74';ctx.fillRect(-8,-8,16,16);
- ctx.restore();
- for(const p of others)marker(p.x,p.y,6,'#a9c6ff');
- marker(player.x,player.y,10,'#9cf2da');
+ for(const shop of shops){
+   rect(shop,shop.color);
+   label(shop.short,shop.x+shop.w/2,shop.y+shop.h/2);
+ }
+ for(const p of others)marker(p.x,p.y,8,'#a9c6ff');
+ marker(player.x,player.y,12,'#9cf2da');
 }
 
