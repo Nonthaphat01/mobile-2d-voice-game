@@ -87,12 +87,15 @@ export function gardenerTravelMs(lot) {
   return Math.ceil(distance / 105 * 1000);
 }
 
-export function gardenerPosition(lot, worker, now) {
+export function gardenerPosition(lot, worker, now, level=0) {
+  const plotAt = i => {
+    const r=estatePlotRect(lot,i,level);
+    return {x:r.x+r.w/2,y:r.y+r.h*.82};
+  };
   const route = gardenerRoute(lot);
   if (worker.phase === 'garden' || worker.phase === 'deposit') {
     const index = worker.plot;
     if (index < 0) return gardenBoxPosition(lot);
-    const plotAt = i => ({x:lot.x+307+(i%2)*94,y:lot.y+98+Math.floor((i%10)/2)*65});
     const target = plotAt(index);
     const from = worker.fromPlot < 0 ? gardenBoxPosition(lot):plotAt(worker.fromPlot);
     const elapsed=Math.max(0,now-worker.startedAt);
@@ -106,7 +109,7 @@ export function gardenerPosition(lot, worker, now) {
   }
   if (worker.phase === 'outbound' && worker.fromPlot >= 0) {
     const index = worker.fromPlot;
-    route.unshift({x:lot.x+270+(index%2)*94, y:lot.y+98+Math.floor(index/2)*65});
+    route.unshift(plotAt(index));
   }
   if (worker.phase === 'return') route.reverse();
   const segments = route.slice(1).map((p,i) => Math.hypot(p.x-route[i].x,p.y-route[i].y));
@@ -120,5 +123,6 @@ export function gardenerPosition(lot, worker, now) {
     distance -= len;
   }
 }
+import {estatePlotRect} from './estate-layout.js?v=estate-map-1';
 import {CROPS} from './estate.js?v=estate-1';
 

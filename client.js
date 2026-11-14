@@ -1,11 +1,12 @@
+import {estatePlotRect,estatePlotIndex} from './shared/estate-layout.js?v=estate-map-1';
 import {roomVoice} from './game-voice.js?v=estate-1';
-import {CROPS,cropStock,seedKey,roomSize,estateLevel,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=estate-1';
-import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
+import {CROPS,cropStock,seedKey,roomSize,estateLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=estate-1';
+import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=estate-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
-import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-map-1';
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
 import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
@@ -19,7 +20,7 @@ const cfg=window.GAME_CONFIG||{};
 const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
 const gardenerVisuals=new Map();
-let visiting=null, houseEnteredAt=0, gardenPage=0, shownGardenZones=0, HOME_GRID=BASE_GRID;
+let visiting=null, houseEnteredAt=0, HOME_GRID=BASE_GRID;
 const interior=()=>roomSize(visiting?.expansion??ownProfile.home.expansion);
 const produceEntries=inventory=>Object.keys(CROPS).flatMap(crop=>Object.entries(cropStock(inventory,crop).tomatoGrades).map(([key,count])=>[crop,key,count]));
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
@@ -87,7 +88,7 @@ function lobbyError(message=''){
  status.hidden=!message;
 }
 function mine(n){return Math.round(Number(n)||0)}
-function hud(){el('money').textContent=`💵 ${mine(ownProfile.money)} บาท`;el('level').textContent=`⭐ Lv.${ownProfile.level}`;const count=online?1+remote.size:1;el('onlineCount').textContent=`👥 ${count}/${MAX_PLAYERS}`;el('hudRoom').textContent=`ชุมชน ${room}`;el('netState').textContent=online?'● ออนไลน์':'● ทดลอง';updateNeedsHud();updateGardenZones()}
+function hud(){el('money').textContent=`💵 ${mine(ownProfile.money)} บาท`;el('level').textContent=`⭐ Lv.${ownProfile.level}`;const count=online?1+remote.size:1;el('onlineCount').textContent=`👥 ${count}/${MAX_PLAYERS}`;el('hudRoom').textContent=`ชุมชน ${room}`;el('netState').textContent=online?'● ออนไลน์':'● ทดลอง';updateNeedsHud()}
 
 let accountMode='login', accountBusy=false, joining=false;
 let firebasePromise, roomsRequest, roomsGeneration=0;
@@ -314,7 +315,7 @@ function onJoined(){
  el('microphone').hidden=!online;
  const l=lots[slot];
  scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();
- visiting=null;gardenPage=0;gardenerVisuals.clear();
+ visiting=null;gardenerVisuals.clear();
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
  active=true;nextNeedsAt=Date.now()+NEEDS_STEP_MS;needsPending=false;tiredSince=hungrySince=null;
  gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;enteredGardenerPost=false;receiptSeen=0;
@@ -929,25 +930,7 @@ async function marketRequest(request){
  }finally{marketBusy=false}
 }
 function localLot(){return lots[slot]}
-function plotRect(l,i,level=0){const tier=estateLevel(level);return {x:l.x+269+(i%2)*94-tier,y:l.y+53+Math.floor((i%PLOT_COUNT)/2)*65-tier,w:78+2*tier,h:53+2*tier}}
 const estateSign=l=>({x:l.x+195,y:l.y+253});
-function updateGardenZones(){
- const control=el('gardenZones');
- const count=ownProfile.home.plots.length/PLOT_COUNT;
- gardenPage=Math.max(0,Math.min(gardenPage,count-1));
- control.hidden=scene!=='outside'||count<=1;
- if(count!==shownGardenZones){
-   control.replaceChildren(...Array.from({length:count},(_,i)=>new Option('สวนโซน '+(i+1)+' / '+count,i)));
-   shownGardenZones=count;
- }
- control.value=String(gardenPage);
-}
-el('gardenZones').onchange=()=>{
- gardenPage=Number(el('gardenZones').value);
- updateGardenZones();
- // Return focus to the game so keyboard movement still works.
- el('gardenZones').blur();
-};
 function estateDialog(){
  dialogType='estate';
  showDialog('🪧 ขยายบ้านและสวน',d=>{
@@ -957,13 +940,11 @@ function estateDialog(){
      const oldCount=ownProfile.home.plots.length;
      await action({type:'expandEstate',level});
      if(!active||!el('dialog').open||dialogType!=='estate'||ownProfile.home.expansion<=level)return;
-     gardenPage=Math.floor(oldCount/PLOT_COUNT);
-     updateGardenZones();
      dialogClose();
-     notice('ขยายสำเร็จ · เปิดสวนโซน '+(gardenPage+1)+' · แปลง '+(gardenPage*PLOT_COUNT+1)+'–'+((gardenPage+1)*PLOT_COUNT));
+     notice('ขยายสำเร็จ · เพิ่มแปลง '+(oldCount+1)+'–'+ownProfile.home.plots.length+' บนที่ดิน');
    },ownProfile.money<price);
    else addText(d,'ขยายครบแล้ว');
-   addText(d,'พื้นที่ใหม่เพิ่มเป็นโซนสวน ใช้ตัวเลือกใต้แถบสถานะเพื่อสลับโซน');
+   addText(d,'แปลงที่ซื้อเพิ่มจะแสดงพร้อมแปลงเดิมบนที่ดิน');
  });
 }
 const market={x:WORLD.w/2-64,y:588,w:128,h:111};
@@ -994,7 +975,7 @@ function nearestInteract(){
      const entry=doorPos(lots[p.slot]);
      targets.push({...point('visit',entry.x,entry.y,75),owner:p.id});
    }
-   for(let plot=0;plot<PLOT_COUNT;plot++)targets.push(area('plot',plotRect(lot,plot,ownProfile.home.expansion),{plot:gardenPage*PLOT_COUNT+plot}));
+   for(let plot=0;plot<ownProfile.home.plots.length;plot++)targets.push(area('plot',estatePlotRect(lot,plot,ownProfile.home.expansion),{plot}));
  }
  return targets.reduce((best,target)=>target.distance<=target.reach&&(!best||target.distance<best.distance)?target:best,null);
 }
@@ -1010,7 +991,6 @@ function interactionLabel(target){
    shop:['🏪','ตลาดกลาง'],sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
 }
 function updateNearby(){
- el('gardenZones').hidden=scene!=='outside'||shownGardenZones<=1||Boolean(buildDraft);
  const button=el('nearbyAction'),camera=renderedCamera;
  const target=!buildDraft&&!el('dialog').open&&camera?.scene===scene?nearestInteract():null;
  button.hidden=!target;
@@ -1143,14 +1123,26 @@ function drawHouse(l,p,now){const h=houseRect(l);round(h.x+4,h.y+10,h.w,h.h,10,'
  const door=doorPos(l);round(door.x-13,door.y-12,26,18,5,'#a17d5a');
  text('🚪',door.x,door.y+8,19);text(p.name||'ผู้เล่น',l.x+l.w/2,l.y+31,15,'#f2fbec');
 }
-function drawPlot(l,i,plot,now,level){const r=plotRect(l,i,level);round(r.x,r.y,r.w,r.h,8,'#60482f');soilTexture(ctx,r.x+2,r.y+2,r.w-4,r.h-4,.9);for(let j=0;j<3;j++)line(r.x+9,r.y+12+j*15,r.x+r.w-9,r.y+12+j*15,'#82613d',3);
- if(plot?.crop){const grow=plot.watered?Math.min(1,(Date.now()-plot.plantedAt)/(CROPS[plot.crop]?.grow||GROW_MS)):.17;const yy=r.y+r.h/2;const size=12+grow*6;
- for(const ox of [-20,0,20]){const x=r.x+r.w/2+ox,bend=sway(now,x,weather);line(x,yy+12,x+bend,yy-7,'#6cad45',4);circle(x-5+bend,yy-10,size/2,'#4c994f');if(grow>.92)text(CROPS[plot.crop]?.icon||'🍅',x+3+bend,yy-4,14)}
- }else text('+',r.x+r.w/2,r.y+r.h/2+6,20,'#d0b888');
- text(String(i+1),r.x+10,r.y+15,10,'#dccfb6')}
+function drawPlot(l,i,plot,now,level){
+ const r=estatePlotRect(l,i,level);
+ const detail=r.w>=34&&r.h>=29;
+ round(r.x,r.y,r.w,r.h,detail?8:3,'#60482f');
+ if(detail){
+   soilTexture(ctx,r.x+2,r.y+2,r.w-4,r.h-4,.9);
+   for(const row of [.22,.50,.78])line(r.x+5,r.y+r.h*row,r.x+r.w-5,r.y+r.h*row,'#82613d',2);
+ }
+ if(plot?.crop){
+   const grow=plot.watered?Math.min(1,(Date.now()-plot.plantedAt)/(CROPS[plot.crop]?.grow||GROW_MS)):.17;
+   const x=r.x+r.w/2,y=r.y+r.h*.64;
+   const radius=Math.min(r.w*.17,r.h*.23)*(0.65+grow*.35);
+   circle(x+(detail?sway(now,x,weather):0),y,radius,'#6cad45');
+   if(grow>.92&&detail)text(CROPS[plot.crop]?.icon||'🍅',x,y+4,Math.min(14,r.h*.32));
+ }
+ if(detail)text(String(i+1),r.x+10,r.y+13,10,'#dccfb6');
+}
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
 function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
- for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');const page=l.slot===slot?gardenPage:0;for(let i=0;i<PLOT_COUNT;i++){const index=page*PLOT_COUNT+i;drawPlot(l,index,u.home?.plots?.[index],now,u.home?.expansion)}drawHouse(l,u,now);fence(l)}
+ for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');const plots=u.home?.plots;const level=estateLevel(u.home?.expansion);for(let i=0;i<plotCount(level);i++)drawPlot(l,i,plots?.[i],now,level);drawHouse(l,u,now);fence(l)}
  if(preview)return;
  drawGardenerPost(now);
  const sign=estateSign(localLot());text('🪧',sign.x,sign.y,22);text('ขยายที่ดิน',sign.x,sign.y+18,11,'#fff4ce');
@@ -1164,9 +1156,7 @@ function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{n
    for(const [n,worker] of workersOf(player.home).entries()){
    const visualId=index*MAX_GARDENERS+n;
    if(!worker||worker.slot!==index||worker.contractUntil&&Date.now()>=worker.contractUntil)continue;
-   const page=index===slot?gardenPage:0;
-   if(worker.plot>=0&&Math.floor(worker.plot/PLOT_COUNT)!==page)continue;
-   const p=gardenerPosition(lots[index],worker,Date.now());
+   const p=gardenerPosition(lots[index],worker,Date.now(),player.home?.expansion);
    if(p){
      p.x+=n*9;p.y+=n*6;
      const old=gardenerVisuals.get(visualId);
@@ -1399,11 +1389,11 @@ c.addEventListener('pointerup',e=>{
  const l=localLot();
  const target=nearestInteract();
  if(target&&['visit','box','estate'].includes(target.type)&&Math.hypot(x-target.x,y-target.y)<34){interact(target);return}
- for(let i=0;i<PLOT_COUNT;i++){
-   const r=plotRect(l,i,ownProfile.home.expansion);
-   if(distanceToRect(x,y,r)!==0)continue;
-   if(plotInReach(r))openPlot(gardenPage*PLOT_COUNT+i);else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
-   return
+ const plot=estatePlotIndex(l,x,y,ownProfile.home.expansion);
+ if(plot>=0){
+   if(plotInReach(estatePlotRect(l,plot,ownProfile.home.expansion)))openPlot(plot);
+   else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
+   return;
  }
  if(distanceToRect(x,y,market)===0){
    if(distanceToRect(me.x,me.y,market)<=plotReach)shopDialog();else notice('เดินเข้าใกล้ตลาดก่อนครับ');
