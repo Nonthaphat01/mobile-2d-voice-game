@@ -1,7 +1,7 @@
 /** Firebase multiplayer and optional server-managed market adapter. */
 import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
-import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
+import {getDatabase, ref, get, onValue, runTransaction, update, set, remove, onDisconnect, serverTimestamp} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
 import {saveProfileAction} from './shared/profile-save.js?v=profile-save-1';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=profile-save-1';
@@ -17,7 +17,7 @@ const publicStats=p=>({level:p.level,money:p.money,playSeconds:p.playSeconds,
 export class FirebaseGame {
  constructor(config,emit,marketEnabled=false,sheetsMarketUrl=''){
   this.config=config;this.emit=emit;this.app=null;this.auth=null;this.db=null;this.uid='';this.room='';this.slot=-1;
-  this.slotRef=null;this.unsubscribe=null;this.unsubConnected=null;this.profile=null;this.lastChat=0;this.ended=false;
+  this.slotRef=null;this.connectionRef=null;this.unsubscribe=null;this.unsubConnected=null;this.profile=null;this.lastChat=0;this.ended=false;
   this.profileWrites=Promise.resolve();
   this.marketEnabled=marketEnabled&&!sheetsMarketUrl;
   this.sheetsMarketUrl=sheetsMarketUrl;
@@ -65,6 +65,7 @@ export class FirebaseGame {
   if(!this.currentUser())throw Error('กรุณาเข้าสู่ระบบก่อน');
   if(this.slotRef)await this.leave();
   const uid=this.currentUser().uid;
+  const sessionId=crypto.randomUUID();
   const profile=await this.loadProfile(name);
   const slotsRef=ref(this.db,`${ROOT}/rooms/${room}/slots`);
   const occupied=(await get(slotsRef)).val()||{};
@@ -72,20 +73,24 @@ export class FirebaseGame {
     throw Error('บัญชีนี้มีตัวละครอยู่ในชุมชนนี้แล้ว กรุณาปิดแท็บเกมเดิมก่อน');
   }
   let taken=-1,slotRef=null;
+  const connectionRef=ref(this.db,`${ROOT}/rooms/${room}/connections/${uid}`);
   const order=Array.from({length:MAX_PLAYERS},(_,i)=>i).sort((a,b)=>{
     const left=occupied[a]?1:0,right=occupied[b]?1:0;return left-right||a-b;
   });
   for(const index of order){
     const candidate=ref(this.db,`${ROOT}/rooms/${room}/slots/${index}`),l=lots[index];
-    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',pose:'stand',text:'',until:0,home:profile.home,appearance:profile.appearance,...publicStats(profile),updatedAt:Date.now()};
+    const pos={uid,sessionId,lastActivityAt:Date.now(),name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',pose:'stand',text:'',until:0,home:profile.home,appearance:profile.appearance,...publicStats(profile),updatedAt:Date.now()};
     const result=await runTransaction(candidate,previous=>previous==null?pos:undefined,{applyLocally:false});
     if(result.committed){taken=index;slotRef=candidate;break;}
   }
   if(taken<0)throw Error('ชุมชนนี้เต็มแล้ว (8/8)');
   try{
-    // After reserving the lot, register server-side cleanup on disconnect.
-    await onDisconnect(slotRef).remove();
-    this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.profile=profile;this.ended=false;
+    // A per-session connection marker is removed on disconnect, NOT the slot.
+    // This prevents a kicked old tab from removing a new occupant of its slot.
+    // The scheduled server sweeper releases abandoned slots within ~1 minute.
+    await onDisconnect(connectionRef).remove();
+    await set(connectionRef,{sessionId,connectedAt:serverTimestamp()});
+    this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.connectionRef=connectionRef;this.profile=profile;this.ended=false;
     this.profileWrites=Promise.resolve();
     const contactProbe=ref(this.db,`${ROOT}/social/contacts/_privacy_probe`);
     this.social=null;
@@ -96,7 +101,14 @@ export class FirebaseGame {
       }
     });
     this.unsubscribe=onValue(slotsRef,snap=>{
-      const v=snap.val()||{};const players=Object.values(v).filter(p=>p&&p.uid!==uid).map(p=>({id:p.uid,...p}));
+      const v=snap.val()||{};
+      const self=v[String(taken)];
+      // Also handles a moderator deleting the entire room's slots in Firebase.
+      if(!this.ended&&this.slotRef===slotRef&&(!self||self.uid!==uid||self.sessionId!==sessionId)){
+        this.emit({type:'kicked',message:'คุณถูกนำออกจากชุมชน กรุณาเข้าใหม่อีกครั้ง'});
+        return;
+      }
+      const players=Object.values(v).filter(p=>p&&p.uid!==uid).map(p=>({id:p.uid,...p}));
       this.emit({type:'players',players});
     },error=>this.emit({type:'error',message:'อ่านข้อมูลเพื่อนไม่ได้: '+error.message}));
     let wasConnected=false;
@@ -105,11 +117,18 @@ export class FirebaseGame {
       if(wasConnected&&!this.ended)this.emit({type:'disconnected'});
     });
     return {id:uid,room,slot:taken,profile};
-  }catch(err){try{await remove(slotRef)}catch{};throw err}
+  }catch(err){
+    try{await onDisconnect(connectionRef).cancel()}catch{}
+    try{await remove(connectionRef)}catch{}
+    try{await remove(slotRef)}catch{}
+    if(this.slotRef===slotRef){this.slotRef=null;this.connectionRef=null;this.uid='';this.room='';this.slot=-1}
+    throw err;
+  }
  }
  send(m){
   if(!this.slotRef||this.ended)return;
   if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,house:m.house??null,restAngle:m.restAngle??null,vehicle:m.scene==='outside'&&this.profile?.garage?.owned.includes(m.vehicle)?m.vehicle:null,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
+  if(m.type==='activity')return update(this.slotRef,{lastActivityAt:serverTimestamp()});
   if(m.type==='voice')return update(this.slotRef,m.fields);
   if(m.type==='say'){
     const now=Date.now();if(now-this.lastChat<850)return;
@@ -196,9 +215,11 @@ export class FirebaseGame {
   }
  }
  async leave(){
-  const slot=this.slotRef;this.ended=true;
+  const slot=this.slotRef,connection=this.connectionRef;
+  this.ended=true;
   this.unsubscribe?.();this.unsubConnected?.();this.unsubscribe=null;this.unsubConnected=null;
-  this.slotRef=null;this.uid='';this.room='';this.slot=-1;this.social=null;
-  if(slot){try{await onDisconnect(slot).cancel()}catch{};try{await remove(slot)}catch{}}
+  this.slotRef=null;this.connectionRef=null;this.uid='';this.room='';this.slot=-1;this.social=null;
+  if(connection){try{await onDisconnect(connection).cancel()}catch{};try{await remove(connection)}catch{}}
+  if(slot){try{await remove(slot)}catch{}}
  }
 }
