@@ -8,7 +8,7 @@ const CROPS = Object.freeze({
 });
 const cropType = key => Object.hasOwn(CROPS,key) ? key : null;
 const estateLevel = value => Number.isInteger(value) ? Math.max(0,Math.min(EXPANSION_PRICES.length,value)) : 0;
-const houseExpansionLevel = home => estateLevel(home?.houseExpansion??home?.expansion);
+const houseExpansionLevel = home => home?.houseUpgradeReset===1 ? estateLevel(home.houseExpansion) : 0;
 const gardenExpansionLevel = home => estateLevel(home?.gardenExpansion??home?.expansion);
 const plotCount = level => 10 * 2 ** estateLevel(level);
 const emptyPlot = () => ({crop:null,plantedAt:0,watered:false});
@@ -319,7 +319,7 @@ function starter(name='ผู้เล่น') {
     money:100, level:1,xp:0, appearance:sanitizeAppearance(), needs:normalizeNeeds(), needsAt:0,
     playSeconds:0,
     inventory:{hoe:1,watering_can:1,tomato_seed:3,banana_seed:0,rice_seed:0,watermelon_seed:0,crops:{},tomato:0,tomatoGrades:{},furniture:Object.fromEntries(Object.keys(FURNITURE_TYPES).map(type=>[type,0]))},
-    home:{expansion:0,houseExpansion:0,gardenExpansion:0,furniture:[],gardenBox:{tomato:0,tomatoGrades:{},crops:{}},plots:Array.from({length:PLOT_COUNT},emptyPlot)}
+    home:{expansion:0,houseExpansion:0,houseUpgradeReset:1,gardenExpansion:0,furniture:[],gardenBox:{tomato:0,tomatoGrades:{},crops:{}},plots:Array.from({length:PLOT_COUNT},emptyPlot)}
   };
 }
 function sanitizeState(s,name='ผู้เล่น') {
@@ -340,7 +340,16 @@ function sanitizeState(s,name='ผู้เล่น') {
   o.home.expansion=estateLevel(s.home?.expansion);
   o.home.houseExpansion=houseExpansionLevel(s.home);
   o.home.gardenExpansion=gardenExpansionLevel(s.home);
-  o.home.furniture=sanitizeFurniture(s.home?.furniture,o.home.houseExpansion);
+  if(s.home?.houseUpgradeReset===1){
+    o.home.furniture=sanitizeFurniture(s.home.furniture,o.home.houseExpansion);
+  }else{
+    // Return furniture from the removed space to the bag during the one-time reset.
+    const previousLevel=estateLevel(s.home?.houseExpansion??s.home?.expansion);
+    for(const item of sanitizeFurniture(s.home?.furniture,previousLevel)){
+      if(isValidFurniturePlacement(item,o.home.furniture))o.home.furniture.push(item);
+      else o.inventory.furniture[item.type]++;
+    }
+  }
   for(const crop of Object.keys(CROPS).filter(crop=>crop!=='tomato')){
     o.inventory[seedKey(crop)]=clampCount(s.inventory?.[seedKey(crop)]);
     for(const [destination,source] of [[o.inventory,s.inventory],[o.home.gardenBox,s.home?.gardenBox]]){

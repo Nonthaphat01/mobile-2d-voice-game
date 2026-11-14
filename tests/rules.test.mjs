@@ -59,29 +59,52 @@ test('8 distinct outdoor lots remain unchanged',()=>{
  assert.equal(lots.length,8);assert.equal(new Set(lots.map(l=>l.slot)).size,8);
 });
 
-test('legacy estate purchases migrate to both tracks and upgrades are independent',()=>{
+test('existing houses restart once and can expand independently of the garden',()=>{
  const old=starter();
  old.home.expansion=1;
+ delete old.home.houseUpgradeReset;
  delete old.home.houseExpansion;
  delete old.home.gardenExpansion;
  old.home.plots[0]={crop:'tomato',plantedAt:10,watered:true};
+ old.home.plots[19]={crop:'banana',plantedAt:11,watered:true};
+ old.home.furniture=[
+   {id:'chair-1',type:'chair',col:0,row:0,rotation:0},
+   {id:'chair-2',type:'chair',col:HOME_GRID.cols,row:0,rotation:0}
+ ];
+ old.inventory.furniture.chair=1;
+ old.money=12000;
  const save=sanitizeState(old);
+ assert.equal(save.home.houseExpansion,0);
+ assert.equal(save.home.gardenExpansion,1);
+ assert.equal(save.home.plots.length,20);
+ assert.equal(save.money,12000);
+ assert.deepEqual(save.home.furniture.map(item=>item.id),['chair-1']);
+ assert.equal(save.inventory.furniture.chair,2);
+ assert.equal(applyAction(save,{type:'expandHouse',level:0}).ok,true);
  assert.equal(save.home.houseExpansion,1);
  assert.equal(save.home.gardenExpansion,1);
  assert.equal(save.home.plots.length,20);
- save.money=12000;
- assert.equal(applyAction(save,{type:'expandHouse',level:1}).ok,true);
- assert.equal(save.home.houseExpansion,2);
- assert.equal(save.home.gardenExpansion,1);
- assert.equal(save.home.plots.length,20);
  assert.equal(applyAction(save,{type:'expandGarden',level:1}).ok,true);
- assert.equal(save.home.houseExpansion,2);
+ assert.equal(save.home.houseExpansion,1);
  assert.equal(save.home.gardenExpansion,2);
  assert.equal(save.home.plots.length,40);
- assert.equal(save.money,2000);
+ assert.equal(save.money,5500);
  assert.equal(applyAction(save,{type:'expandGarden',level:1}).ok,false);
- assert.equal(applyAction(save,{type:'expandHouse',level:2}).ok,false);
+ assert.equal(applyAction(save,{type:'expandHouse',level:0}).ok,false);
  const roundTrip=sanitizeState(save);
+ assert.equal(roundTrip.home.houseExpansion,1);
+ assert.equal(roundTrip.inventory.furniture.chair,2);
  assert.equal(roundTrip.home.plots.length,40);
  assert.equal(roundTrip.home.plots[0].crop,'tomato');
+ assert.equal(roundTrip.home.plots[19].crop,'banana');
+});
+
+test('the house reset includes saves that already bought a separate house upgrade',()=>{
+ const old=starter();
+ delete old.home.houseUpgradeReset;
+ old.home.houseExpansion=2;
+ old.home.gardenExpansion=3;
+ const save=sanitizeState(old);
+ assert.equal(save.home.houseExpansion,0);
+ assert.equal(save.home.gardenExpansion,3);
 });

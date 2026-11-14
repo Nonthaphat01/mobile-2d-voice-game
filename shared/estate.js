@@ -8,7 +8,7 @@ export const CROPS = Object.freeze({
 });
 export const cropType = key => Object.hasOwn(CROPS,key) ? key : null;
 export const estateLevel = value => Number.isInteger(value) ? Math.max(0,Math.min(EXPANSION_PRICES.length,value)) : 0;
-export const houseExpansionLevel = home => estateLevel(home?.houseExpansion??home?.expansion);
+export const houseExpansionLevel = home => home?.houseUpgradeReset===1 ? estateLevel(home.houseExpansion) : 0;
 export const gardenExpansionLevel = home => estateLevel(home?.gardenExpansion??home?.expansion);
 export const plotCount = level => 10 * 2 ** estateLevel(level);
 export const emptyPlot = () => ({crop:null,plantedAt:0,watered:false});
