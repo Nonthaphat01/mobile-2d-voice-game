@@ -137,3 +137,35 @@
   .entry-brand p { font-size:.83rem; }
 }
 @media(prefers-reduced-motion:reduce) { .entry-landscape { animation:none; } }
+
+
+/* Cozy homepage refresh: presentation only. Keep game and Firebase controls intact. */
+.entry-brand { display:flex; flex-direction:column; gap:18px; min-height:624px; }
+.entry-brand::before { background:linear-gradient(180deg,rgba(14,40,29,.82) 0%,rgba(21,49,33,.38) 30%,rgba(16,36,23,.12) 58%,rgba(12,36,23,.74) 100%); }
+.entry-edition { position:relative; z-index:1; align-self:flex-start; gap:10px; text-shadow:0 1px 6px #1c382c; }
+.entry-edition span { display:grid; place-items:center; width:32px; height:32px; border:1px solid #f7edc27a; border-radius:10px; background:#e7f5cb35; font-size:20px; }
+.entry-edition b { border-radius:999px; }
+.entry-story { position:relative; z-index:1; margin-top:auto; }
+.entry-story-kicker { display:block; font:800 11px/1.5 "Noto Sans Thai",sans-serif; color:#ffdfa0; letter-spacing:.13em; text-shadow:0 2px 8px #173424; }
+.entry-brand .entry-story h1 { margin:16px 0 18px; font:800 clamp(2.4rem,4.9vw,4.15rem)/1.17 "Noto Sans Thai",Tahoma,sans-serif; letter-spacing:-.055em; text-shadow:0 3px 18px #173424b8; }
+.entry-brand .entry-story h1 em { color:#ffe3a0; font-style:normal; }
+.entry-brand .entry-story p { max-width:28ch; margin:0; font-size:clamp(.85rem,1.5vw,1rem); font-weight:600; line-height:1.8; }
+.entry-footer { position:relative; z-index:1; display:flex; align-items:center; gap:12px; margin-top:10px; padding-top:17px; border-top:1px solid #fff4d857; color:#fff6d9; font-size:12px; font-weight:700; text-shadow:0 1px 8px #122c22; }
+.entry-footer-icon { display:grid; place-items:center; flex:none; width:42px; height:42px; border:1px solid #e3f0cb7f; border-radius:12px; background:#ffffff20; font-size:23px; }
+.entry-footer small { display:block; margin-top:3px; font-weight:500; color:#e6e3cb; font-size:10px; }
+.entry-card { align-content:center; }
+@media (max-width:720px) {
+ .entry-brand { min-height:325px; gap:9px; padding:21px 22px 22px; }
+ .entry-brand::before { background:linear-gradient(90deg,#142d24ec 0%,#173626a6 53%,#17362630 100%); }
+ .entry-brand .entry-story h1 { font-size:clamp(1.85rem,7.7vw,2.75rem); margin:9px 0 6px; }
+ .entry-story-kicker { font-size:9px; }
+ .entry-brand .entry-story p { font-size:12px; line-height:1.55; }
+ .entry-footer { padding-top:8px; margin-top:4px; font-size:10px; }
+ .entry-footer-icon { width:30px; height:30px; font-size:18px; }
+ .entry-footer small { font-size:9px; }
+}
+@media (max-width:360px) {
+ .entry-brand { min-height:295px; }
+ .entry-brand .entry-story h1 { font-size:1.8rem; }
+ .entry-footer small { display:none; }
+}
