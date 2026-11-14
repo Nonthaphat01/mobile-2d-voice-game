@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {estateBounds,estateFenceBlocks,estatePlotRect,estatePlotIndex} from '../shared/estate-layout.js';
+import {estateBounds,estateFenceBlocks,estateFenceSegments,estatePlotRect,estatePlotIndex} from '../shared/estate-layout.js';
 import {plotCount} from '../shared/estate.js';
 import {gardenerPosition} from '../shared/farming.js';
 
@@ -31,6 +31,11 @@ test('each purchase moves the fence out while keeping the road gates and neighbo
       const previous=estateBounds(lot,tier-1),current=estateBounds(lot,tier);
       assert.ok(current.w*current.h>previous.w*previous.h);
       assert.equal(current.gateY,base.gateY);
+      assert.deepEqual(estateFenceSegments(lot,tier).slice(0,2),estateFenceSegments(lot,0).slice(0,2));
+      assert.ok(!estateFenceBlocks(lot,lot.x-12,current.gateY,tier));
+      const sideY=current.gateY+(lot.slot<4?-100:100);
+      if(tier>1)assert.ok(!estateFenceBlocks(lot,lot.x,sideY,tier));
+      assert.ok(estateFenceBlocks(lot,current.x,sideY,tier));
       assert.ok(!estateFenceBlocks(lot,current.gateX+21,current.gateY,tier));
       assert.ok(estateFenceBlocks(lot,current.gateX,current.gateY,tier));
       const back=lot.slot<4?current.y:current.y+current.h;

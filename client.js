@@ -1,4 +1,4 @@
-import {estateBounds,estateFenceBlocks,estatePlotRect,estatePlotIndex} from './shared/estate-layout.js?v=estate-fence-1';
+import {estateBounds,estateFenceBlocks,estateFenceSegments,estatePlotRect,estatePlotIndex} from './shared/estate-layout.js?v=estate-frontage-1';
 import {roomVoice} from './game-voice.js?v=estate-1';
 import {CROPS,cropStock,seedKey,roomSize,estateLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=estate-1';
 import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
@@ -6,7 +6,7 @@ import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppear
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
-import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-fence-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-frontage-1';
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
 import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
@@ -1110,13 +1110,12 @@ function road(now){round(0,0,WORLD.w,WORLD.h,0,'#77a65c');grassTexture(ctx,0,0,W
  for(let x=54;x<WORLD.w;x+=235){const bend=sway(now,x,weather);circle(x+bend,566,19,'#597d4c');circle(x-7+bend*1.6,552,12,'#7fa85a');circle(x+bend,737,16,'#6d8e51')}
 }
 function fence(l,level){
- const {x,y,w,h,gateX,gateY}=estateBounds(l,level),right=x+w,bottom=y+h;
- const color='#b9a37c';
- line(x,y,x,bottom,color,7);line(right,y,right,bottom,color,7);
- const farY=gateY===y?bottom:y;
- line(x,farY,right,farY,color,7);
- line(x,gateY,gateX,gateY,color,7);line(gateX+42,gateY,right,gateY,color,7);
- for(let yy=y;yy<=bottom;yy+=31){round(x-4,yy,9,10,2,'#e2ca91');round(right-4,yy,9,10,2,'#e2ca91')}
+ for(const [x,y,right,bottom] of estateFenceSegments(l,level)){
+   line(x,y,right,bottom,'#b9a37c',7);
+   if(x===right)for(let yy=Math.min(y,bottom);yy<=Math.max(y,bottom);yy+=31){
+     round(x-4,yy,9,10,2,'#e2ca91');
+   }
+ }
 }
 function drawHouse(l,p,now){const h=houseRect(l);round(h.x+4,h.y+10,h.w,h.h,10,'#3c3d33');round(h.x,h.y,h.w,h.h,12,'#a88460');
  // Wooden roof with gentle animated highlight.
@@ -1145,7 +1144,7 @@ function drawPlot(l,i,plot,now,level){
 }
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
 function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
- for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}const plots=u.home?.plots,level=estateLevel(u.home?.expansion);const bounds=estateBounds(l,level);round(bounds.x,bounds.y,bounds.w,bounds.h,12,'#8faf6a');for(let i=0;i<plotCount(level);i++)drawPlot(l,i,plots?.[i],now,level);drawHouse(l,u,now);fence(l,level)}
+ for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}const plots=u.home?.plots,level=estateLevel(u.home?.expansion);const bounds=estateBounds(l,level);const backY=l.slot<4?bounds.y:bounds.y+bounds.h,stepY=bounds.gateY+(l.slot<4?-24:24);round(l.x,Math.min(backY,bounds.gateY),l.w,bounds.h,0,'#8faf6a');round(bounds.x,Math.min(backY,stepY),bounds.w,Math.abs(backY-stepY),0,'#8faf6a');for(let i=0;i<plotCount(level);i++)drawPlot(l,i,plots?.[i],now,level);drawHouse(l,u,now);fence(l,level)}
  if(preview)return;
  drawGardenerPost(now);
  const sign=estateSign(localLot());text('🪧',sign.x,sign.y,22);text('ขยายที่ดิน',sign.x,sign.y+18,11,'#fff4ce');
