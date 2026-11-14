@@ -44,6 +44,35 @@ let joyX=0,joyY=0,joyId=null,sound=false,soundCtx=null,lastStep=0,ambientAt=0;
 let plotReadyTimer,renderedCamera;
 let gardenerPending=false, gardenerRetryAt=0, gardenerResume=false, receiptSeen=0;
 let pendingGardenAction=null;
+const AFK_KICK_MS=30*60*1000;
+const AFK_WARNING_MS=AFK_KICK_MS-30*1000;
+let lastPlayerActivity=Date.now(),lastSyncedActivity=0,afkWarningSent=false;
+function recordPlayerActivity(){
+ if(!active||!online||document.hidden)return;
+ const now=Date.now();
+ lastPlayerActivity=now;afkWarningSent=false;
+ if(now-lastSyncedActivity>=15000){
+   lastSyncedActivity=now;
+   send({type:'activity'});
+ }
+}
+function checkPlayerAfk(){
+ if(!active||!online)return;
+ const idle=Date.now()-lastPlayerActivity;
+ if(idle>=AFK_KICK_MS){
+   leaveGame('ออกจากชุมชนอัตโนมัติ: ไม่มีการใช้งานนาน 30 นาที (AFK)');
+ }else if(idle>=AFK_WARNING_MS&&!afkWarningSent){
+   afkWarningSent=true;
+   notice('⚠️ AFK: อีก 30 วินาทีจะออกจากชุมชน แตะหน้าจอหรือกดปุ่มเพื่ออยู่ต่อ');
+ }
+}
+// Only real player input counts. Gardener, hunger timers and background
+// Firebase writes do not extend the AFK session.
+addEventListener('pointerdown',recordPlayerActivity,{passive:true});
+addEventListener('keydown',e=>{if(!e.repeat)recordPlayerActivity()},{passive:true});
+addEventListener('pointermove',e=>{if(e.pointerType==='mouse'||e.buttons)recordPlayerActivity()},{passive:true});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkPlayerAfk()});
+setInterval(checkPlayerAfk,10000);
 let marketEpoch=-1, weather=weatherAt(Date.now());
 let nextNeedsAt=0, needsPending=false, tiredSince=null, hungrySince=null, unread=0;
 const reducedEffects=matchMedia('(prefers-reduced-motion: reduce)');
@@ -344,6 +373,8 @@ function onJoined(){
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
  setRiding(false);
  active=true;nextNeedsAt=Date.now()+NEEDS_STEP_MS;needsPending=false;tiredSince=hungrySince=null;
+ lastPlayerActivity=Date.now();lastSyncedActivity=0;afkWarningSent=false;
+ if(online)recordPlayerActivity();
  gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;receiptSeen=0;selectedTarget=null;pendingGardenAction=null;
  el('lobby').hidden=true;
  for(const id of ['hud','joystick','chatPanel','bagBtn','socialButtons','mapPanel'])el(id).hidden=false;
@@ -1299,7 +1330,7 @@ const voice=roomVoice({
  identity:()=>myId,
  publish:fields=>{if(online)send({type:'voice',fields})},
  status:on=>{el('microphone').setAttribute('aria-pressed',String(on));el('microphone').textContent=on?'🎙️':'🎤'},
- talking:on=>{if(me)me.voiceTalking=on}
+ talking:on=>{if(me)me.voiceTalking=on;if(on)recordPlayerActivity()}
 });
 el('microphone').onclick=async()=>{
  const button=el('microphone');button.disabled=true;
