@@ -130,6 +130,7 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
    el('friendBadge').hidden=true;
  }
  function connect(next,id){
+   const reopenPhone=pane==='phone'&&el('dialog').open;
    disconnect();adapter=next;ownId=id;
    if(!adapter)return;
    const current=generation;
@@ -144,6 +145,7 @@ export function installSocialUI({el,showDialog,addButton,addText,avatarIcon,noti
    unsub.push(adapter.watchDirectory(render),
      adapter.watchList('contacts',list=>{if(generation===current){contacts=list;render()}},fail),
      adapter.watchList('requests',list=>{if(generation===current){requests=list;render()}},fail));
+   if(reopenPhone)phone();
  }
  el('dialog').addEventListener('close',()=>{stopMessages?.();stopMessages=null;updateList=null;pane=null});
  el('friendsBtn').onclick=friends;

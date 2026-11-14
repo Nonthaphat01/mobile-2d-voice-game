@@ -7,7 +7,7 @@ import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,garden
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
 import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
-import {installSocialUI} from './social-ui.js?v=v5-neighbors-1';
+import {installSocialUI} from './social-ui.js?v=v5-neighbors-2';
 import {weatherAt, drawWeather, sway} from './weather.js?v=v5-farm-1';
 import {fatigueOpacity,hungerOffset,LOW_NEED,NEEDS_STEP_MS} from './shared/needs.js?v=v5-hud-1';
 
@@ -191,7 +191,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=v5-neighbors-1');
+   const {FirebaseGame}=await import('./firebase-game.js?v=v5-neighbors-2');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;

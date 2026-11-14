@@ -87,7 +87,7 @@ export class FirebaseGame {
     const contactProbe=ref(this.db,`${ROOT}/social/contacts/_privacy_probe`);
     this.social=null;
     get(contactProbe).catch(error=>{
-      if(this.slotRef===slotRef&&/permission[_-]denied/i.test(error.code||'')&&uid!=='_privacy_probe'){
+      if(this.slotRef===slotRef&&/permission[\s_-]denied/i.test(`${error.code||''} ${error.message||''}`)&&uid!=='_privacy_probe'){
         this.social=gameSocial(this.db,uid,profile.displayName);
         this.emit({type:'social'});
       }
