@@ -19,7 +19,7 @@ const cfg=window.GAME_CONFIG||{};
 const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
 const gardenerVisuals=new Map();
-let visiting=null, houseEnteredAt=0, gardenPage=0, HOME_GRID=BASE_GRID;
+let visiting=null, houseEnteredAt=0, gardenPage=0, shownGardenZones=0, HOME_GRID=BASE_GRID;
 const interior=()=>roomSize(visiting?.expansion??ownProfile.home.expansion);
 const produceEntries=inventory=>Object.keys(CROPS).flatMap(crop=>Object.entries(cropStock(inventory,crop).tomatoGrades).map(([key,count])=>[crop,key,count]));
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
@@ -87,7 +87,7 @@ function lobbyError(message=''){
  status.hidden=!message;
 }
 function mine(n){return Math.round(Number(n)||0)}
-function hud(){el('money').textContent=`💵 ${mine(ownProfile.money)} บาท`;el('level').textContent=`⭐ Lv.${ownProfile.level}`;const count=online?1+remote.size:1;el('onlineCount').textContent=`👥 ${count}/${MAX_PLAYERS}`;el('hudRoom').textContent=`ชุมชน ${room}`;el('netState').textContent=online?'● ออนไลน์':'● ทดลอง';updateNeedsHud()}
+function hud(){el('money').textContent=`💵 ${mine(ownProfile.money)} บาท`;el('level').textContent=`⭐ Lv.${ownProfile.level}`;const count=online?1+remote.size:1;el('onlineCount').textContent=`👥 ${count}/${MAX_PLAYERS}`;el('hudRoom').textContent=`ชุมชน ${room}`;el('netState').textContent=online?'● ออนไลน์':'● ทดลอง';updateNeedsHud();updateGardenZones()}
 
 let accountMode='login', accountBusy=false, joining=false;
 let firebasePromise, roomsRequest, roomsGeneration=0;
@@ -931,20 +931,39 @@ async function marketRequest(request){
 function localLot(){return lots[slot]}
 function plotRect(l,i,level=0){const tier=estateLevel(level);return {x:l.x+269+(i%2)*94-tier,y:l.y+53+Math.floor((i%PLOT_COUNT)/2)*65-tier,w:78+2*tier,h:53+2*tier}}
 const estateSign=l=>({x:l.x+195,y:l.y+253});
+function updateGardenZones(){
+ const control=el('gardenZones');
+ const count=ownProfile.home.plots.length/PLOT_COUNT;
+ gardenPage=Math.max(0,Math.min(gardenPage,count-1));
+ control.hidden=scene!=='outside'||count<=1;
+ if(count!==shownGardenZones){
+   control.replaceChildren(...Array.from({length:count},(_,i)=>new Option('สวนโซน '+(i+1)+' / '+count,i)));
+   shownGardenZones=count;
+ }
+ control.value=String(gardenPage);
+}
+el('gardenZones').onchange=()=>{
+ gardenPage=Number(el('gardenZones').value);
+ updateGardenZones();
+ // Return focus to the game so keyboard movement still works.
+ el('gardenZones').blur();
+};
 function estateDialog(){
  dialogType='estate';
  showDialog('🪧 ขยายบ้านและสวน',d=>{
    const level=ownProfile.home.expansion,price=EXPANSION_PRICES[level];
    addText(d,'ขยายแล้ว '+level+'/5 · แปลงทั้งหมด '+ownProfile.home.plots.length);
-   if(price)addButton(d,'ซื้อพื้นที่ '+price.toLocaleString('th-TH')+' บาท',async()=>{await action({type:'expandEstate',level});estateDialog()},ownProfile.money<price);
+   if(price)addButton(d,'ซื้อพื้นที่ '+price.toLocaleString('th-TH')+' บาท',async()=>{
+     const oldCount=ownProfile.home.plots.length;
+     await action({type:'expandEstate',level});
+     if(!active||!el('dialog').open||dialogType!=='estate'||ownProfile.home.expansion<=level)return;
+     gardenPage=Math.floor(oldCount/PLOT_COUNT);
+     updateGardenZones();
+     dialogClose();
+     notice('ขยายสำเร็จ · เปิดสวนโซน '+(gardenPage+1)+' · แปลง '+(gardenPage*PLOT_COUNT+1)+'–'+((gardenPage+1)*PLOT_COUNT));
+   },ownProfile.money<price);
    else addText(d,'ขยายครบแล้ว');
-   const pages=ownProfile.home.plots.length/PLOT_COUNT;
-   if(pages>1){
-     const select=document.createElement('select');select.setAttribute('aria-label','เลือกโซนสวน');
-     for(let i=0;i<pages;i++)select.add(new Option('โซนสวน '+(i+1),i,i===gardenPage,i===gardenPage));
-     select.onchange=()=>{gardenPage=Number(select.value);dialogClose();notice('โซนสวน '+(gardenPage+1))};
-     d.append(select);
-   }
+   addText(d,'พื้นที่ใหม่เพิ่มเป็นโซนสวน ใช้ตัวเลือกใต้แถบสถานะเพื่อสลับโซน');
  });
 }
 const market={x:WORLD.w/2-64,y:588,w:128,h:111};
@@ -991,6 +1010,7 @@ function interactionLabel(target){
    shop:['🏪','ตลาดกลาง'],sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
 }
 function updateNearby(){
+ el('gardenZones').hidden=scene!=='outside'||shownGardenZones<=1||Boolean(buildDraft);
  const button=el('nearbyAction'),camera=renderedCamera;
  const target=!buildDraft&&!el('dialog').open&&camera?.scene===scene?nearestInteract():null;
  button.hidden=!target;
