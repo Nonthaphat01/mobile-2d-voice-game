@@ -1,5 +1,5 @@
 import {estateBounds,estateFenceBlocks,estateFenceSegments,estateGardenFields,estatePlotRect,estatePlotIndex,estateWorld,estateFromWire,estateToWire,mapEstateLot} from './shared/estate-layout.js?v=estate-guide-1';
-import {roomVoice} from './game-voice.js?v=estate-1';
+import {roomVoice} from './game-voice.js?v=audio-20261114';
 import {CROPS,cropStock,seedKey,roomSize,houseExpansionLevel,gardenExpansionLevel,plotCount,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=house-reset-1';
 import {MAX_PLAYERS,ROOM_IDS,starter,sanitizeState,sanitizeFurniture,applyAction,lots as baseLots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=profile-save-1';
 import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=town-1';
@@ -23,6 +23,7 @@ import {VEHICLES,HOME_FINISHES,sanitizeArchitecture,partitionKey,partitionLine,p
 const el=id=>document.getElementById(id);
 const c=el('game'),ctx=c.getContext('2d');
 const cfg=window.GAME_CONFIG||{};
+const bgm=window.neighborhoodMusic;
 const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
 const footprints=walkFootprints();
@@ -295,6 +296,7 @@ el('logoutAccount').onclick=async()=>{
 
 async function joinOnline(){
  if(!session||joining||accountBusy||active)return;
+ beginGameAudio(); // Called during Join click for mobile autoplay permission.
  joining=true;
  lobbyError();
  updateEntryControls();
@@ -303,6 +305,7 @@ async function joinOnline(){
    if(!adapter.currentUser()){
      showEntry(null,true);
      lobbyError('กรุณาเข้าสู่ระบบอีกครั้ง');
+     bgm?.exit();
      return;
    }
    remote.clear();
@@ -312,7 +315,7 @@ async function joinOnline(){
    onJoined();
    if(hasChosenAppearance())send({type:'appearance',appearance:ownProfile.appearance});
    notice('โหลดเซฟออนไลน์แล้ว');
- }catch(error){online=false;lobbyError('เข้าชุมชนไม่สำเร็จ: '+(error.message||String(error)))}
+ }catch(error){online=false;bgm?.exit();lobbyError('เข้าชุมชนไม่สำเร็จ: '+(error.message||String(error)))}
  finally{joining=false;updateEntryControls();if(!active)refreshRooms()}
 }
 el('joinOnline').onclick=joinOnline;
@@ -331,7 +334,7 @@ function applyAvatarAppearance(look){
   }
   notice(active?'🎨 ใช้โมเดล V4 และบันทึกตัวละครแล้ว':'🎨 เลือกรูปลักษณ์ตัวละครแล้ว');
 }
-el('playDemo').onclick=()=>{if(accountBusy||joining||active)return;online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
+el('playDemo').onclick=()=>{if(accountBusy||joining||active)return;beginGameAudio();online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
 function onJoined(){
  el('microphone').hidden=!online;
  const l=lots[slot];
@@ -434,6 +437,7 @@ async function leaveGame(message=''){
  if(!active)return;
  pendingGardenAction=null;
  closeBuild(false);
+ bgm?.exit();
  voice.close();
  socialUI.disconnect();
  accountBusy=true;
@@ -466,6 +470,11 @@ el('menuBtn').onclick=()=>{
      soundButton.setAttribute('aria-pressed',String(sound));
    });
    soundButton.setAttribute('aria-pressed',String(sound));
+   const musicButton=addButton(d,bgm?.enabled?'🎵 เพลงพื้นหลัง: เปิด (20%)':'🎵 เพลงพื้นหลัง: ปิด',()=>{
+     bgm?.setEnabled(!bgm.enabled);
+     musicButton.textContent=bgm?.enabled?'🎵 เพลงพื้นหลัง: เปิด (20%)':'🎵 เพลงพื้นหลัง: ปิด';
+   });
+   if(bgm?.missingAssets)addText(d,'ยังไม่มีไฟล์เพลง 2 เพลงบน GitHub — อัปโหลดไปที่ assets/music/');
    addButton(d,'🎨 แต่งตัวละคร',()=>showDialog('แต่งตัวละคร',panel=>buildAppearanceEditor(panel,applyAvatarAppearance)));
    addButton(d,session?'กลับหน้าเลือกเซิร์ฟเวอร์':'กลับหน้าเข้าเกม',leaveGame);
    addText(d,'เดินด้วย WASD หรือลูกศร · แตะไอคอนใกล้ตัวหรือกด E · กด / เพื่อพิมพ์แชท');
@@ -1232,12 +1241,27 @@ function interact(act=selectedInteract()){
  else if(act.type==='estate')estateDialog();
 }
 el('nearbyUse').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)interact()};
+function beginGameAudio(){
+ // Unlock audio while the player is physically pressing Join / Play.
+ try{
+   soundCtx??=new (window.AudioContext||window.webkitAudioContext)();
+   soundCtx.resume().catch(()=>{});
+   sound=true;
+ }catch{sound=false}
+ voice.setListening(true); // Receiving friends never activates the microphone.
+ voice.resumePlayback();
+ bgm?.enter();
+}
 async function toggleSound(){
- if(sound){sound=false;notice('ปิดเสียงแล้ว');return}
+ if(sound){
+   sound=false;bgm?.setEnabled(false);voice.setListening(false);
+   notice('ปิดเสียงเกมและเสียงเพื่อนแล้ว');return;
+ }
  try{
    soundCtx??=new (window.AudioContext||window.webkitAudioContext)();
    await soundCtx.resume();
-   sound=true;notice('เปิดเสียงแล้ว');
+   sound=true;bgm?.setEnabled(true);voice.setListening(true);voice.resumePlayback();
+   notice('เปิดเสียงเกม เพลง และเสียงเพื่อนแล้ว');
  }catch{notice('เบราว์เซอร์นี้ไม่รองรับเสียงประกอบ')}
 }
 function blip(freq=440,duration=.09,vol=.015,type='sine'){if(!sound||!soundCtx)return;const a=soundCtx.createOscillator(),g=soundCtx.createGain();a.type=type;a.frequency.setValueAtTime(freq,soundCtx.currentTime);g.gain.setValueAtTime(vol,soundCtx.currentTime);g.gain.exponentialRampToValueAtTime(.0001,soundCtx.currentTime+duration);a.connect(g).connect(soundCtx.destination);a.start();a.stop(soundCtx.currentTime+duration)}
@@ -1253,8 +1277,8 @@ function playV4Footstep(){
     clip.preload='auto';
     v4StepSamples.set(ground,clip);
   }
-  try{clip.pause();clip.currentTime=0;clip.volume=.3;clip.play().catch(()=>blip(160,.06,.008,'triangle'))}
-  catch{blip(160,.06,.008,'triangle')}
+  try{clip.pause();clip.currentTime=0;clip.volume=.09;clip.play().catch(()=>blip(160,.06,.0024,'triangle'))}
+  catch{blip(160,.06,.0024,'triangle')}
 }
 function playAmbient(t){if(!sound||!soundCtx||t-ambientAt<1900)return;ambientAt=t;const f=600+Math.sin(t/9000)*130;blip(f,.2,.006,'sine');setTimeout(()=>blip(f*1.15,.13,.003,'sine'),130)}
 el('chatInput').onfocus=()=>{keys.clear();joyReset()};
@@ -1623,6 +1647,7 @@ function canMove(x,y){if(scene==='inside'){
  return true}
 function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
  if(active){
+  bgm?.setTalking(online && [...remote.values()].some(player=>player.voiceTalking===true));
   const clock=Date.now();
   weather=weatherAt(clock);
   tickGardener(clock);
