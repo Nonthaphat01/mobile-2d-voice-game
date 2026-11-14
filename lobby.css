@@ -169,3 +169,63 @@
  .entry-brand .entry-story h1 { font-size:1.8rem; }
  .entry-footer small { display:none; }
 }
+
+
+/* Magical lights V5 — background-only; pointer events always reach game controls */
+.entry-lobby { isolation:isolate; --pointer-x:-1000px; --pointer-y:-1000px; }
+.entry-shell { position:relative; z-index:1; }
+.entry-lobby::before {
+  content:""; display:block; position:fixed; inset:-35%; pointer-events:none; z-index:0;
+  background:
+    linear-gradient(114deg,transparent 39%,rgba(252,230,154,.13) 47%,rgba(255,249,217,.3) 49%,transparent 53%),
+    linear-gradient(114deg,transparent 24%,rgba(186,244,172,.12) 33%,transparent 40%),
+    linear-gradient(114deg,transparent 64%,rgba(255,204,128,.19) 71%,transparent 76%);
+  opacity:.78; mix-blend-mode:screen; animation:lobby-rays 15s linear infinite;
+}
+.entry-lobby::after {
+  content:""; display:block; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:radial-gradient(circle 240px at var(--pointer-x) var(--pointer-y),rgba(255,229,152,.17),transparent 70%);
+}
+.lobby-lights {
+  position:fixed; inset:0; width:100%; height:100%; z-index:2;
+  pointer-events:none; touch-action:auto; opacity:.91;
+}
+.entry-light-rays {
+  position:absolute; inset:-60% -70%; z-index:0; pointer-events:none;
+  background:
+    linear-gradient(114deg,transparent 27%,rgba(255,246,194,.0) 39%,rgba(255,240,177,.34) 44%,transparent 48%),
+    linear-gradient(114deg,transparent 52%,rgba(255,234,164,.22) 60%,transparent 68%),
+    linear-gradient(114deg,transparent 69%,rgba(199,244,166,.18) 73%,transparent 79%);
+  mix-blend-mode:screen; opacity:.62;
+  animation:brand-light-rays 11s linear infinite;
+}
+.entry-brand::after {
+  content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+  background:radial-gradient(circle 185px at var(--glow-x,-1000px) var(--glow-y,-1000px),rgba(255,243,182,.34),rgba(255,218,133,.12) 35%,transparent 74%);
+  mix-blend-mode:screen;
+}
+.entry-landscape {
+  animation:cozy-landscape-sway 27s ease-in-out infinite alternate;
+}
+@keyframes lobby-rays {
+  from { transform:translate3d(-22%,0,0) rotate(-5deg); }
+  to { transform:translate3d(24%,0,0) rotate(5deg); }
+}
+@keyframes brand-light-rays {
+  from { transform:translate3d(-24%,0,0); }
+  to { transform:translate3d(22%,0,0); }
+}
+@keyframes cozy-landscape-sway {
+  from { transform:translate3d(var(--land-x,0px),var(--land-y,0px),0) scale(1.045); }
+  to { transform:translate3d(var(--land-x,0px),var(--land-y,0px),0) scale(1.095); }
+}
+@media (max-width:720px) {
+ .entry-light-rays { opacity:.39; }
+ .entry-lobby::before { opacity:.46; }
+ .lobby-lights { opacity:.75; }
+}
+@media (prefers-reduced-motion:reduce) {
+ .entry-lobby::before,.entry-light-rays,.entry-landscape { animation:none !important; }
+ .entry-landscape { transform:none !important; }
+ .entry-lobby::after,.entry-brand::after,.lobby-lights { display:none; }
+}
