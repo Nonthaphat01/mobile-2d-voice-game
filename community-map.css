@@ -1,37 +1,21 @@
-.game-dialog:has(.community-map) {
-  width: min(720px, 94vw);
-  max-width: 94vw;
-}
-.community-map {
-  display: block;
-  width: 100%;
-  height: auto;
+.community-map-panel {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  z-index: 5;
+  width: clamp(132px, 21vw, 250px);
+  padding: 5px;
   border: 1px solid #719583;
-  border-radius: 12px;
+  border-radius: 11px;
+  background: #152d2af2;
+  pointer-events: none;
 }
-.community-map-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 12px;
-  color: #e8f2ec;
-  font-size: 12px;
+.community-map-panel canvas { display: block; width: 100%; height: auto; border-radius: 6px; }
+.community-map-legend { display: flex; justify-content: space-between; gap: 2px; padding: 2px 2px 0; font-size: clamp(9px, 1vw, 12px); }
+.community-map-legend span:nth-child(1) { color: #9cf2da; }
+.community-map-legend span:nth-child(2) { color: #f4bf73; }
+.community-map-legend span:nth-child(3) { color: #f5cd74; }
+.community-map-legend span:nth-child(4) { color: #a9c6ff; }
+@media (max-width: 600px) {
+  .community-map-panel { top: calc(max(10px, env(safe-area-inset-top)) + 66px); }
 }
-.community-map-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.community-map-legend i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-.community-map-legend span:nth-child(2) i {
-  border-radius: 2px;
-}
-.community-map-legend span:nth-child(3) i {
-  border-radius: 1px;
-  transform: rotate(45deg);
-}
-

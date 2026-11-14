@@ -2,7 +2,7 @@
 import {changeProduce, GARDENER_PLANS, GARDENER_HEARTBEAT, GARDEN_STEP_MS, gradeOf, marketPrice, MAX_MONEY, MAX_PRODUCE, normalizeProduce, rollGrade} from './farming.js?v=estate-1';
 import {advanceNeeds, NEEDS_STEP_MS, normalizeNeeds} from './needs.js?v=v5-neighbors-1';
 import {FURNITURE_TYPES} from './furniture.js?v=v5-neighbors-1';
-import {CROPS,cropType,cropStock,seedKey,estateLevel,plotCount,emptyPlot,EXPANSION_PRICES,MAX_GARDENERS,workersOf,setWorkers} from './estate.js?v=estate-1';
+import {CROPS,cropType,cropStock,seedKey,estateLevel,houseExpansionLevel,gardenExpansionLevel,plotCount,emptyPlot,EXPANSION_PRICES,MAX_GARDENERS,workersOf,setWorkers} from './estate.js?v=estate-split-1';
 export {FURNITURE_TYPES};
 export function homeGrid(level=0){
   const tier=estateLevel(level);
@@ -107,7 +107,7 @@ export function starter(name='ผู้เล่น') {
     money:100, level:1,xp:0, appearance:sanitizeAppearance(), needs:normalizeNeeds(), needsAt:0,
     playSeconds:0,
     inventory:{hoe:1,watering_can:1,tomato_seed:3,banana_seed:0,rice_seed:0,watermelon_seed:0,crops:{},tomato:0,tomatoGrades:{},furniture:Object.fromEntries(Object.keys(FURNITURE_TYPES).map(type=>[type,0]))},
-    home:{expansion:0,furniture:[],gardenBox:{tomato:0,tomatoGrades:{},crops:{}},plots:Array.from({length:PLOT_COUNT},emptyPlot)}
+    home:{expansion:0,houseExpansion:0,gardenExpansion:0,furniture:[],gardenBox:{tomato:0,tomatoGrades:{},crops:{}},plots:Array.from({length:PLOT_COUNT},emptyPlot)}
   };
 }
 export function sanitizeState(s,name='ผู้เล่น') {
@@ -126,7 +126,9 @@ export function sanitizeState(s,name='ผู้เล่น') {
   o.inventory.tomato=Object.values(o.inventory.tomatoGrades).reduce((sum,count)=>sum+count,0);
   for(const type of Object.keys(FURNITURE_TYPES))o.inventory.furniture[type]=clampCount(s.inventory?.furniture?.[type]);
   o.home.expansion=estateLevel(s.home?.expansion);
-  o.home.furniture=sanitizeFurniture(s.home?.furniture,o.home.expansion);
+  o.home.houseExpansion=houseExpansionLevel(s.home);
+  o.home.gardenExpansion=gardenExpansionLevel(s.home);
+  o.home.furniture=sanitizeFurniture(s.home?.furniture,o.home.houseExpansion);
   for(const crop of Object.keys(CROPS).filter(crop=>crop!=='tomato')){
     o.inventory[seedKey(crop)]=clampCount(s.inventory?.[seedKey(crop)]);
     for(const [destination,source] of [[o.inventory,s.inventory],[o.home.gardenBox,s.home?.gardenBox]]){
@@ -136,7 +138,7 @@ export function sanitizeState(s,name='ผู้เล่น') {
   }
   o.home.gardenBox.tomatoGrades=normalizeProduce(s.home?.gardenBox);
   o.home.gardenBox.tomato=Object.values(o.home.gardenBox.tomatoGrades).reduce((sum,count)=>sum+count,0);
-  o.home.plots=Array.from({length:plotCount(o.home.expansion)},(_,i)=>{
+  o.home.plots=Array.from({length:plotCount(o.home.gardenExpansion)},(_,i)=>{
     const q=s.home?.plots?.[i];
     return cropType(q?.crop)?{crop:q.crop,plantedAt:Math.max(0,Number(q.plantedAt)||0),watered:q.watered===true}:emptyPlot();
   });
@@ -316,12 +318,17 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
       if(s.money<cost||items[key]+quantity>99999)return {ok:false,message:'เงินไม่พอหรือกระเป๋าเต็ม'};
       s.money-=cost;items[key]+=quantity;status='ซื้อเมล็ด'+CROPS[crop].name+' '+quantity+' ชิ้น';break;
     }
-    case 'expandEstate': {
-      const level=s.home.expansion, price=EXPANSION_PRICES[level];
+    case 'expandHouse':
+    case 'expandGarden': {
+      const garden=action.type==='expandGarden';
+      const field=garden?'gardenExpansion':'houseExpansion';
+      const level=garden?gardenExpansionLevel(s.home):houseExpansionLevel(s.home);
+      const price=EXPANSION_PRICES[level];
       if(!price||action.level!==level||s.money<price)return {ok:false,message:'ซื้อพื้นที่ไม่ได้ กรุณาตรวจสอบราคาและเงิน'};
-      s.money-=price;s.home.expansion++;
-      while(s.home.plots.length<plotCount(s.home.expansion))s.home.plots.push(emptyPlot());
-      status='ขยายบ้านและสวนแล้ว';break;
+      s.money-=price;
+      s.home[field]=level+1;
+      if(garden)while(s.home.plots.length<plotCount(level+1))s.home.plots.push(emptyPlot());
+      status=garden?'ขยายสวนแล้ว':'ขยายพื้นที่ในบ้านแล้ว';break;
     }
     case 'buy': {
       const item=String(action.item);const def=isFurnitureType(item)?FURNITURE_TYPES[item]:null;
@@ -332,7 +339,7 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
     case 'placeFurniture': {
       const item=String(action.item);if(!isFurnitureType(item)||items.furniture[item]<1)return {ok:false,message:'ไม่มีเฟอร์นิเจอร์ชิ้นนี้ในกระเป๋า'};
       const candidate=normalizeFurniture({id:action.id,type:item,col:action.col,row:action.row,rotation:action.rotation},s.home.furniture.length);
-      if(!candidate||s.home.furniture.some(p=>p.id===candidate.id)||!isValidFurniturePlacement(candidate,s.home.furniture,null,s.home.expansion))return {ok:false,message:'ตำแหน่งนี้วางไม่ได้หรือมีของกีดขวาง'};
+      if(!candidate||s.home.furniture.some(p=>p.id===candidate.id)||!isValidFurniturePlacement(candidate,s.home.furniture,null,houseExpansionLevel(s.home)))return {ok:false,message:'ตำแหน่งนี้วางไม่ได้หรือมีของกีดขวาง'};
       s.home.furniture.push(candidate);items.furniture[item]--;status='วาง'+FURNITURE_TYPES[item].label+'แล้ว';break;
     }
     case 'moveFurniture':
@@ -341,7 +348,7 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
       if(index<0)return {ok:false,message:'ไม่พบเฟอร์นิเจอร์ชิ้นนี้'};
       const current=s.home.furniture[index];
       const candidate=normalizeFurniture({...current,col:action.col??current.col,row:action.row??current.row,rotation:action.rotation??(action.type==='rotateFurniture'?current.rotation+90:current.rotation)},index);
-      if(!candidate||!isValidFurniturePlacement(candidate,s.home.furniture,current.id,s.home.expansion))return {ok:false,message:'ตำแหน่งนี้วางไม่ได้หรือมีของกีดขวาง'};
+      if(!candidate||!isValidFurniturePlacement(candidate,s.home.furniture,current.id,houseExpansionLevel(s.home)))return {ok:false,message:'ตำแหน่งนี้วางไม่ได้หรือมีของกีดขวาง'};
       s.home.furniture[index]=candidate;status=action.type==='rotateFurniture'?'หมุนเฟอร์นิเจอร์แล้ว':'ย้ายเฟอร์นิเจอร์แล้ว';break;
     }
     case 'removeFurniture': {
@@ -351,7 +358,7 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
       status='เก็บเฟอร์นิเจอร์เข้ากระเป๋าแล้ว';break;
     }
     case 'saveHome': {
-      const furniture=strictFurnitureList(action.furniture,s.home.expansion);
+      const furniture=strictFurnitureList(action.furniture,houseExpansionLevel(s.home));
       const proposed={};for(const type of Object.keys(FURNITURE_TYPES))proposed[type]=clampCount(action.inventoryFurniture?.[type]);
       if(!furniture||Object.values(proposed).some(value=>value>99999))return {ok:false,message:'แบบบ้านไม่ถูกต้อง'};
       for(const type of Object.keys(FURNITURE_TYPES)){

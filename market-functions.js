@@ -3,7 +3,7 @@ import {getDatabase} from 'firebase-admin/database';
 import {getFirestore} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {createHmac, randomBytes} from 'node:crypto';
-import {applyAction, lots} from './shared/rules.js?v=estate-1';
+import {applyAction, lots} from './shared/rules.js?v=estate-split-1';
 import {gardenerPost,gardenBoxPosition} from './shared/farming.js?v=v5-neighbors-1';
 import {firestoreMarket, MARKET_PATH} from './firestore-market.js';
 
@@ -13,7 +13,7 @@ const db = getDatabase();
 const game = db.ref(ROOT);
 const firestore = getFirestore();
 const market = firestoreMarket(firestore,async uid=>(await game.child('profiles').child(uid).get()).val());
-const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','gardenerStep','gardenerResume','collectGardenBox','expandEstate','needsTick','eat']);
+const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','gardenerStep','gardenerResume','collectGardenBox','expandHouse','expandGarden','needsTick','eat']);
 const nearMarket = player => player.scene==='outside' &&
   Math.hypot(Math.max(1136-player.x,0,player.x-1264),Math.max(588-player.y,0,player.y-699))<=82;
 
@@ -53,7 +53,7 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
       if(player.scene!=='outside'||Math.hypot(player.x-post.x,player.y-post.y)>75)
         return {ok:false,message:'เดินไปที่จุดจ้างคนสวนหน้าบ้านก่อน'};
     }
-    if(action.type==='expandEstate'){
+    if(['expandHouse','expandGarden'].includes(action.type)){
       const lot=lots[slot];
       if(player.scene!=='outside'||Math.hypot(player.x-lot.x-195,player.y-lot.y-253)>75)
         return {ok:false,message:'เดินไปที่ป้ายขยายพื้นที่หน้าบ้านก่อน'};

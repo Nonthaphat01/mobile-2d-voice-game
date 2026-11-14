@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="lobby.css?v=v5-account-1">
 <link rel="stylesheet" href="game-hud.css?v=v5-gardener-1">
 <link rel="stylesheet" href="neighbors.css?v=estate-2">
-<link rel="stylesheet" href="community-map.css?v=estate-guide-1">
+<link rel="stylesheet" href="community-map.css?v=estate-split-1">
 </head>
 <body>
 <canvas id="game" aria-label="แผนที่ชุมชน 2 มิติ"></canvas>
@@ -74,10 +74,13 @@
     <label title="ความอิ่ม"><span aria-hidden="true">🍽</span><span class="sr-only">ความอิ่ม</span><meter id="fullness" min="0" max="100" value="100"></meter><output id="fullnessValue" aria-hidden="true">100</output></label>
   </div>
 </header>
+<aside id="mapPanel" class="community-map-panel" aria-label="แผนที่ชุมชน" hidden>
+  <canvas id="communityMap" width="960" height="470" role="img" aria-label="แผนที่แสดงตำแหน่งของคุณ บ้าน ตลาดกลาง และเพื่อนบ้าน"></canvas>
+  <div class="community-map-legend"><span>● คุณ</span><span>■ บ้าน</span><span>◆ ตลาด</span><span>● เพื่อน</span></div>
+</aside>
 <div id="joystick" class="joystick" hidden><div id="stick" class="stick"></div></div>
 <button id="bagBtn" class="bag-shortcut" type="button" aria-label="เปิดกระเป๋า" title="เปิดกระเป๋า (I)" hidden>🎒</button>
 <div id="socialButtons" class="social-shortcuts" hidden>
-  <button id="mapBtn" type="button" aria-label="แผนที่ชุมชน" title="แผนที่ชุมชน (M)">🗺️</button>
   <button id="friendsBtn" type="button" aria-label="เพื่อนและผู้เล่น" title="เพื่อนและผู้เล่น">👥</button>
   <button id="phoneBtn" type="button" aria-label="โทรศัพท์" title="โทรศัพท์">📱<span id="friendBadge" hidden></span></button>
 </div>
@@ -110,7 +113,7 @@
   </div>
 </section>
 <script src="config.js?v=v5-sheets-1"></script>
-<script type="module" src="client.js?v=estate-guide-1"></script>
+<script type="module" src="client.js?v=estate-split-1"></script>
 </body>
 </html>
 

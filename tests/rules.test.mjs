@@ -58,3 +58,30 @@ test('legacy saves migrate placed furniture and keep invalid state safe',()=>{
 test('8 distinct outdoor lots remain unchanged',()=>{
  assert.equal(lots.length,8);assert.equal(new Set(lots.map(l=>l.slot)).size,8);
 });
+
+test('legacy estate purchases migrate to both tracks and upgrades are independent',()=>{
+ const old=starter();
+ old.home.expansion=1;
+ delete old.home.houseExpansion;
+ delete old.home.gardenExpansion;
+ old.home.plots[0]={crop:'tomato',plantedAt:10,watered:true};
+ const save=sanitizeState(old);
+ assert.equal(save.home.houseExpansion,1);
+ assert.equal(save.home.gardenExpansion,1);
+ assert.equal(save.home.plots.length,20);
+ save.money=12000;
+ assert.equal(applyAction(save,{type:'expandHouse',level:1}).ok,true);
+ assert.equal(save.home.houseExpansion,2);
+ assert.equal(save.home.gardenExpansion,1);
+ assert.equal(save.home.plots.length,20);
+ assert.equal(applyAction(save,{type:'expandGarden',level:1}).ok,true);
+ assert.equal(save.home.houseExpansion,2);
+ assert.equal(save.home.gardenExpansion,2);
+ assert.equal(save.home.plots.length,40);
+ assert.equal(save.money,2000);
+ assert.equal(applyAction(save,{type:'expandGarden',level:1}).ok,false);
+ assert.equal(applyAction(save,{type:'expandHouse',level:2}).ok,false);
+ const roundTrip=sanitizeState(save);
+ assert.equal(roundTrip.home.plots.length,40);
+ assert.equal(roundTrip.home.plots[0].crop,'tomato');
+});

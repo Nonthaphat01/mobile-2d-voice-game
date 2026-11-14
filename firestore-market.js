@@ -1,4 +1,4 @@
-import {sanitizeState, starter} from './shared/rules.js?v=estate-1';
+import {sanitizeState, starter} from './shared/rules.js?v=estate-split-1';
 import {trade} from './shared/market-trade.js';
 
 export const MARKET_PATH = 'HOODGAME/market';

@@ -3,7 +3,7 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=estate-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=estate-split-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=v5-sheets-1';
 

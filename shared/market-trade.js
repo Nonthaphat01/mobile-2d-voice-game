@@ -1,5 +1,5 @@
 import {gradeOf, marketPrice, changeProduce, MAX_MONEY, MAX_PRODUCE} from './farming.js?v=estate-1';
-import {sanitizeState} from './rules.js?v=estate-1';
+import {sanitizeState} from './rules.js?v=estate-split-1';
 
 export const LISTING_DURATION = 86_400_000;
 import {cropType,cropStock} from './estate.js?v=estate-1';
