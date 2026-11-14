@@ -32,5 +32,7 @@ div.nearby-action[hidden] { display: none; }
 .community-map-legend span:nth-child(3) { color: #f5cd74; }
 .community-map-legend span:nth-child(4) { color: #a9c6ff; }
 @media (max-width: 600px) {
-  .community-map-panel { top: calc(max(10px, env(safe-area-inset-top)) + 66px); }
+  :root { --mobile-map-width: clamp(155px, 23vw, 300px); }
+  .community-map-panel { top: calc(max(10px, env(safe-area-inset-top)) + 66px); width: var(--mobile-map-width); }
+  #chatPanel { max-width: calc(100vw - var(--mobile-map-width) - 28px - env(safe-area-inset-right)); }
 }

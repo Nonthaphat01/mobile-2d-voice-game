@@ -3,7 +3,7 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {GARDEN_ACTIONS,saveGardenAction} from './shared/garden-save.js?v=garden-save-1';
+import {GARDEN_ACTIONS,saveGardenAction} from './shared/garden-save.js?v=garden-save-2';
 import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=town-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=town-1';
@@ -220,8 +220,11 @@ export class FirebaseGame {
     this.profile=result.profile;
     this.emit({type:'profile',profile:result.profile,notice:result.message,background});
     if(result.ok){
-      try{await update(slotRef,{home:result.profile.home,...publicStats(result.profile),updatedAt:Date.now()})}
-      catch(e){if(this.slotRef===slotRef&&!background)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ'})}
+      // Presence uses the same SDK connection. Queue the update immediately
+      // without delaying the result of an already committed profile write.
+      update(slotRef,{home:result.profile.home,...publicStats(result.profile),updatedAt:Date.now()}).catch(()=>{
+        if(this.slotRef===slotRef&&!background)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ',chatOnly:true});
+      });
     }
   }else if(result.message&&!background)this.emit({type:'notice',message:result.message});
   return result;

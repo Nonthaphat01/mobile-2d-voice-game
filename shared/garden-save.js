@@ -14,6 +14,15 @@ function mergeChanges(saved,before,after){
 }
 
 export async function saveGardenAction(databaseURL,root,uid,token,action,fetcher=fetch){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
+  try{
+    return await writeGardenAction(databaseURL,root,uid,token,action,
+      (url,options)=>fetcher(url,{...options,signal:controller.signal}));
+  }finally{clearTimeout(timeout)}
+}
+
+async function writeGardenAction(databaseURL,root,uid,token,action,fetcher){
   const url=new URL(databaseURL.replace(/\/$/,'')+'/'+root+'/profiles/'+encodeURIComponent(uid)+'.json');
   url.searchParams.set('auth',token);
   const headers={'X-Firebase-ETag':'true'};
@@ -21,6 +30,10 @@ export async function saveGardenAction(databaseURL,root,uid,token,action,fetcher
   for(let attempt=0;attempt<6;attempt++){
     if(![200,412].includes(response.status))break;
     const etag=response.headers.get('etag'), saved=await response.json();
+    if(!etag&&response.status===412){
+      response=await fetcher(url,{headers,cache:'no-store'});
+      continue;
+    }
     if(!etag||!saved)break;
     const profile=sanitizeState(saved);
     const before=JSON.parse(JSON.stringify(profile));
