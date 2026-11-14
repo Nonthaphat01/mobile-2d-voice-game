@@ -25,3 +25,12 @@ body.building .social-shortcuts { display:none; }
 .dm-form button { width:auto; margin:0; }
 .build-stock { max-height:90px; overflow:auto; flex-wrap:wrap; }
 .build-stock button { flex:0 0 auto; }
+.furniture-cards { grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); }
+.furniture-cards .dialog-action { min-height:91px; padding:5px; font-size:12px; }
+.furniture-cards .dialog-action span { display:block; font-size:27px; }
+.bulk-row { display:grid; grid-template-columns:minmax(60px,1fr) repeat(3,minmax(52px,1fr)); align-items:center; gap:4px; }
+.bulk-row .dialog-action { padding:5px; min-height:38px; font-size:12px; }
+.chat-tools,#emojiChoices { display:flex; flex-wrap:wrap; gap:4px; }
+.chat-tools { padding:3px; }
+.chat-tools button { padding:4px; border-radius:5px; background:#254658; color:white; border:1px solid #5b818d; }
+#microphone[aria-pressed="true"] { background:#416b43; }

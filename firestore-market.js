@@ -1,4 +1,4 @@
-import {sanitizeState, starter} from './shared/rules.js?v=v5-neighbors-1';
+import {sanitizeState, starter} from './shared/rules.js?v=estate-1';
 import {trade} from './shared/market-trade.js';
 
 export const MARKET_PATH = 'HOODGAME/market';
@@ -44,8 +44,8 @@ export function firestoreMarket(db, readLegacyProfile) {
         const item = doc.data();
         return item.expiresAt>now||item.seller===uid;
       }).map(doc => {
-        const {seller,name,key,quantity,unitPrice,expiresAt} = doc.data();
-        return {id:doc.id,sellerKey:seller,own:seller===uid,name,key,quantity,unitPrice,expired:expiresAt<=now};
+        const {seller,name,crop,key,quantity,unitPrice,expiresAt} = doc.data();
+        return {id:doc.id,sellerKey:seller,own:seller===uid,name,...(crop&&crop!=='tomato'?{crop}:{}),key,quantity,unitPrice,expired:expiresAt<=now};
       }),
       profile:sanitizeState(profile.data())
     };
@@ -81,7 +81,7 @@ export function firestoreMarket(db, readLegacyProfile) {
       const profile = marketState.profiles[uid];
       tx.set(userRef, profile);
       if (request.type==='list') tx.create(listingRef, marketState.marketListings[request.id]);
-      else tx.delete(listingRef);
+      else if(marketState.marketListings[request.id])tx.set(listingRef,marketState.marketListings[request.id]);else tx.delete(listingRef);
       if (request.type==='buy') tx.set(sellerRef,marketState.profiles[sellerRef.id]);
       return {...result,profile};
     });

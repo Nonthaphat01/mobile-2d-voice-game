@@ -31,7 +31,8 @@ test('gardener grows and brings the harvest to the garden box without selling',(
   for(let time=worker.lastSeenAt+10000;time<ripeAt;time+=10000)step(time);
   step(ripeAt);
   assert.equal(state.inventory.tomato,0);
-  assert.deepEqual(state.home.gardenBox,{tomato:3,tomatoGrades:{100:3}});
+  assert.equal(state.home.gardenBox.tomato,3);
+  assert.deepEqual(state.home.gardenBox.tomatoGrades,{100:3});
   assert.equal(worker.phase,'deposit');
   const arrival=worker.nextAt;
   assert.equal(gardenerPosition(lots[0],worker,arrival).x,gardenBoxPosition(lots[0]).x);
@@ -70,7 +71,7 @@ test('offline catch-up stores crops up to expiry and survives reload without dup
   assert.equal(applyAction(reloaded,{type:'gardenerResume',slot:2},end+60000,()=>.1).ok,true);
   assert.deepEqual(reloaded.home.gardenerReceipt,{at:end+60000,gross:0,paid:0,stored:3,ended:true});
   assert.equal(reloaded.money,0);
-  assert.deepEqual(sanitizeState(reloaded).home.gardenBox,{tomato:3,tomatoGrades:{100:3}});
+  assert.deepEqual(sanitizeState(reloaded).home.gardenBox.tomatoGrades,{100:3});
   assert.equal(reloaded.home.gardener,undefined);
   assert.equal(applyAction(reloaded,{type:'gardenerResume',slot:2},end+70000,()=>.1).ok,false);
   assert.equal(reloaded.home.gardenBox.tomato,3);

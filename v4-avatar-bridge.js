@@ -23,14 +23,14 @@ export function drawClassicActor(ctx,p,now,local,profileName,localAppearance){
  if(!actor){actor={x,y,scene:'outside',pose:'stand',face:Math.PI/2,lastTravel:-1e9};actors.set(id,actor)}
  const dx=x-actor.x,dy=y-actor.y,travel=Math.hypot(dx,dy);
  if(travel>.1)actor.lastTravel=now;
- const face=(local||p.id?.startsWith('gardener-'))?(Number.isFinite(p.face)?p.face:Math.PI/2):
+ const face=p.pose==='sit'&&Number.isFinite(p.restAngle)?Math.PI/2+p.restAngle:(local||p.id?.startsWith('gardener-'))?(Number.isFinite(p.face)?p.face:Math.PI/2):
    travel>.25?Math.atan2(dy,dx):actor.face;
  Object.assign(actor,p,{x,y,face,scene:local?(p.scene||'outside'):(p.scene||'outside'),
-  pose:p.pose||'stand',walking:local||p.positionInterpolated?!!p.walking:(now-actor.lastTravel<340),
+  pose:p.pose||'stand',onBed:p.pose==='sleep',walking:local||p.positionInterpolated?!!p.walking:(now-actor.lastTravel<340),
   name:local?profileName:(p.name||'ผู้เล่น'),
   appearance:(local?sanitizeAppearance(localAppearance):
      p.appearance?sanitizeAppearance(p.appearance):undefined)});
- return renderClassicAvatar(ctx,actor,now,{speaking:!!(p.text&&p.until>Date.now())});
+ return renderClassicAvatar(ctx,actor,now,{speaking:p.voiceTalking===true||!!(p.text&&p.until>Date.now())});
 }
 
 function appearancePreview(canvas){

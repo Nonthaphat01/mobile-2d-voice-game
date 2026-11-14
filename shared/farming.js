@@ -35,11 +35,11 @@ export function rollGrade(random = Math.random) {
   }
 }
 
-export function marketPrice(key, now = Date.now()) {
+export function marketPrice(key, now = Date.now(), crop='tomato') {
   if (!gradeOf(key)) return 0;
   const rates = [100, 115, 125, 110, 90, 80];
   const rate = rates[Math.floor(now / MARKET_HOUR_MS) % rates.length];
-  return Math.max(1, Math.round(7 * Number(key) * rate / 10000));
+  return Math.max(1, Math.round(CROPS[crop].price * Number(key) * rate / 10000));
 }
 
 export function normalizeProduce(inventory) {
@@ -92,7 +92,7 @@ export function gardenerPosition(lot, worker, now) {
   if (worker.phase === 'garden' || worker.phase === 'deposit') {
     const index = worker.plot;
     if (index < 0) return gardenBoxPosition(lot);
-    const plotAt = i => ({x:lot.x+274+(i%2)*94,y:lot.y+98+Math.floor(i/2)*65});
+    const plotAt = i => ({x:lot.x+307+(i%2)*94,y:lot.y+98+Math.floor((i%10)/2)*65});
     const target = plotAt(index);
     const from = worker.fromPlot < 0 ? gardenBoxPosition(lot):plotAt(worker.fromPlot);
     const elapsed=Math.max(0,now-worker.startedAt);
@@ -120,3 +120,5 @@ export function gardenerPosition(lot, worker, now) {
     distance -= len;
   }
 }
+import {CROPS} from './estate.js?v=estate-1';
+

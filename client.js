@@ -1,9 +1,11 @@
-import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=v5-neighbors-1';
-import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-neighbors-1';
+import {roomVoice} from './game-voice.js?v=estate-1';
+import {CROPS,cropStock,seedKey,roomSize,estateLevel,EXPANSION_PRICES,MAX_GARDENERS,workersOf} from './shared/estate.js?v=estate-1';
+import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID as BASE_GRID,homeGrid,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=estate-1';
+import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=estate-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
 import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
-import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=v5-neighbors-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=estate-1';
 import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
 import {groupListings} from './shared/social.js?v=v5-neighbors-1';
 import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
@@ -17,7 +19,9 @@ const cfg=window.GAME_CONFIG||{};
 const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
 const gardenerVisuals=new Map();
-let visiting=null, houseEnteredAt=0;
+let visiting=null, houseEnteredAt=0, gardenPage=0, HOME_GRID=BASE_GRID;
+const interior=()=>roomSize(visiting?.expansion??ownProfile.home.expansion);
+const produceEntries=inventory=>Object.keys(CROPS).flatMap(crop=>Object.entries(cropStock(inventory,crop).tomatoGrades).map(([key,count])=>[crop,key,count]));
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
 let sentMovement;
 let scene='outside',active=false,online=false,fbGame=null,session=null;
@@ -191,7 +195,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=v5-neighbors-2');
+   const {FirebaseGame}=await import('./firebase-game.js?v=estate-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
@@ -307,9 +311,10 @@ function applyAvatarAppearance(look){
 }
 el('playDemo').onclick=()=>{if(accountBusy||joining||active)return;online=false;fbGame?.leave();room=selectedRoom;myId='demo';slot=0;ownProfile=demoData();if(hasChosenAppearance())ownProfile.appearance=getChosenAppearance();else useSavedAppearance(ownProfile.appearance);ownProfile.displayName=(ownProfile.displayName==='ผู้เล่น'?el('nickname').value.trim().slice(0,18)||'ผู้เล่น':ownProfile.displayName);demoSave();remote.clear();onJoined();notice(localNotice)};
 function onJoined(){
+ el('microphone').hidden=!online;
  const l=lots[slot];
  scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();
- visiting=null;gardenerVisuals.clear();
+ visiting=null;gardenPage=0;gardenerVisuals.clear();
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
  active=true;nextNeedsAt=Date.now()+NEEDS_STEP_MS;needsPending=false;tiredSince=hungrySince=null;
  gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;enteredGardenerPost=false;receiptSeen=0;
@@ -337,6 +342,7 @@ function onNetwork(m){if(!active&&!['rooms','players','social'].includes(m.type)
    const players=m.players||[],ids=new Set(players.map(p=>p.id)),now=performance.now();
    for(const id of remote.keys())if(!ids.has(id))remote.delete(id);
    for(const p of players)trackRemote(p,now);
+   if(active&&online)voice.sync(players);
    if(visiting&&!remote.has(visiting.id)){interact({type:'exit'});notice('เจ้าของบ้านออกจากชุมชนแล้ว')}
    hud()
    socialUI.refresh();
@@ -383,6 +389,7 @@ function action(a){if(['plant','water','harvest'].includes(a?.type)){
 async function leaveGame(message=''){
  if(!active)return;
  closeBuild(false);
+ voice.close();
  socialUI.disconnect();
  accountBusy=true;
  active=false;
@@ -478,8 +485,9 @@ function finishInventoryGrid(grid){while(grid.childElementCount<Math.max(18,Math
 function inventory(){dialogType='inventory';showDialog('🎒 กระเป๋าของฉัน',d=>{
  addText(d,'เงิน '+ownProfile.money+' บาท · เลเวล '+ownProfile.level+' · EXP '+ownProfile.xp+'/'+ownProfile.level*30);
  const grid=inventoryGrid(d);
- for(const [key,icon,label] of [['hoe','⛏️','จอบ'],['watering_can','💦','บัวรดน้ำ'],['tomato_seed','🌱','เมล็ดมะเขือเทศ']])itemCell(grid,label,icon,ownProfile.inventory[key]);
- for(const [key,count] of Object.entries(ownProfile.inventory.tomatoGrades))itemCell(grid,'มะเขือเทศ เกรด '+gradeOf(key).name+' '+key/100+'×','🍅',count);
+ for(const [key,icon,label] of [['hoe','⛏️','จอบ'],['watering_can','💦','บัวรดน้ำ']])itemCell(grid,label,icon,ownProfile.inventory[key]);
+ for(const [crop,def] of Object.entries(CROPS))itemCell(grid,'เมล็ด'+def.name,'🌱',ownProfile.inventory[seedKey(crop)]);
+ for(const [crop,key,count] of produceEntries(ownProfile.inventory))itemCell(grid,CROPS[crop].name+' เกรด '+gradeOf(key).name,CROPS[crop].icon,count);
  for(const [type,def] of Object.entries(FURNITURE_TYPES))if(ownProfile.inventory.furniture[type])itemCell(grid,def.label,def.emoji,ownProfile.inventory.furniture[type],type);
  finishInventoryGrid(grid);
  if(ownProfile.inventory.tomato)addButton(d,'🍅 กินมะเขือเทศ 1 ผล',()=>action({type:'eat'}));
@@ -492,6 +500,9 @@ const stockButtons = new Map();
 let hoverTile, savingBuild = false;
 let focusedTile = 0;
 
+function populateBuildGrid(){
+ HOME_GRID=homeGrid(ownProfile.home.expansion);
+ buildFloor.replaceChildren();buildTiles.length=0;focusedTile=0;
 for (let row = 0; row < HOME_GRID.rows; row++) {
   for (let col = 0; col < HOME_GRID.cols; col++) {
     const tile = document.createElement('button');
@@ -513,6 +524,8 @@ for (let row = 0; row < HOME_GRID.rows; row++) {
 }
 buildFloor.style.gridTemplateColumns = 'repeat(' + HOME_GRID.cols + ', minmax(0,1fr))';
 buildFloor.style.gridTemplateRows = 'repeat(' + HOME_GRID.rows + ', minmax(0,1fr))';
+}
+
 buildFloor.onpointerleave = () => { hoverTile = null; };
 buildFloor.onkeydown = e => {
   const steps = {ArrowLeft: -1, ArrowRight: 1, ArrowUp: -HOME_GRID.cols, ArrowDown: HOME_GRID.cols};
@@ -542,6 +555,7 @@ new ResizeObserver(() => { buildCamera = null; }).observe(el('buildDock'));
 function buildHome() {
   if(visiting){notice('ออกจากบ้านเพื่อนก่อนเข้าโหมดสร้างบ้าน');return}
   if (!active || buildDraft) return;
+  populateBuildGrid();
   buildDraft = {furniture: cloneFurniture(ownProfile.home.furniture), inventory: furnitureInventory()};
   dialogClose();
   dialogType = null;
@@ -591,7 +605,7 @@ function buildTileClick(col, row) {
     notice('เลือกของจากกระเป๋า หรือแตะเฟอร์นิเจอร์ที่วางแล้ว');
     return;
   }
-  if (!isValidFurniturePlacement(candidate, buildDraft.furniture, candidate.id)) {
+  if (!isValidFurniturePlacement(candidate, buildDraft.furniture, candidate.id,ownProfile.home.expansion)) {
     notice('วางตรงนี้ไม่ได้ เพราะทับของเดิมหรือเลยขอบพื้น');
     return;
   }
@@ -617,7 +631,7 @@ function rotateSelected() {
     return;
   }
   const candidate = {...current, rotation: (current.rotation + 90) % 360};
-  if (!isValidFurniturePlacement(candidate, buildDraft.furniture, current.id)) {
+  if (!isValidFurniturePlacement(candidate, buildDraft.furniture, current.id,ownProfile.home.expansion)) {
     notice('หมุนตรงนี้ไม่ได้ ลองย้ายไปช่องที่มีพื้นที่ว่าง');
     return;
   }
@@ -692,24 +706,28 @@ function roomBuildCamera() {
   const top = el('buildTitle').getBoundingClientRect().bottom + 4;
   const bottom = el('buildDock').getBoundingClientRect().top - 6;
   const centerY = (top + bottom) / 2;
-  const zoom = Math.min((w - 12) / 650, Math.max(1, bottom - top) / 430, 1.6);
-  buildCamera = {x: 325, y: 215, zoom, centerY};
+  const room=interior();
+  const zoom=Math.min((w-12)/room.w,Math.max(1,bottom-top)/room.h,1.6);
+  buildCamera = {x:room.w/2,y:room.h/2,zoom,centerY};
   Object.assign(buildFloor.style, {
-    left: (w / 2 + (HOME_GRID.x - 325) * zoom) + 'px',
-    top: (centerY + (HOME_GRID.y - 215) * zoom) + 'px',
+    left: (w / 2 + (HOME_GRID.x - buildCamera.x) * zoom) + 'px',
+    top: (centerY + (HOME_GRID.y - buildCamera.y) * zoom) + 'px',
     width: HOME_GRID.cols * HOME_GRID.tile * zoom + 'px',
     height: HOME_GRID.rows * HOME_GRID.tile * zoom + 'px'
   });
   return buildCamera;
 }
 
-function openPlot(i){if(i<0||i>=PLOT_COUNT)return;dialogType='plot';dialogPlot=i;const p=ownProfile.home.plots[i];const remaining=p.plantedAt+GROW_MS-Date.now();
- showDialog(`🌱 แปลงสวนที่ ${i+1}`,d=>{
- addText(d,p.crop?`ปลูกมะเขือเทศแล้ว${p.watered?' • รดน้ำแล้ว':' • ต้องรดน้ำ'}`:'แปลงว่าง พร้อมปลูกพืช');
- if(!p.crop)addButton(d,`ปลูกเมล็ดมะเขือเทศ (มี ${ownProfile.inventory.tomato_seed})`,()=>action({type:'plant',plot:i}),ownProfile.inventory.tomato_seed<1);
+function openPlot(i){if(i<0||i>=ownProfile.home.plots.length)return;dialogType='plot';dialogPlot=i;const p=ownProfile.home.plots[i],def=CROPS[p.crop];const remaining=p.plantedAt+(def?.grow||0)-Date.now();
+ showDialog('🌱 แปลงสวนที่ '+(i+1),d=>{
+ addText(d,def?def.icon+' '+def.name+(p.watered?' · รดน้ำแล้ว':' · ต้องรดน้ำ'):'แปลงว่าง');
+ if(!p.crop)for(const [crop,type] of Object.entries(CROPS)){
+   const count=ownProfile.inventory[seedKey(crop)];
+   addButton(d,type.icon+' ปลูก'+type.name+' · มี '+count,()=>action({type:'plant',plot:i,crop}),!count);
+ }
  else if(!p.watered)addButton(d,'💦 รดน้ำ',()=>action({type:'water',plot:i}));
  else {
-   const harvest=addButton(d,'🍅 เก็บเกี่ยว +3 ผล / +10 EXP',()=>action({type:'harvest',plot:i}),remaining>0);
+   const harvest=addButton(d,def.icon+' เก็บเกี่ยว +3 ผล / +10 EXP',()=>action({type:'harvest',plot:i}),remaining>0);
    if(remaining>0){
      const wait=addText(d,`รอเก็บเกี่ยวประมาณ ${Math.ceil(remaining/1000)} วินาที`);
      plotReadyTimer=setTimeout(()=>{harvest.disabled=false;wait.remove()},remaining);
@@ -721,13 +739,15 @@ function openPlot(i){if(i<0||i>=PLOT_COUNT)return;dialogType='plot';dialogPlot=i
 function homeDialog(){dialogType='house';showDialog('🏡 บ้านของฉัน',d=>{
  const placed=ownProfile.home.furniture;const stock=furnitureInventory();addText(d,'วางแล้ว '+placed.length+' ชิ้น · ในกระเป๋า '+Object.values(stock).reduce((total,n)=>total+n,0)+' ชิ้น');
  addButton(d,'🏗️ เข้าโหมดสร้างบ้าน / จัดวาง',buildHome);
- const list=document.createElement('div');list.className='catalog-list';d.append(list);
+ const list=document.createElement('div');list.className='catalog-list furniture-cards';d.append(list);
  const filter=document.createElement('input');filter.type='search';filter.placeholder='ค้นหาเฟอร์นิเจอร์';filter.setAttribute('aria-label','ค้นหาเฟอร์นิเจอร์');d.insertBefore(filter,list);
  filter.value=furnitureSearch;
  const render=()=>{
    list.replaceChildren();
    for(const [type,def] of Object.entries(FURNITURE_TYPES))if(def.label.includes(furnitureSearch)){
-     addButton(list,furnitureLabel(type)+' · '+def.price+' บาท',()=>action({type:'buy',item:type}),ownProfile.money<def.price);
+     const button=addButton(list,'',()=>action({type:'buy',item:type}),ownProfile.money<def.price);
+     const icon=document.createElement('span');icon.textContent=def.emoji;
+     button.append(icon,document.createTextNode(def.label),document.createElement('br'),document.createTextNode(def.price+' บาท'));
    }
    if(!list.childElementCount)addText(list,'ไม่พบเฟอร์นิเจอร์');
  };
@@ -746,14 +766,14 @@ function gradeLabel(parent,key){
 function appendProduce(parent, atMarket=false){
  const list=document.createElement('div');
  list.className='produce-list';
- for(const [key,count] of Object.entries(ownProfile.inventory.tomatoGrades)){
+ for(const [crop,key,count] of produceEntries(ownProfile.inventory)){
    const row=document.createElement('div');
    row.className='produce-row';
-   gradeLabel(row,key);
+   row.append(CROPS[crop].icon+' '+CROPS[crop].name+' ');gradeLabel(row,key);
    row.append('× '+count);
    if(atMarket){
-     const total=marketPrice(key)*count;
-     addButton(row,'ขาย '+total.toLocaleString('th-TH')+' บาท',()=>action({type:'sell',grade:key}));
+     const total=marketPrice(key,Date.now(),crop)*count;
+     addButton(row,'ขาย '+total.toLocaleString('th-TH')+' บาท',()=>action({type:'sell',grade:key,crop}));
    }
    list.append(row);
  }
@@ -762,39 +782,32 @@ function appendProduce(parent, atMarket=false){
 function gardenDialog(){
  dialogType='garden';
  showDialog('จุดจ้างคนสวน',d=>{
-   const worker=ownProfile.home.gardener;
-   if(worker){
-     const labels={garden:'กำลังดูแลสวน',deposit:'กำลังนำผลผลิตไปเก็บในกล่อง'};
-     addText(d,labels[worker.phase]);
-     const time=addText(d,'');
-     time.id='gardenerTime';
-     updateGardenerTime(Date.now());
-   }else{
-     addText(d,'คนสวนใช้เมล็ดจากกระเป๋าและเก็บผลผลิตลงกล่องข้างสวน เวลาจ้างเดินต่อเมื่อปิดเกม');
-     for(const [plan,{label,cost}] of Object.entries(GARDENER_PLANS)){
-       addButton(d,label+' · '+cost.toLocaleString('th-TH')+' บาท',()=>action({type:'hireGardener',slot,plan}),ownProfile.money<cost);
-     }
-   }
+   const workers=workersOf(ownProfile.home);
+   addText(d,'คนสวน '+workers.length+'/'+MAX_GARDENERS+' คน');
+   workers.forEach((worker,i)=>{addText(d,'').dataset.worker=i});
+   updateGardenerTime(Date.now());
+   for(const [plan,{label,cost}] of Object.entries(GARDENER_PLANS))
+     addButton(d,label+' · '+cost.toLocaleString('th-TH')+' บาท',()=>action({type:'hireGardener',slot,plan}),workers.length>=MAX_GARDENERS||ownProfile.money<cost);
  });
 }
 function gardenBoxDialog(){
  dialogType='box';
  showDialog('📦 กล่องผลผลิตข้างสวน',d=>{
-   const box=ownProfile.home.gardenBox;
-   addText(d,box.tomato?'มะเขือเทศในกล่อง '+box.tomato+' ผล':'กล่องยังว่าง');
-   const grid=inventoryGrid(d);
-   for(const [key,count] of Object.entries(box.tomatoGrades))itemCell(grid,'เกรด '+gradeOf(key).name+' '+key/100+'×','🍅',count);
+   const entries=produceEntries(ownProfile.home.gardenBox), grid=inventoryGrid(d);
+   for(const [crop,key,count] of entries)itemCell(grid,CROPS[crop].name+' เกรด '+gradeOf(key).name,CROPS[crop].icon,count);
+   if(!entries.length)addText(d,'กล่องยังว่าง');
    finishInventoryGrid(grid);
-   addButton(d,'รับผลผลิตเข้ากระเป๋า',()=>action({type:'collectGardenBox'}),box.tomato===0);
+   addButton(d,'รับผลผลิตเข้ากระเป๋า',()=>action({type:'collectGardenBox'}),!entries.length);
  });
 }
 function updateGardenerTime(now){
- const time=el('gardenerTime'),worker=ownProfile.home.gardener;
- if(!time||!worker||!el('dialog').open)return;
- const seconds=Math.max(0,Math.ceil((worker.contractUntil-now)/1000));
- const hours=Math.floor(seconds/3600),minutes=Math.floor(seconds/60)%60;
- const value='เหลือเวลาจ้าง '+(hours?hours+' ชม. ':'')+minutes+' นาที '+seconds%60+' วินาที';
- if(time.textContent!==value)time.textContent=value;
+ const workers=workersOf(ownProfile.home);
+ for(const line of el('dialogContent').querySelectorAll('[data-worker]')){
+   const n=Number(line.dataset.worker), worker=workers[n];if(!worker)continue;
+   const sec=Math.max(0,Math.ceil((worker.contractUntil-now)/1000));
+   const value='คนที่ '+(n+1)+' · '+Math.floor(sec/3600)+' ชม. '+Math.floor(sec/60)%60+' นาที '+sec%60+' วิ';
+   if(line.textContent!==value)line.textContent=value;
+ }
 }
 function showGardenerReceipt(){
  const receipt=ownProfile.home.gardenerReceipt;
@@ -815,14 +828,16 @@ function showGardenerReceipt(){
 function shopDialog(){
  dialogType='shop';
  showDialog('🏪 ตลาดกลางชุมชน',d=>{
-   const quote=marketPrice(100);
-   addText(d,'ราคาตลาดเปลี่ยนทุก 10 นาที · เกรด C ตอนนี้ '+quote+' บาท/ผล');
-   addButton(d,'🌱 ซื้อเมล็ดมะเขือเทศ 5 บาท',()=>action({type:'seed'}),ownProfile.money<5);
-   appendProduce(d,true);
-   if(ownProfile.inventory.tomato){
-     const total=Object.entries(ownProfile.inventory.tomatoGrades).reduce((sum,[key,n])=>sum+marketPrice(key)*n,0);
-     addButton(d,'ขายทั้งหมด '+total.toLocaleString('th-TH')+' บาท',()=>action({type:'sell'}));
+   for(const [crop,def] of Object.entries(CROPS)){
+     const row=document.createElement('div');row.className='bulk-row';
+     row.append(def.icon+' '+def.name);
+     for(const quantity of [1,10,100]){
+       const price=def.seed*quantity;
+       addButton(row,quantity+' · '+price+' บาท',()=>action({type:'seed',crop,quantity}),ownProfile.money<price);
+     }
+     d.append(row);
    }
+   appendProduce(d,true);
    addButton(d,'ร้านค้าออนไลน์ · ซื้อขายกับผู้เล่น',onlineMarket);
  });
 }
@@ -844,14 +859,14 @@ async function onlineMarket(){
  if(!response.listings){addText(d,response.message||'โหลดรายการขายไม่สำเร็จ');addButton(d,'ลองใหม่',onlineMarket);return}
  if(response.profile){ownProfile=sanitizeState(response.profile);hud()}
  addText(d,'ลงขายตามราคาตลาด ณ เวลาลงขาย · ประกาศอยู่ 24 ชม. · เก็บของคืนได้เมื่อหมดอายุ');
- const entries=Object.entries(ownProfile.inventory.tomatoGrades);
+ const entries=produceEntries(ownProfile.inventory);
  if(entries.length){
    const form=document.createElement('form');
    form.className='market-listing-form';
    const grade=document.createElement('select');
    grade.setAttribute('aria-label','เลือกเกรดผลผลิต');
-   for(const [key,count] of entries){
-     const option=new Option('เกรด '+gradeOf(key).name+' '+Number(key)/100+'× · มี '+count+' ผล',key);
+   for(const [crop,key,count] of entries){
+     const option=new Option(CROPS[crop].icon+' '+CROPS[crop].name+' '+gradeOf(key).name+' · มี '+count,crop+':'+key);
      grade.append(option);
    }
    const qty=document.createElement('input');
@@ -859,13 +874,14 @@ async function onlineMarket(){
    qty.setAttribute('aria-label','จำนวนผลที่ลงขาย');
    const submit=document.createElement('button');
    submit.className='dialog-action';submit.type='submit';submit.textContent='ลงขาย';
-   const setMax=()=>{qty.max=String(Math.min(999,ownProfile.inventory.tomatoGrades[grade.value]||0))};
+   const selected=()=>grade.value.split(':');
+   const setMax=()=>{const [crop,key]=selected();qty.max=String(Math.min(999,cropStock(ownProfile.inventory,crop).tomatoGrades[key]||0));};
    grade.onchange=setMax;setMax();
    form.append(grade,qty,submit);
    form.onsubmit=async e=>{
      e.preventDefault();
      submit.disabled=true;
-     try{await marketRequest({type:'list',id:crypto.randomUUID(),key:Number(grade.value),quantity:Number(qty.value)})}
+     try{const [crop,key]=selected();await marketRequest({type:'list',id:crypto.randomUUID(),crop,key:Number(key),quantity:Number(qty.value)})}
      finally{submit.disabled=false}
    };
    d.append(form);
@@ -880,10 +896,12 @@ async function onlineMarket(){
      addText(list,seller.name);
      for(const row of seller.items){
        const entry=document.createElement('div');entry.className='dialog-row';
+       const product=CROPS[row.crop]||CROPS.tomato;
+       entry.append(product.icon+' '+product.name+' ');
        gradeLabel(entry,row.key);
-       addText(entry,row.quantity+' ผล · '+row.unitPrice.toLocaleString('th-TH')+' บาท/ผล'+(row.expired?' · หมดอายุ':''));
-       const total=(row.quantity*row.unitPrice).toLocaleString('th-TH');
-       addButton(entry,row.own?'เก็บของคืน':'ซื้อ '+total+' บาท',()=>marketRequest({type:row.own?'cancel':'buy',id:row.id}));
+       addText(entry,row.quantity+' ชิ้น · '+row.unitPrice+' บาท/ชิ้น'+(row.expired?' · หมดอายุ':''));
+       if(row.own)addButton(entry,'เก็บของคืน',()=>marketRequest({type:'cancel',id:row.id}));
+       else for(const quantity of [1,10,100])addButton(entry,'ซื้อ '+quantity+' · '+(quantity*row.unitPrice)+' บาท',()=>marketRequest({type:'buy',id:row.id,quantity}),row.expired||row.quantity<quantity);
        list.append(entry);
      }
      return;
@@ -911,7 +929,24 @@ async function marketRequest(request){
  }finally{marketBusy=false}
 }
 function localLot(){return lots[slot]}
-function plotRect(l,i){return {x:l.x+269+(i%2)*94,y:l.y+53+Math.floor(i/2)*65,w:78,h:53}}
+function plotRect(l,i,level=0){const tier=estateLevel(level);return {x:l.x+269+(i%2)*94-tier,y:l.y+53+Math.floor((i%PLOT_COUNT)/2)*65-tier,w:78+2*tier,h:53+2*tier}}
+const estateSign=l=>({x:l.x+195,y:l.y+253});
+function estateDialog(){
+ dialogType='estate';
+ showDialog('🪧 ขยายบ้านและสวน',d=>{
+   const level=ownProfile.home.expansion,price=EXPANSION_PRICES[level];
+   addText(d,'ขยายแล้ว '+level+'/5 · แปลงทั้งหมด '+ownProfile.home.plots.length);
+   if(price)addButton(d,'ซื้อพื้นที่ '+price.toLocaleString('th-TH')+' บาท',async()=>{await action({type:'expandEstate',level});estateDialog()},ownProfile.money<price);
+   else addText(d,'ขยายครบแล้ว');
+   const pages=ownProfile.home.plots.length/PLOT_COUNT;
+   if(pages>1){
+     const select=document.createElement('select');select.setAttribute('aria-label','เลือกโซนสวน');
+     for(let i=0;i<pages;i++)select.add(new Option('โซนสวน '+(i+1),i,i===gardenPage,i===gardenPage));
+     select.onchange=()=>{gardenPage=Number(select.value);dialogClose();notice('โซนสวน '+(gardenPage+1))};
+     d.append(select);
+   }
+ });
+}
 const market={x:WORLD.w/2-64,y:588,w:128,h:111};
 const plotReach=75;
 function distanceToRect(x,y,r){return Math.hypot(Math.max(r.x-x,0,x-r.x-r.w),Math.max(r.y-y,0,y-r.y-r.h))}
@@ -924,7 +959,7 @@ function nearestInteract(){
  const area=(type,r,extra={})=>({...extra,type,x:r.x+r.w/2,y:r.y+r.h/2,distance:distanceToRect(me.x,me.y,r),reach:plotReach});
  if(scene==='inside'){
    if(me.pose==='sit'||me.pose==='sleep')return {type:'stand',x:me.x,y:me.y};
-   targets.push(point('exit',325,409,70));
+   const r=interior();targets.push(point('exit',r.w/2,r.h-21,70));
    for(const item of (visiting?.furniture||ownProfile.home.furniture)){
      const pose=furniturePose(item);
      if(pose)targets.push(area(pose,furnitureRect(item),{rotation:item.rotation}));
@@ -933,13 +968,14 @@ function nearestInteract(){
    const lot=localLot(),door=doorPos(lot);
    const post=gardenerPost(lot);
    const box=gardenBoxPosition(lot);
+   const sign=estateSign(lot);targets.push(point('estate',sign.x,sign.y,45));
    targets.push(point('door',door.x,door.y,85),point('gardener',post.x,post.y,48),point('box',box.x,box.y,47),area('shop',market));
    for(const p of remote.values()){
      if(!Number.isInteger(p.slot)||!lots[p.slot])continue;
      const entry=doorPos(lots[p.slot]);
      targets.push({...point('visit',entry.x,entry.y,75),owner:p.id});
    }
-   for(let plot=0;plot<PLOT_COUNT;plot++)targets.push(area('plot',plotRect(lot,plot),{plot}));
+   for(let plot=0;plot<PLOT_COUNT;plot++)targets.push(area('plot',plotRect(lot,plot,ownProfile.home.expansion),{plot:gardenPage*PLOT_COUNT+plot}));
  }
  return targets.reduce((best,target)=>target.distance<=target.reach&&(!best||target.distance<best.distance)?target:best,null);
 }
@@ -948,9 +984,10 @@ function interactionLabel(target){
    const p=ownProfile.home.plots[target.plot];
    if(!p.crop)return ['🌱','ปลูก'];
    if(!p.watered)return ['💧','รดน้ำ'];
-   return Date.now()-p.plantedAt>=GROW_MS?['🍅','เก็บเกี่ยว']:['🌿','ดูแปลง'];
+   const crop=CROPS[p.crop];
+   return crop&&Date.now()-p.plantedAt>=crop.grow?[crop.icon,'เก็บเกี่ยว']:['🌿','ดูแปลง'];
  }
- return {stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],gardener:['🌾','จ้างคนสวน'],box:['📦','กล่องผลผลิต'],visit:['🏠','เยี่ยมบ้าน'],
+ return {estate:['🪧','ขยายบ้านและสวน'],stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],gardener:['🌾','จ้างคนสวน'],box:['📦','กล่องผลผลิต'],visit:['🏠','เยี่ยมบ้าน'],
    shop:['🏪','ตลาดกลาง'],sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
 }
 function updateNearby(){
@@ -969,7 +1006,7 @@ function updateNearby(){
 function interact(act=nearestInteract()){
  if(!act)return;
  if(act.type==='stand'){me.pose='stand';me.onBed=false;notice('ลุกขึ้นยืนแล้ว');return}
- else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.restAngle=(act.rotation||0)*Math.PI/180;me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
+ else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.restAngle=(act.rotation||0)*Math.PI/180;me.face=Math.PI/2+me.restAngle;me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
  if(act.type==='exit'){
    me.pose='stand';me.onBed=false;scene='outside';
    const p=doorPos(lots[visiting?.slot]||localLot());me.x=p.x;me.y=p.y+45;
@@ -978,14 +1015,15 @@ function interact(act=nearestInteract()){
  else if(act.type==='door'||act.type==='visit'){
    const host=act.type==='visit'?remote.get(act.owner):null;
    if(act.type==='visit'&&(!host||!lots[host.slot]))return;
-   visiting=host?{id:host.id,slot:host.slot,name:host.name,furniture:sanitizeFurniture(host.home?.furniture)}:null;
-   scene='inside';houseEnteredAt=performance.now();me.x=325;me.y=357;me.pose='stand';
+   visiting=host?{id:host.id,slot:host.slot,name:host.name,expansion:estateLevel(host.home?.expansion),furniture:sanitizeFurniture(host.home?.furniture,estateLevel(host.home?.expansion))}:null;
+   scene='inside';houseEnteredAt=performance.now();me.x=interior().w/2;me.y=interior().h-73;me.pose='stand';
    notice(visiting?'เข้าบ้านของ '+visiting.name:'เข้าบ้านของคุณแล้ว');
  }
  else if(act.type==='plot')openPlot(act.plot);
  else if(act.type==='shop')shopDialog();
  else if(act.type==='gardener')gardenDialog();
  else if(act.type==='box')gardenBoxDialog();
+ else if(act.type==='estate')estateDialog();
 }
 el('nearbyAction').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)interact()};
 async function toggleSound(){
@@ -1015,9 +1053,7 @@ function playV4Footstep(){
 function playAmbient(t){if(!sound||!soundCtx||t-ambientAt<1900)return;ambientAt=t;const f=600+Math.sin(t/9000)*130;blip(f,.2,.006,'sine');setTimeout(()=>blip(f*1.15,.13,.003,'sine'),130)}
 el('chatInput').onfocus=()=>{keys.clear();joyReset()};
 let lastChatSent=-Infinity;
-el('chatForm').onsubmit=e=>{
- e.preventDefault();
- const input=el('chatInput'),message=input.value.trim().slice(0,120);
+function chatMessage(message){
  if(!active||!message)return;
  const now=performance.now();
  if(online&&now-lastChatSent<950){notice('รอสักครู่ก่อนส่งข้อความถัดไป');return}
@@ -1025,8 +1061,30 @@ el('chatForm').onsubmit=e=>{
  me.text=message;me.until=Date.now()+5000;
  if(online)send({type:'say',text:message});
  appendChat(ownProfile.displayName,message);
- input.value='';input.blur();
+ return true;
+}
+el('chatForm').onsubmit=e=>{e.preventDefault();const input=el('chatInput');if(chatMessage(input.value.trim().slice(0,120))){input.value='';input.blur()}};
+
+const voice=roomVoice({
+ identity:()=>myId,
+ publish:fields=>{if(online)send({type:'voice',fields})},
+ status:on=>{el('microphone').setAttribute('aria-pressed',String(on));el('microphone').textContent=on?'🎙️':'🎤'},
+ talking:on=>{if(me)me.voiceTalking=on}
+});
+el('microphone').onclick=async()=>{
+ const button=el('microphone');button.disabled=true;
+ try{await voice.toggle(()=>[...remote.values()])}
+ catch{notice('เปิดไมค์ไม่ได้ กรุณาตรวจสอบสิทธิ์ไมโครโฟน')}
+ finally{button.disabled=false}
 };
+el('emojis').onclick=()=>{el('emojiChoices').hidden=!el('emojiChoices').hidden};
+for(const emoji of ['😀','😂','❤️','👍','👋','🎉','😴','🌱']){
+ const button=document.createElement('button');
+ button.type='button';button.textContent=emoji;
+ button.onclick=()=>{if(chatMessage(emoji))el('emojiChoices').hidden=true};
+ el('emojiChoices').append(button);
+}
+addEventListener('pagehide',()=>voice.close());
 addEventListener('keydown',e=>{
  if(buildDraft){if(e.key==='Escape'){e.preventDefault();cancelBuild()}return}
  const tag=document.activeElement?.tagName;if(['INPUT','TEXTAREA','SELECT'].includes(tag))return;
@@ -1065,34 +1123,41 @@ function drawHouse(l,p,now){const h=houseRect(l);round(h.x+4,h.y+10,h.w,h.h,10,'
  const door=doorPos(l);round(door.x-13,door.y-12,26,18,5,'#a17d5a');
  text('🚪',door.x,door.y+8,19);text(p.name||'ผู้เล่น',l.x+l.w/2,l.y+31,15,'#f2fbec');
 }
-function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#60482f');soilTexture(ctx,r.x+2,r.y+2,r.w-4,r.h-4,.9);for(let j=0;j<3;j++)line(r.x+9,r.y+12+j*15,r.x+r.w-9,r.y+12+j*15,'#82613d',3);
- if(plot?.crop){const grow=plot.watered?Math.min(1,(Date.now()-plot.plantedAt)/GROW_MS):.17;const yy=r.y+r.h/2;const size=12+grow*6;
- for(const ox of [-20,0,20]){const x=r.x+r.w/2+ox,bend=sway(now,x,weather);line(x,yy+12,x+bend,yy-7,'#6cad45',4);circle(x-5+bend,yy-10,size/2,'#4c994f');if(grow>.92)circle(x+7+bend,yy-7,6,'#ee624a')}
+function drawPlot(l,i,plot,now,level){const r=plotRect(l,i,level);round(r.x,r.y,r.w,r.h,8,'#60482f');soilTexture(ctx,r.x+2,r.y+2,r.w-4,r.h-4,.9);for(let j=0;j<3;j++)line(r.x+9,r.y+12+j*15,r.x+r.w-9,r.y+12+j*15,'#82613d',3);
+ if(plot?.crop){const grow=plot.watered?Math.min(1,(Date.now()-plot.plantedAt)/(CROPS[plot.crop]?.grow||GROW_MS)):.17;const yy=r.y+r.h/2;const size=12+grow*6;
+ for(const ox of [-20,0,20]){const x=r.x+r.w/2+ox,bend=sway(now,x,weather);line(x,yy+12,x+bend,yy-7,'#6cad45',4);circle(x-5+bend,yy-10,size/2,'#4c994f');if(grow>.92)text(CROPS[plot.crop]?.icon||'🍅',x+3+bend,yy-4,14)}
  }else text('+',r.x+r.w/2,r.y+r.h/2+6,20,'#d0b888');
  text(String(i+1),r.x+10,r.y+15,10,'#dccfb6')}
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
 function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
- for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<PLOT_COUNT;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
+ for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');const page=l.slot===slot?gardenPage:0;for(let i=0;i<PLOT_COUNT;i++){const index=page*PLOT_COUNT+i;drawPlot(l,index,u.home?.plots?.[index],now,u.home?.expansion)}drawHouse(l,u,now);fence(l)}
  if(preview)return;
  drawGardenerPost(now);
+ const sign=estateSign(localLot());text('🪧',sign.x,sign.y,22);text('ขยายที่ดิน',sign.x,sign.y+18,11,'#fff4ce');
  const box=gardenBoxPosition(localLot());
  round(box.x-15,box.y-12,30,23,3,'#644431');
  round(box.x-15,box.y-15,30,12,3,'#c58e5c');
  round(box.x-3,box.y-5,6,7,2,'#f1cd7d');
- if(ownProfile.home.gardenBox.tomato)text(String(ownProfile.home.gardenBox.tomato),box.x,box.y+24,12,'#fff5bf');
+ const boxCount=produceEntries(ownProfile.home.gardenBox).reduce((sum,[,,count])=>sum+count,0);
+ if(boxCount)text(String(boxCount),box.x,box.y+24,12,'#fff5bf');
  for(const [index, player] of lotsUsed){
-   const worker=player.home?.gardener;
+   for(const [n,worker] of workersOf(player.home).entries()){
+   const visualId=index*MAX_GARDENERS+n;
    if(!worker||worker.slot!==index||worker.contractUntil&&Date.now()>=worker.contractUntil)continue;
+   const page=index===slot?gardenPage:0;
+   if(worker.plot>=0&&Math.floor(worker.plot/PLOT_COUNT)!==page)continue;
    const p=gardenerPosition(lots[index],worker,Date.now());
    if(p){
-     const old=gardenerVisuals.get(index);
+     p.x+=n*9;p.y+=n*6;
+     const old=gardenerVisuals.get(visualId);
      const delta=old?Math.max(0,now-old.now):0;
      const keep=old&&delta<700&&Math.hypot(old.x-p.x,old.y-p.y)<220;
      const blend=1-Math.exp(-delta/140);
      const x=keep?old.x+(p.x-old.x)*blend:p.x,y=keep?old.y+(p.y-old.y)*blend:p.y;
-     gardenerVisuals.set(index,{x,y,now});
-     avatar({...p,x,y,id:'gardener-'+index,name:'คนสวน',scene:'outside',pose:'stand',positionInterpolated:true,appearance:{gender:2,skin:2,hair:2,style:0,outfit:3,accessory:1}},now,false);
+     gardenerVisuals.set(visualId,{x,y,now});
+     avatar({...p,x,y,id:'gardener-'+visualId,name:'คนสวน',scene:'outside',pose:'stand',positionInterpolated:true,appearance:{gender:2,skin:2,hair:2,style:0,outfit:3,accessory:1}},now,false);
    }
+ }
  }
  for(const p of remote.values()){
    if(p.scene==='outside')avatar({...p,...sampleRemoteMotion(p.motion,now),positionInterpolated:true},now,false);
@@ -1140,7 +1205,7 @@ function drawBuildPreview() {
  if(item && buildSelection?.kind!=='new')return;
  const candidate=placementAt(col,row);
  if(!candidate)return;
- const valid=isValidFurniturePlacement(candidate,buildDraft.furniture,candidate.id);
+ const valid=isValidFurniturePlacement(candidate,buildDraft.furniture,candidate.id,ownProfile.home.expansion);
  const r=furnitureRect(candidate);
  ctx.save();
  ctx.beginPath();
@@ -1156,7 +1221,11 @@ function drawBuildPreview() {
  }
  ctx.restore();
 }
-function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430,.87);for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
+function indoors(now){const room=interior(),mid=room.w/2;
+ round(0,0,room.w,room.h,0,'#d6b88e');woodTexture(ctx,0,0,room.w,room.h,.87);
+ for(let y=36;y<room.h;y+=48)line(15,y,room.w-15,y,'#c29a76',1);
+ round(0,0,room.w,43,0,'#836b61');round(0,0,21,room.h,0,'#927566');
+ round(room.w-20,0,20,room.h,0,'#927566');round(mid-25,room.h-22,55,22,3,'#634f45');text('🚪',mid,room.h-15,21);
  const furniture=buildDraft?.furniture || visiting?.furniture || ownProfile.home.furniture;
  text('บ้านของ '+(visiting?.name||ownProfile.displayName),325,90,22,'#4b443a');
  if(buildDraft)drawBuildGrid();
@@ -1181,7 +1250,8 @@ function avatar(p,now,local){
 }
 function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRect(0,0,w,h);
  const zoomProgress=reducedEffects.matches?1:Math.min(1,Math.max(0,(now-houseEnteredAt)/340));
- const camera=buildDraft?roomBuildCamera():scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)*(.85+.15*zoomProgress)};
+ const room=interior();
+ const camera=buildDraft?roomBuildCamera():scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:room.w/2,y:room.h/2,zoom:Math.min(w/(room.w+20),h/(room.h+20),1.5)*(.85+.15*zoomProgress)};
  if(scene==='inside'&&!buildDraft){
    const door=doorPos(lots[visiting?.slot]||localLot());
    ctx.save();
@@ -1222,7 +1292,7 @@ function tickNeeds(clock,now){
 function tickGardener(now){
  const worker=ownProfile.home.gardener;
  if(!worker||gardenerPending||document.hidden||now<gardenerRetryAt)return;
- const due=Math.min(worker.nextAt,worker.contractUntil||now,worker.lastSeenAt+GARDENER_HEARTBEAT);
+ const due=Math.min(...workersOf(ownProfile.home).map(w=>Math.min(w.nextAt,w.contractUntil||now,w.lastSeenAt+GARDENER_HEARTBEAT)));
  if(!gardenerResume&&now<due)return;
  gardenerPending=true;
  gardenerRetryAt=now+1500;
@@ -1233,7 +1303,7 @@ function tickGardener(now){
  }).finally(()=>{if(me===player)gardenerPending=false});
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)gardenerResume=true});
-function canMove(x,y){if(scene==='inside')return x>22&&y>55&&x<628&&y<399;
+function canMove(x,y){if(scene==='inside'){const r=interior();return x>22&&y>55&&x<r.w-22&&y<r.h-31;}
  if(x<22||y<22||x>WORLD.w-22||y>WORLD.h-22)return false;
  for(const l of lots){
    const house=houseRect(l);
@@ -1291,7 +1361,7 @@ function publishMovement(now){
  const house=scene==='inside'?(visiting?.id||myId):null;
  const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose||house!==sentMovement?.house;
  if(!changedSceneOrPose&&(now-lastMove<MOVE_INTERVAL_MS||(x===sentMovement.x&&y===sentMovement.y)))return;
- const movement={type:'move',x,y,scene,pose,house,restAngle:pose==='sleep'?me.restAngle:null};
+ const movement={type:'move',x,y,scene,pose,house,restAngle:pose==='stand'?null:me.restAngle};
  lastMove=now;sentMovement=movement;
  send(movement);
 }
@@ -1308,11 +1378,11 @@ c.addEventListener('pointerup',e=>{
  }
  const l=localLot();
  const target=nearestInteract();
- if(target&&['visit','box'].includes(target.type)&&Math.hypot(x-target.x,y-target.y)<34){interact(target);return}
+ if(target&&['visit','box','estate'].includes(target.type)&&Math.hypot(x-target.x,y-target.y)<34){interact(target);return}
  for(let i=0;i<PLOT_COUNT;i++){
-   const r=plotRect(l,i);
+   const r=plotRect(l,i,ownProfile.home.expansion);
    if(distanceToRect(x,y,r)!==0)continue;
-   if(plotInReach(r))openPlot(i);else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
+   if(plotInReach(r))openPlot(gardenPage*PLOT_COUNT+i);else notice('เดินเข้าใกล้แปลงสวนก่อนครับ');
    return
  }
  if(distanceToRect(x,y,market)===0){

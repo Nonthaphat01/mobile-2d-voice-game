@@ -3,7 +3,7 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-neighbors-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=estate-1';
 import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=v5-sheets-1';
 
@@ -107,6 +107,7 @@ export class FirebaseGame {
  send(m){
   if(!this.slotRef||this.ended)return;
   if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,house:m.house??null,restAngle:m.restAngle??null,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
+  if(m.type==='voice')return update(this.slotRef,m.fields);
   if(m.type==='say'){
     const now=Date.now();if(now-this.lastChat<850)return;
     this.lastChat=now;return update(this.slotRef,{text:String(m.text||'').slice(0,120),until:now+5000});
@@ -204,8 +205,8 @@ export class FirebaseGame {
     if(!slotRef||this.slotRef!==slotRef)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
     const result=await this.market(request);
     if(this.slotRef!==slotRef)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
-    if(result.marketSchema===2)this.marketSchema=2;
-    if(result.profile&&(!this.sheetsMarketUrl||this.marketSchema===2))this.profile=result.profile;
+    if(result.marketSchema===3)this.marketSchema=3;
+    if(result.profile&&(!this.sheetsMarketUrl||this.marketSchema===3))this.profile=result.profile;
     return result;
   });
   this.profileWrites=pending.catch(()=>{});
@@ -215,12 +216,12 @@ export class FirebaseGame {
   if((!this.marketCall&&!this.sheetsMarketUrl)||!this.slotRef||this.ended)return {ok:false,message:'ร้านออนไลน์ยังไม่เปิดให้บริการ'};
   try{
     if(this.sheetsMarketUrl){
-      if(request.type!=='browse'&&this.marketSchema!==2)
+      if(request.type!=='browse'&&this.marketSchema!==3)
         return {ok:false,message:'ร้านค้ากำลังอัปเดต กรุณารอให้เซิร์ฟเวอร์รองรับเซฟรุ่นใหม่'};
       const token=await this.currentUser()?.getIdToken();
       if(!token)return {ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
-      const result=await requestSheetsMarket(this.sheetsMarketUrl,token,{...request,room:this.room,slot:this.slot});
-      if(request.type==='browse'&&result.marketSchema!==2){
+      const result=await requestSheetsMarket(this.sheetsMarketUrl,token,{...request,marketSchema:3,room:this.room,slot:this.slot});
+      if(request.type==='browse'&&result.marketSchema!==3){
         this.marketSchema=0;
         return {ok:false,message:'ร้านค้าอยู่ระหว่างอัปเดตเซิร์ฟเวอร์ เกมส่วนอื่นเล่นได้ตามปกติ'};
       }
