@@ -1,6 +1,6 @@
 export function roomVoice({identity, publish, status, talking}) {
  const senders=new Map(), receivers=new Map();
- let stream=null, context=null, timer=null, lastTalking=false, generation=0;
+ let stream=null, context=null, timer=null, lastTalking=false, generation=0, listening=true;
  const peers=()=>new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
  function gathered(peer){
    if(peer.iceGatheringState==='complete')return Promise.resolve();
@@ -68,9 +68,9 @@ export function roomVoice({identity, publish, status, talking}) {
  async function answer(id,offer){
    clear(receivers,id);
    const peer=peers(), audio=document.createElement('audio'), token=offer.token;
-   audio.autoplay=true;audio.hidden=true;document.body.append(audio);
+   audio.autoplay=true;audio.playsInline=true;audio.volume=1;audio.muted=!listening;audio.hidden=true;document.body.append(audio);
    receivers.set(id,{peer,audio,token});
-   peer.ontrack=event=>{audio.srcObject=event.streams[0];audio.play().catch(()=>{})};
+   peer.ontrack=event=>{audio.srcObject=event.streams[0];resumePlayback()};
    await peer.setRemoteDescription({type:'offer',sdp:offer.sdp});
    await peer.setLocalDescription(await peer.createAnswer());
    await gathered(peer);
@@ -98,5 +98,23 @@ export function roomVoice({identity, publish, status, talking}) {
      }else if(receivers.has(id)){clear(receivers,id);publish({['voiceAnswers/'+id]:null})}
    }
  }
- return {sync,toggle,close(){stop();for(const id of receivers.keys())clear(receivers,id)}};
+ function resumePlayback(){
+   if(!listening)return;
+   for(const {audio} of receivers.values()){
+     if(!audio?.srcObject)continue;
+     audio.muted=false;audio.volume=1;
+     if(audio.paused)audio.play().catch(()=>{});
+   }
+ }
+ function setListening(value){
+   listening=Boolean(value);
+   for(const {audio} of receivers.values()){
+     if(audio)audio.muted=!listening;
+   }
+   if(listening)resumePlayback();
+ }
+ // Some mobile browsers pause remote media despite autoplay. A subsequent
+ // player tap is a user gesture, allowing WebRTC audio to resume.
+ document.addEventListener('pointerdown',()=>{if(listening)resumePlayback()},{passive:true});
+ return {sync,toggle,setListening,resumePlayback,close(){stop();for(const id of receivers.keys())clear(receivers,id)}};
 }
