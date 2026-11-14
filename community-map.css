@@ -16,6 +16,7 @@
 body.building #mapPanel { display: none; }
 div.nearby-action { left: 50%; top: auto; bottom: max(68px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(450px, 68vw); display: grid; gap: 5px; padding: 5px; }
 div.nearby-action[hidden] { display: none; }
+div.nearby-action:active { transform: translateX(-50%); }
 .nearby-tabs { display: flex; gap: 4px; overflow-x: auto; }
 .nearby-tabs:empty { display: none; }
 .nearby-tabs button, #nearbyUse, #hireShortcut, #rideShortcut {
