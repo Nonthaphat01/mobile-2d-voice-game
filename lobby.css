@@ -4,7 +4,8 @@
   --cream:#faf8ee;
   --muted:#566754;
   --line:#d9dfcc;
-  display:block;
+  display:grid;
+  place-items:safe center;
   padding:clamp(12px,4vw,62px);
   font:400 15px/1.5 "Noto Sans Thai",Tahoma,sans-serif;
   color:#213a2c;
@@ -24,9 +25,6 @@
   overflow:hidden;
   background:var(--cream);
   box-shadow:0 30px 90px #0b2019a8;
-}
-@media (min-width:721px) and (min-height:810px) {
-  .entry-shell { margin-block-start:max(0px,calc((100dvh - 748px)/2)); }
 }
 .entry-brand {
   position:relative;
@@ -120,7 +118,7 @@
 .entry-room-slots i { width:4px; height:4px; border-radius:1px; background:#bdc8b2; }
 .entry-room-slots .occupied { background:#507348; }
 .entry-card .avatar-customizer { margin:8px 0 4px; border:1px solid #cbd6bf; border-radius:11px; background:transparent; color:#263f2e; }
-.entry-card .avatar-customizer summary { display:flex; align-items:center; gap:9px; min-height:40px; padding:5px 9px; border-radius:10px; cursor:pointer; font-size:.9rem; font-weight:800; list-style:none; }
+.entry-card .avatar-customizer summary { display:flex; align-items:center; gap:9px; min-height:40px; margin:0; padding:5px 9px; border-radius:10px; background:transparent; color:#263f2e; cursor:pointer; font-size:.9rem; font-weight:800; list-style:none; }
 .entry-card .avatar-customizer summary::-webkit-details-marker { display:none; }
 .entry-card .avatar-customizer summary span { display:grid; place-items:center; width:28px; height:28px; border-radius:8px; background:#dce9cf; }
 .entry-card .avatar-customizer summary b { margin-inline-start:auto; font-size:1.15rem; }
@@ -130,7 +128,7 @@
 .entry-message { margin:12px 0 0; padding:9px 11px; border-radius:8px; background:#f5e4d6; color:#783f29; font-size:.85rem; overflow-wrap:anywhere; }
 
 @media (max-width:720px) {
-  .entry-lobby { padding:12px 12px max(12px,env(safe-area-inset-bottom)); }
+  .entry-lobby { align-items:start; padding:12px 12px max(12px,env(safe-area-inset-bottom)); }
   .entry-shell { grid-template-columns:minmax(0,1fr); min-height:0; max-width:530px; border-radius:20px; }
   .entry-brand { min-height:265px; padding:25px 21px 40px; }
   .entry-landscape { background-position:center 61%; }
