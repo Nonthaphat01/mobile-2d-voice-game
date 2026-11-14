@@ -147,14 +147,33 @@ export class FirebaseGame {
   const profileRef=ref(this.db,`${ROOT}/profiles/${uid}`);
   let lastResult={ok:false,message:'ไม่สามารถทำรายการได้'};
   try{
-    const result=await runTransaction(profileRef,current=>{
-      // RTDB can start with a null local cache. Let the server compare its value
-      // and retry against the existing save before deciding the action failed.
-      if(current==null)return null;
-      const state=sanitizeState(current);
-      const r=applyAction(state,action,Date.now());lastResult=r;
-      return r.ok?state:undefined;
-    },{applyLocally:false});
+    // A harvest or garden-box transfer must be atomic. Under concurrent writes
+    // (for example an open second tab and the automated gardener), Firebase can
+    // exhaust its internal transaction retries. Refresh the profile and retry
+    // the WHOLE transaction with bounded backoff; never overwrite the save.
+    let result;
+    for(let attempt=0;attempt<4;attempt++){
+      try{
+        result=await runTransaction(profileRef,current=>{
+          // A cold local cache can initially be null. Let the database compare
+          // this read with the server value instead of overwriting saved data.
+          if(current==null)return null;
+          const state=sanitizeState(current);
+          const r=applyAction(state,action,Date.now());
+          lastResult=r;
+          return r.ok?state:undefined;
+        },{applyLocally:false});
+        break;
+      }catch(error){
+        const conflict=/maxretry/i.test(String(error?.code||'')+' '+String(error?.message||''));
+        if(!conflict||attempt===3)throw error;
+        if(this.slotRef!==slotRef||this.ended)return;
+        await new Promise(resolve=>setTimeout(resolve,250*Math.pow(2,attempt)+Math.floor(Math.random()*150)));
+        // Refresh stale data before attempting the transaction again.
+        await get(profileRef);
+        if(this.slotRef!==slotRef||this.ended)return;
+      }
+    }
     if(this.slotRef!==slotRef)return;
     if(!result.committed||!result.snapshot.exists()){
       const failure={ok:false,message:lastResult.ok?'บันทึกข้อมูลไม่สำเร็จ':lastResult.message};
@@ -175,7 +194,10 @@ export class FirebaseGame {
     }
     return lastResult;
   }catch(e){
-    const failure={ok:false,message:'บันทึกข้อมูลไม่สำเร็จ: '+e.message};
+    const exhausted=/maxretry/i.test(String(e?.code||'')+' '+String(e?.message||''));
+    const failure={ok:false,message:exhausted
+      ?'เซฟกำลังถูกเขียนพร้อมกันหลายรายการ กรุณาปิดแท็บเกมที่เปิดซ้ำ แล้วลองเก็บผลผลิตอีกครั้ง'
+      :'บันทึกข้อมูลไม่สำเร็จ: '+e.message};
     if(this.slotRef===slotRef)this.emit({type:'error',message:failure.message});
     return failure;
   }
