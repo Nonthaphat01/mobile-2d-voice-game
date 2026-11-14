@@ -6,11 +6,11 @@ export function normalizeNeeds(saved) {
   return {happiness:value('happiness'),energy:value('energy'),fullness:value('fullness')};
 }
 
-export function advanceNeeds(needs, pose) {
+export function advanceNeeds(needs, pose, nearPlayer=false) {
   const next = normalizeNeeds(needs);
   next.fullness -= .85;
   next.energy += pose === 'sleep' ? 6 : pose === 'sit' ? 1.5 : -.6;
-  next.happiness += pose === 'sit' ? 4 : pose === 'sleep' ? .75 : next.fullness <= LOW_NEED ? -.8 : -.35;
+  next.happiness += (pose === 'sit' ? 8 : pose === 'sleep' ? 1.5 : next.fullness <= LOW_NEED ? -.8 : -.35)+(nearPlayer?1.25:0);
   return normalizeNeeds(next);
 }
 

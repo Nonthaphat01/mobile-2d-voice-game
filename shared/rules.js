@@ -1,16 +1,14 @@
 /** Game state rules shared by the browser and server. */
-import {changeProduce, gardenerTravelMs, GARDENER_PLANS, GARDENER_HEARTBEAT, GARDENER_OFFLINE_RATE, GARDEN_STEP_MS, gradeOf, marketPrice, MAX_MONEY, MAX_PRODUCE, normalizeProduce, rollGrade} from './farming.js?v=v5-gardener-1';
-import {advanceNeeds, NEEDS_STEP_MS, normalizeNeeds} from './needs.js?v=v5-hud-1';
+import {changeProduce, GARDENER_PLANS, GARDENER_HEARTBEAT, GARDEN_STEP_MS, gradeOf, marketPrice, MAX_MONEY, MAX_PRODUCE, normalizeProduce, rollGrade} from './farming.js?v=v5-neighbors-1';
+import {advanceNeeds, NEEDS_STEP_MS, normalizeNeeds} from './needs.js?v=v5-neighbors-1';
+import {FURNITURE_TYPES} from './furniture.js?v=v5-neighbors-1';
+export {FURNITURE_TYPES};
 export const MAX_PLAYERS = 8;
 export const PLOT_COUNT = 10;
 export const ROOM_IDS = ['001', '002', '003'];
 export const GROW_MS = 60_000;
 export const WORLD = {w:2400,h:1290};
 export const HOME_GRID = Object.freeze({x:36,y:106,cols:12,rows:6,tile:48});
-export const FURNITURE_TYPES = Object.freeze({
-  bed:{price:45,label:'เตียง',emoji:'🛏️',width:2,height:1},
-  chair:{price:25,label:'เก้าอี้',emoji:'🪑',width:1,height:1}
-});
 export const lots = Array.from({length:8}, (_,slot)=> ({
   slot,
   x:130+(slot%4)*555,
@@ -40,7 +38,7 @@ function normalizeRotation(value){
 }
 export function furnitureFootprint(value){
   const type=typeof value==='string'?value:value?.type;
-  const def=FURNITURE_TYPES[type]||FURNITURE_TYPES.chair;
+  const def=isFurnitureType(type)?FURNITURE_TYPES[type]:FURNITURE_TYPES.chair;
   const rotation=normalizeRotation(typeof value==='string'?0:value?.rotation);
   return rotation%180===0?{w:def.width,h:def.height}:{w:def.height,h:def.width};
 }
@@ -101,8 +99,9 @@ export function starter(name='ผู้เล่น') {
   return {
     version:5, displayName:String(name).trim().slice(0,18)||'ผู้เล่น',
     money:100, level:1,xp:0, appearance:sanitizeAppearance(), needs:normalizeNeeds(), needsAt:0,
-    inventory:{hoe:1,watering_can:1,tomato_seed:3,tomato:0,tomatoGrades:{},furniture:{bed:0,chair:0}},
-    home:{furniture:[],plots:Array.from({length:PLOT_COUNT},()=>({crop:null,plantedAt:0,watered:false}))}
+    playSeconds:0,
+    inventory:{hoe:1,watering_can:1,tomato_seed:3,tomato:0,tomatoGrades:{},furniture:Object.fromEntries(Object.keys(FURNITURE_TYPES).map(type=>[type,0]))},
+    home:{furniture:[],gardenBox:{tomato:0,tomatoGrades:{}},plots:Array.from({length:PLOT_COUNT},()=>({crop:null,plantedAt:0,watered:false}))}
   };
 }
 export function sanitizeState(s,name='ผู้เล่น') {
@@ -115,17 +114,20 @@ export function sanitizeState(s,name='ผู้เล่น') {
   o.appearance=sanitizeAppearance(s.appearance);
   o.needs=normalizeNeeds(s.needs);
   o.needsAt=Number.isFinite(s.needsAt)?Math.max(0,s.needsAt):0;
+  o.playSeconds=Number.isSafeInteger(s.playSeconds)?Math.max(0,s.playSeconds):0;
   for(const key of ['hoe','watering_can','tomato_seed'])o.inventory[key]=clampCount(s.inventory?.[key]);
   o.inventory.tomatoGrades=normalizeProduce(s.inventory);
   o.inventory.tomato=Object.values(o.inventory.tomatoGrades).reduce((sum,count)=>sum+count,0);
   for(const type of Object.keys(FURNITURE_TYPES))o.inventory.furniture[type]=clampCount(s.inventory?.furniture?.[type]);
   o.home.furniture=sanitizeFurniture(s.home?.furniture);
+  o.home.gardenBox.tomatoGrades=normalizeProduce(s.home?.gardenBox);
+  o.home.gardenBox.tomato=Object.values(o.home.gardenBox.tomatoGrades).reduce((sum,count)=>sum+count,0);
   o.home.plots=o.home.plots.map((p,i)=>{const q=s.home?.plots?.[i];return q?.crop==='tomato'?{crop:'tomato',plantedAt:Math.max(0,Number(q.plantedAt)||0),watered:q.watered===true}:p});
   const worker=s.home?.gardener;
-  if(worker && ['garden','outbound','return'].includes(worker.phase)){
+  if(worker && ['garden','deposit','outbound','return'].includes(worker.phase)){
     const plotIndex=i=>Number.isInteger(i)&&i>=0&&i<PLOT_COUNT?i:-1;
     o.home.gardener={
-      phase:worker.phase, startedAt:Number.isFinite(worker.startedAt)?Math.max(0,worker.startedAt):0,
+      phase:['outbound','return'].includes(worker.phase)?'garden':worker.phase, startedAt:Number.isFinite(worker.startedAt)?Math.max(0,worker.startedAt):0,
       nextAt:Number.isFinite(worker.nextAt)?Math.max(0,worker.nextAt):0,
       contractUntil:Number.isFinite(worker.contractUntil)?Math.max(0,worker.contractUntil):0,
       lastSeenAt:Number.isFinite(worker.lastSeenAt)?Math.max(0,worker.lastSeenAt):0,
@@ -135,7 +137,7 @@ export function sanitizeState(s,name='ผู้เล่น') {
   }
   const receipt=s.home?.gardenerReceipt;
   if(Number.isSafeInteger(receipt?.at)&&receipt.at>0&&Number.isSafeInteger(receipt.gross)&&Number.isSafeInteger(receipt.paid)&&receipt.paid>=0&&receipt.paid<=receipt.gross)
-    o.home.gardenerReceipt={at:receipt.at,gross:receipt.gross,paid:receipt.paid,ended:receipt.ended===true};
+    o.home.gardenerReceipt={at:receipt.at,gross:receipt.gross,paid:receipt.paid,stored:clampCount(receipt.stored),ended:receipt.ended===true};
   return o;
 }
 
@@ -150,30 +152,24 @@ function sellProduce(state, grade, now){
   return {ok:true,message:'ขายมะเขือเทศ ได้ '+total+' บาท'};
 }
 
-function advanceGardener(state, now, random, slot, receiveSale){
+function advanceGardener(state, now, random, slot){
   const worker=state.home.gardener;
   const inventory=state.inventory;
   const plots=state.home.plots;
-  const previous=worker.plot;
+  const previous=worker.phase==='deposit'?-1:worker.plot;
   const update=(phase,delay,plot=-1,fromPlot=-1)=>Object.assign(worker,{phase,startedAt:now,nextAt:now+delay,plot,fromPlot,slot});
-  if(worker.phase==='outbound'){
-    receiveSale(now);
-    update('return',gardenerTravelMs(lots[slot]));
-    return;
-  }
-  if(worker.phase==='return'){
-    update('garden',GARDEN_STEP_MS);
-    return;
-  }
-  let plot=plots.findIndex(p=>p.crop&&p.watered&&now-p.plantedAt>=GROW_MS&&inventory.tomato<=MAX_PRODUCE-3);
+  let plot=plots.findIndex(p=>p.crop&&p.watered&&now-p.plantedAt>=GROW_MS&&state.home.gardenBox.tomato<=MAX_PRODUCE-3);
   let type='harvest';
   if(plot<0&&inventory.watering_can){plot=plots.findIndex(p=>p.crop&&!p.watered);type='water'}
   if(plot<0&&inventory.tomato_seed){plot=plots.findIndex(p=>!p.crop);type='plant'}
-  if(plot>=0&&(type==='harvest'||!inventory.tomato)){
+  if(plot>=0){
+    if(type==='harvest'){
+      harvestCrop(state,plots[plot],state.home.gardenBox,random);
+      update('deposit',GARDEN_STEP_MS,plot,previous);
+      return;
+    }
     applyAction(state,{type,plot},now,random);
     update('garden',GARDEN_STEP_MS,plot,previous);
-  }else if(inventory.tomato){
-    update('outbound',gardenerTravelMs(lots[slot])+(previous>=0?2600:0),-1,previous);
   }else{
     const next=plots.filter(p=>p.crop&&p.watered).map(p=>p.plantedAt+GROW_MS).filter(at=>at>now);
     update('garden',next.length?Math.max(GARDEN_STEP_MS,Math.min(...next)-now):20000,previous,previous);
@@ -192,23 +188,11 @@ function settleGardener(state, action, now, random){
   }
   const gap=now-worker.lastSeenAt;
   const offline=gap>GARDENER_HEARTBEAT*1.5||(action.type==='gardenerResume'&&gap>0);
-  const lastSeen=worker.lastSeenAt;
   const cutoff=Math.min(now,worker.contractUntil);
-  let gross=0, paid=0, onlinePaid=0;
-  const receiveSale=at=>{
-    const entries=Object.entries(state.inventory.tomatoGrades);
-    const price=entries.reduce((sum,[key,n])=>sum+marketPrice(key,at)*n,0);
-    if(!price)return;
-    const away=offline&&at>lastSeen;
-    const amount=away?Math.floor((gross+price)*GARDENER_OFFLINE_RATE)-paid:price;
-    if(state.money+amount>MAX_MONEY)return;
-    for(const [key,n] of entries)changeProduce(state.inventory,key,-n);
-    state.money+=amount;
-    if(away){gross+=price;paid+=amount}else onlinePaid+=amount;
-  };
+  const before=state.home.gardenBox.tomato;
   worker.nextAt=Math.max(worker.nextAt,worker.contractUntil-GARDENER_PLANS.day.duration,0);
   while(worker.nextAt<=cutoff){
-    advanceGardener(state,worker.nextAt,random,worker.slot,receiveSale);
+    advanceGardener(state,worker.nextAt,random,worker.slot);
   }
   const ended=now>=worker.contractUntil;
   if(ended)delete state.home.gardener;
@@ -218,9 +202,19 @@ function settleGardener(state, action, now, random){
     }
     worker.lastSeenAt=now;
   }
-  if(offline&&(gross||ended||gap>=GARDENER_HEARTBEAT))state.home.gardenerReceipt={at:now,gross,paid,ended};
-  const message=onlinePaid?'คนสวนขายผลผลิตได้ '+onlinePaid.toLocaleString('th-TH')+' บาท':'';
-  return {ok:true,message:ended&&!offline?(message?message+' · หมดเวลาจ้าง':'หมดเวลาจ้างคนสวนแล้ว'):message};
+  const stored=state.home.gardenBox.tomato-before;
+  if(offline&&(stored||ended))state.home.gardenerReceipt={at:now,gross:0,paid:0,stored,ended};
+  const message=stored?'คนสวนเก็บผลผลิตเข้ากล่อง '+stored+' ผล':'';
+  return {ok:true,message:offline?'':ended?(message?message+' · หมดเวลาจ้าง':'หมดเวลาจ้างคนสวนแล้ว'):message};
+}
+
+function harvestCrop(state,plot,destination,random){
+  const grade=rollGrade(random);
+  if(!changeProduce(destination,grade,3))return null;
+  Object.assign(plot,{crop:null,watered:false,plantedAt:0});
+  state.xp+=10;
+  while(state.xp>=state.level*30){state.xp-=state.level*30;state.level=Math.min(99,state.level+1)}
+  return grade;
 }
 
 export function applyAction(s,action,now=Date.now(),random=Math.random) {
@@ -231,7 +225,8 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
   switch(action?.type){
     case 'needsTick':
       if(now-s.needsAt<NEEDS_STEP_MS-250)return {ok:false,message:''};
-      s.needs=advanceNeeds(s.needs,action.pose);
+      s.needs=advanceNeeds(s.needs,action.pose,action.nearPlayer===true);
+      s.playSeconds=Math.min(Number.MAX_SAFE_INTEGER,s.playSeconds+NEEDS_STEP_MS/1000);
       s.needsAt=now;
       break;
     case 'eat': {
@@ -252,14 +247,24 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
     case 'harvest': {
       if(!plot?.crop || !plot.watered || now-plot.plantedAt<GROW_MS)return {ok:false,message:'ต้นไม้ยังไม่พร้อมเก็บเกี่ยว'};
       if(items.tomato>MAX_PRODUCE-3)return {ok:false,message:'กระเป๋าผลผลิตเต็ม'};
-      const grade=rollGrade(random);
-      changeProduce(items,grade,3);
-      plot.crop=null;plot.watered=false;plot.plantedAt=0;s.xp+=10;
-      while(s.xp>=s.level*30){s.xp-=s.level*30;s.level=Math.min(99,s.level+1)}
+      const grade=harvestCrop(s,plot,items,random);
       status='เก็บมะเขือเทศเกรด '+gradeOf(grade).name+' '+(grade/100)+'× จำนวน 3 ผล ได้ 10 EXP';break;
     }
     case 'sell':
       return sellProduce(s,action.grade,now);
+    case 'collectGardenBox': {
+      const box=s.home.gardenBox;
+      let space=MAX_PRODUCE-items.tomato, collected=0;
+      for(const [key,quantity] of Object.entries(box.tomatoGrades)){
+        const count=Math.min(space,quantity);
+        if(!count)break;
+        changeProduce(items,key,count);
+        changeProduce(box,key,-count);
+        collected+=count;space-=count;
+      }
+      if(!collected)return {ok:false,message:box.tomato?'กระเป๋าเต็ม':'กล่องยังว่าง'};
+      status='รับผลผลิตจากกล่อง '+collected+' ผล';break;
+    }
     case 'hireGardener': {
       const plan=Object.hasOwn(GARDENER_PLANS,action.plan)?GARDENER_PLANS[action.plan]:null;
       if(!plan||!Number.isInteger(action.slot)||!lots[action.slot])return {ok:false,message:'กรุณาเลือกเวลาจ้างคนสวน'};
@@ -277,7 +282,7 @@ export function applyAction(s,action,now=Date.now(),random=Math.random) {
       if(s.money<5)return {ok:false,message:'เงินไม่พอซื้อเมล็ด (5 บาท)'};
       s.money-=5;items.tomato_seed++;status='ซื้อเมล็ด 1 ชิ้น';break;
     case 'buy': {
-      const item=String(action.item);const def=FURNITURE_TYPES[item];
+      const item=String(action.item);const def=isFurnitureType(item)?FURNITURE_TYPES[item]:null;
       if(!def||s.money<def.price)return {ok:false,message:'ซื้อไม่ได้: เงินไม่พอ'};
       items.furniture[item]=clampCount(items.furniture[item])+1;s.money-=def.price;
       status='ซื้อ'+def.label+'เข้ากระเป๋าแล้ว';break;

@@ -3,8 +3,8 @@ import {getDatabase} from 'firebase-admin/database';
 import {getFirestore} from 'firebase-admin/firestore';
 import {onCall, HttpsError} from 'firebase-functions/v2/https';
 import {createHmac, randomBytes} from 'node:crypto';
-import {applyAction, lots} from './shared/rules.js?v=v5-gardener-1';
-import {gardenerPost} from './shared/farming.js?v=v5-gardener-1';
+import {applyAction, lots} from './shared/rules.js?v=v5-neighbors-1';
+import {gardenerPost,gardenBoxPosition} from './shared/farming.js?v=v5-neighbors-1';
 import {firestoreMarket, MARKET_PATH} from './firestore-market.js';
 
 initializeApp({databaseURL:'https://gamesurvival-58e92-default-rtdb.asia-southeast1.firebasedatabase.app'});
@@ -13,7 +13,7 @@ const db = getDatabase();
 const game = db.ref(ROOT);
 const firestore = getFirestore();
 const market = firestoreMarket(firestore,async uid=>(await game.child('profiles').child(uid).get()).val());
-const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','gardenerStep','gardenerResume','needsTick','eat']);
+const allowedActions = new Set(['plant','water','harvest','sell','seed','buy','saveHome','name','appearance','hireGardener','gardenerStep','gardenerResume','collectGardenBox','needsTick','eat']);
 const nearMarket = player => player.scene==='outside' &&
   Math.hypot(Math.max(1136-player.x,0,player.x-1264),Math.max(588-player.y,0,player.y-699))<=82;
 
@@ -41,12 +41,22 @@ export const neighborhoodMarket = onCall({region:'asia-southeast1',maxInstances:
   if(data.type==='action'){
     const action={...data.action,slot};
     if(!allowedActions.has(action.type))throw new HttpsError('invalid-argument','คำสั่งไม่ถูกต้อง');
-    if(action.type==='needsTick')action.pose=player.scene==='inside'?player.pose:'stand';
+    if(action.type==='needsTick'){
+      action.pose=player.scene==='inside'?player.pose:'stand';
+      const players=(await playerRef.parent.get()).val()||{};
+      action.nearPlayer=Object.values(players).some(p=>p&&p.uid!==uid&&p.scene===player.scene&&
+        (p.scene!=='inside'||(p.house||p.uid)===(player.house||uid))&&Math.hypot(p.x-player.x,p.y-player.y)<=100);
+    }
     if(['sell','seed'].includes(action.type)&&!nearMarket(player))return {ok:false,message:'เดินไปที่ตลาดกลางก่อน'};
     if(action.type==='hireGardener'){
       const post=gardenerPost(lots[slot]);
       if(player.scene!=='outside'||Math.hypot(player.x-post.x,player.y-post.y)>75)
         return {ok:false,message:'เดินไปที่จุดจ้างคนสวนหน้าบ้านก่อน'};
+    }
+    if(action.type==='collectGardenBox'){
+      const box=gardenBoxPosition(lots[slot]);
+      if(player.scene!=='outside'||Math.hypot(player.x-box.x,player.y-box.y)>60)
+        return {ok:false,message:'เดินไปที่กล่องข้างสวนก่อน'};
     }
     const seed=randomBytes(32);
     return market.action(uid,state=>{

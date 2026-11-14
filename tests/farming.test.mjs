@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {applyAction, GROW_MS, lots, sanitizeState, starter} from '../shared/rules.js';
-import {gardenerPosition, gradeOf, marketPrice, rollGrade} from '../shared/farming.js';
+import {gardenBoxPosition, gardenerPosition, gradeOf, rollGrade} from '../shared/farming.js';
 import {LISTING_DURATION, trade} from '../shared/market-trade.js';
 
 test('old tomatoes migrate to C and all grade bands respect the requested multipliers',()=>{
@@ -18,7 +18,7 @@ test('old tomatoes migrate to C and all grade bands respect the requested multip
   }
 });
 
-test('gardener grows, walks to the market, sells once, then returns',()=>{
+test('gardener grows and brings the harvest to the garden box without selling',()=>{
   const state=starter();
   state.money=200;
   state.inventory.tomato_seed=1;
@@ -30,21 +30,20 @@ test('gardener grows, walks to the market, sells once, then returns',()=>{
   const ripeAt=1000+GROW_MS;
   for(let time=worker.lastSeenAt+10000;time<ripeAt;time+=10000)step(time);
   step(ripeAt);
-  assert.equal(state.inventory.tomato,3);
-  step(worker.nextAt);
-  assert.equal(worker.phase,'outbound');
-  const arrival=worker.nextAt;
-  assert.equal(gardenerPosition(lots[0],worker,arrival).x,1200);
-  step(arrival-1);
-  assert.equal(worker.phase,'outbound');
-  step(arrival);
-  assert.equal(worker.phase,'return');
   assert.equal(state.inventory.tomato,0);
-  assert.equal(state.money,100+3*marketPrice(100,arrival));
+  assert.deepEqual(state.home.gardenBox,{tomato:3,tomatoGrades:{100:3}});
+  assert.equal(worker.phase,'deposit');
+  const arrival=worker.nextAt;
+  assert.equal(gardenerPosition(lots[0],worker,arrival).x,gardenBoxPosition(lots[0]).x);
+  step(arrival-1);
+  assert.equal(worker.phase,'deposit');
   step(arrival);
-  assert.equal(state.money,100+3*marketPrice(100,arrival));
-  step(worker.nextAt);
   assert.equal(worker.phase,'garden');
+  assert.equal(state.money,100);
+  assert.equal(applyAction(state,{type:'collectGardenBox'},arrival).ok,true);
+  assert.equal(state.inventory.tomato,3);
+  assert.equal(state.home.gardenBox.tomato,0);
+  assert.equal(applyAction(state,{type:'collectGardenBox'},arrival).ok,false);
 });
 
 test('contract options charge once and reject invalid plans or insufficient funds',()=>{
@@ -61,7 +60,7 @@ test('contract options charge once and reject invalid plans or insufficient fund
   assert.equal(applyAction(starter(),{type:'hireGardener',slot:0,plan:'constructor'},10000).ok,false);
 });
 
-test('offline catch-up settles 80% up to expiry, survives reload and cannot pay twice',()=>{
+test('offline catch-up stores crops up to expiry and survives reload without duplication',()=>{
   const state=starter();
   state.inventory.tomato_seed=1;
   const now=10_000;
@@ -69,11 +68,12 @@ test('offline catch-up settles 80% up to expiry, survives reload and cannot pay 
   const end=state.home.gardener.contractUntil;
   const reloaded=sanitizeState(JSON.parse(JSON.stringify(state)));
   assert.equal(applyAction(reloaded,{type:'gardenerResume',slot:2},end+60000,()=>.1).ok,true);
-  assert.deepEqual(reloaded.home.gardenerReceipt,{at:end+60000,gross:21,paid:16,ended:true});
-  assert.equal(reloaded.money,16);
+  assert.deepEqual(reloaded.home.gardenerReceipt,{at:end+60000,gross:0,paid:0,stored:3,ended:true});
+  assert.equal(reloaded.money,0);
+  assert.deepEqual(sanitizeState(reloaded).home.gardenBox,{tomato:3,tomatoGrades:{100:3}});
   assert.equal(reloaded.home.gardener,undefined);
   assert.equal(applyAction(reloaded,{type:'gardenerResume',slot:2},end+70000,()=>.1).ok,false);
-  assert.equal(reloaded.money,16);
+  assert.equal(reloaded.home.gardenBox.tomato,3);
 });
 
 test('old permanent hires migrate without a fee and a long absence does not extend the contract',()=>{

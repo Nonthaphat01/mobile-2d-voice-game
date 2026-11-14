@@ -20,6 +20,58 @@
             }
           }
         }
+      },
+      "social": {
+        "requests": {
+          "$target": {
+            ".read": "auth != null && auth.uid === $target",
+            "$from": {
+              ".write": "auth != null && $from !== $target && ((auth.uid === $from && newData.val() === true && root.child('little-neighborhood-v5/profiles/' + $target).exists() && !root.child('little-neighborhood-v5/social/contacts/' + $from + '/' + $target).exists()) || (auth.uid === $target && !newData.exists()))",
+              ".validate": "newData.val() === true"
+            }
+          }
+        },
+        "contacts": {
+          "$owner": {
+            ".read": "auth != null && auth.uid === $owner",
+            "$peer": {
+              ".write": "auth != null && $owner !== $peer && !data.exists() && newData.exists() && ((auth.uid === $owner && root.child('little-neighborhood-v5/social/requests/' + $owner + '/' + $peer).val() === true) || (auth.uid === $peer && root.child('little-neighborhood-v5/social/requests/' + $peer + '/' + $owner).val() === true))",
+              ".validate": "newData.hasChildren(['name'])",
+              "name": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 18"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
+        },
+        "messages": {
+          "$left": {
+            "$right": {
+              ".read": "auth != null && $left !== $right && (auth.uid === $left || auth.uid === $right) && root.child('little-neighborhood-v5/social/contacts/' + $left + '/' + $right).exists() && root.child('little-neighborhood-v5/social/contacts/' + $right + '/' + $left).exists() && query.limitToLast <= 200",
+              ".indexOn": [
+                "at"
+              ],
+              "$message": {
+                ".write": "auth != null && $left !== $right && (auth.uid === $left || auth.uid === $right) && !data.exists() && newData.exists() && root.child('little-neighborhood-v5/social/contacts/' + $left + '/' + $right).exists() && root.child('little-neighborhood-v5/social/contacts/' + $right + '/' + $left).exists()",
+                ".validate": "newData.hasChildren(['sender','text','at'])",
+                "sender": {
+                  ".validate": "newData.val() === auth.uid"
+                },
+                "text": {
+                  ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 240"
+                },
+                "at": {
+                  ".validate": "newData.isNumber() && newData.val() >= now - 10000 && newData.val() <= now + 1000"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

@@ -131,16 +131,14 @@ function stepPose(phase,side){
  const swing=(cycle-stance)/(1-stance);
  return {reach:2*ease(swing)-1,lift:Math.sin(swing*Math.PI)};
 }
-function drawSleeper(c,a,skin,hair,shirt,now,onBed,progress){
+function drawSleeper(c,a,skin,hair,shirt,now,onBed,progress,angle){
  c.save();
- c.rotate(onBed?-.03:.12);
+ if(onBed){
+   c.translate(0,-10);c.rotate(Number.isFinite(angle)?angle:0);c.scale(.64,.64);
+ }else c.rotate(.12);
  const breath=Math.sin(now/640)*.65;
  const profile=bodyProfiles[a.gender];
- if(onBed){
-   shapeRound(c,-51,-19,40,37,11,'#bdaabc65');
-   shapeRound(c,-52,-22,40,37,11,lightGradient(c,0,-22,0,15,['#fffaf4','#faf2e8','#ded6d4']));
-   shapeLine(c,[[-48,5],[-45,10],[-18,10]],'#d8cacb',1.1);
- }else{
+ if(!onBed){
    shapeEllipse(c,-3,14,41,10,'#171b3429');
    shapeEllipse(c,30,18,21,6,'#171b3429');
  }
@@ -459,9 +457,9 @@ function paintCharacter(c,p,now,speaking=false,visual=null,seat=p.pose==='sit'?1
  const chestX=Math.cos(phase)*1.05*swing+walkX*(seat*1.5+squat*1.1+swing*1.9)+(bend?1.4:0)+danceSway*3.7;
  const chestY=dip+bob+(bend?3:0)-danceHop+Math.sin(now/580)*.42*(1-swing);
  const sleep=ease(visual?.sleep??Number(p.pose==='sleep'));
- if(sleep>=.72){
+ if(sleep>=.72||(p.onBed&&p.pose==='sleep')){
    c.save();c.translate(0,4*(1-sleep));
-   drawSleeper(c,a,skin,hair,shirt,now,visual?.onBed??p.onBed,sleep);
+   drawSleeper(c,a,skin,hair,shirt,now,visual?.onBed??p.onBed,sleep,p.restAngle);
    c.restore();
    return;
  }

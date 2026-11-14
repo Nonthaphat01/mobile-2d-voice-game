@@ -15,10 +15,14 @@ test('needs ticks are limited and sitting or sleeping restores the right needs',
   save.needs={happiness:50,energy:50,fullness:50};
   const now=10000;
   assert.equal(applyAction(save,{type:'needsTick',pose:'sit'},now).ok,true);
-  assert.equal(save.needs.happiness,54);
+  assert.equal(save.needs.happiness,58);
   assert.equal(applyAction(save,{type:'needsTick',pose:'sleep'},now+100).ok,false);
   assert.equal(applyAction(save,{type:'needsTick',pose:'sleep'},now+NEEDS_STEP_MS).ok,true);
   assert.equal(save.needs.energy,57.5);
+  assert.equal(save.needs.happiness,59.5);
+  assert.equal(applyAction(save,{type:'needsTick',pose:'stand',nearPlayer:true},now+2*NEEDS_STEP_MS).ok,true);
+  assert.ok(save.needs.happiness>59.5);
+  assert.equal(save.playSeconds,3*NEEDS_STEP_MS/1000);
   assert.ok(save.needs.fullness<50);
 });
 

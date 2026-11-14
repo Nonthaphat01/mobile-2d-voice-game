@@ -5,7 +5,8 @@ import {starter,applyAction,lots,PLOT_COUNT,GROW_MS,sanitizeState,HOME_GRID} fro
 test('starter home: 100 baht, empty home, ten plots, starter tools',()=>{
  const s=starter('นนท์');
  assert.equal(s.money,100);assert.deepEqual(s.home.furniture,[]);
- assert.deepEqual(s.inventory.furniture,{bed:0,chair:0});
+ assert.equal(Object.keys(s.inventory.furniture).length,27);
+ assert.ok(Object.values(s.inventory.furniture).every(count=>count===0));
  assert.equal(s.home.plots.length,PLOT_COUNT);assert.equal(s.inventory.hoe,1);assert.equal(s.inventory.tomato_seed,3);
 });
 test('garden cycle: plant, water, harvest after 60s and gain EXP',()=>{
@@ -57,4 +58,3 @@ test('legacy saves migrate placed furniture and keep invalid state safe',()=>{
 test('8 distinct outdoor lots remain unchanged',()=>{
  assert.equal(lots.length,8);assert.equal(new Set(lots.map(l=>l.slot)).size,8);
 });
-

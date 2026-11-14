@@ -1,4 +1,4 @@
-import {sanitizeState, starter} from './shared/rules.js?v=v5-gardener-1';
+import {sanitizeState, starter} from './shared/rules.js?v=v5-neighbors-1';
 import {trade} from './shared/market-trade.js';
 
 export const MARKET_PATH = 'HOODGAME/market';
@@ -45,7 +45,7 @@ export function firestoreMarket(db, readLegacyProfile) {
         return item.expiresAt>now||item.seller===uid;
       }).map(doc => {
         const {seller,name,key,quantity,unitPrice,expiresAt} = doc.data();
-        return {id:doc.id,own:seller===uid,name,key,quantity,unitPrice,expired:expiresAt<=now};
+        return {id:doc.id,sellerKey:seller,own:seller===uid,name,key,quantity,unitPrice,expired:expiresAt<=now};
       }),
       profile:sanitizeState(profile.data())
     };

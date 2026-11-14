@@ -61,7 +61,7 @@ test('listing is in HOODGAME and purchase writes both profiles and listing toget
   assert.equal((await market.transact('seller',{type:'list',id,key:500,quantity:2},0)).ok,true);
   const listing=MARKET_PATH+'/listings/'+id;
   assert.equal(db.rows.get(listing).unitPrice,35);
-  assert.deepEqual((await market.browse('buyer',1000)).listings,[{id,own:false,name:'เจ้าของ',key:500,quantity:2,unitPrice:35,expired:false}]);
+  assert.deepEqual((await market.browse('buyer',1000)).listings,[{id,own:false,name:'เจ้าของ',sellerKey:'seller',key:500,quantity:2,unitPrice:35,expired:false}]);
   const results=await Promise.all(['buyer','another'].map(uid=>market.transact(uid,{type:'buy',id},600000)));
   assert.equal(results.filter(x=>x.ok).length,1);
   assert.equal(db.rows.has(listing),false);

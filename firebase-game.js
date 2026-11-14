@@ -3,12 +3,14 @@ import {initializeApp, getApps} from 'https://www.gstatic.com/firebasejs/11.10.0
 import {getAuth, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 import {getDatabase, ref, get, onValue, runTransaction, update, remove, onDisconnect} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
 import {getFunctions, httpsCallable} from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js';
-import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-gardener-1';
+import {MAX_PLAYERS, ROOM_IDS, starter, sanitizeState, applyAction, lots, sanitizeAppearance} from './shared/rules.js?v=v5-neighbors-1';
+import {gameSocial} from './game-social.js?v=v5-neighbors-1';
 import {requestSheetsMarket} from './shared/sheets-market-client.js?v=v5-sheets-1';
 
 const backgroundAction = type => type==='gardenerResume'?'gardenerStep':['gardenerStep','needsTick'].includes(type)?type:false;
 
 const ROOT='little-neighborhood-v5';
+const publicStats=p=>({level:p.level,money:p.money,playSeconds:p.playSeconds});
 export class FirebaseGame {
  constructor(config,emit,marketEnabled=false,sheetsMarketUrl=''){
   this.config=config;this.emit=emit;this.app=null;this.auth=null;this.db=null;this.uid='';this.room='';this.slot=-1;
@@ -16,6 +18,7 @@ export class FirebaseGame {
   this.profileWrites=Promise.resolve();
   this.marketEnabled=marketEnabled&&!sheetsMarketUrl;
   this.sheetsMarketUrl=sheetsMarketUrl;
+  this.marketSchema=0;
  }
  async ready(){
   if(this.app)return;
@@ -71,7 +74,7 @@ export class FirebaseGame {
   });
   for(const index of order){
     const candidate=ref(this.db,`${ROOT}/rooms/${room}/slots/${index}`),l=lots[index];
-    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',pose:'stand',text:'',until:0,home:profile.home,appearance:profile.appearance,updatedAt:Date.now()};
+    const pos={uid,name:profile.displayName,slot:index,x:l.x+247,y:index<4?l.y+l.h-45:l.y+50,scene:'outside',pose:'stand',text:'',until:0,home:profile.home,appearance:profile.appearance,...publicStats(profile),updatedAt:Date.now()};
     const result=await runTransaction(candidate,previous=>previous==null?pos:undefined,{applyLocally:false});
     if(result.committed){taken=index;slotRef=candidate;break;}
   }
@@ -81,6 +84,14 @@ export class FirebaseGame {
     await onDisconnect(slotRef).remove();
     this.uid=uid;this.room=room;this.slot=taken;this.slotRef=slotRef;this.profile=profile;this.ended=false;
     this.profileWrites=Promise.resolve();
+    const contactProbe=ref(this.db,`${ROOT}/social/contacts/_privacy_probe`);
+    this.social=null;
+    get(contactProbe).catch(error=>{
+      if(this.slotRef===slotRef&&/permission[_-]denied/i.test(error.code||'')&&uid!=='_privacy_probe'){
+        this.social=gameSocial(this.db,uid,profile.displayName);
+        this.emit({type:'social'});
+      }
+    });
     this.unsubscribe=onValue(slotsRef,snap=>{
       const v=snap.val()||{};const players=Object.values(v).filter(p=>p&&p.uid!==uid).map(p=>({id:p.uid,...p}));
       this.emit({type:'players',players});
@@ -95,7 +106,7 @@ export class FirebaseGame {
  }
  send(m){
   if(!this.slotRef||this.ended)return;
-  if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
+  if(m.type==='move')return update(this.slotRef,{x:m.x,y:m.y,scene:m.scene,house:m.house??null,restAngle:m.restAngle??null,pose:['stand','sit','sleep'].includes(m.pose)?m.pose:'stand',updatedAt:Date.now()});
   if(m.type==='say'){
     const now=Date.now();if(now-this.lastChat<850)return;
     this.lastChat=now;return update(this.slotRef,{text:String(m.text||'').slice(0,120),until:now+5000});
@@ -124,8 +135,11 @@ export class FirebaseGame {
     }
     this.profile=result.profile;
     this.emit({type:'profile',profile:this.profile,notice:result.message,background});
-    if(action.type==='needsTick')return result;
-    try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,updatedAt:Date.now()})}
+    if(action.type==='needsTick'){
+      await update(slotRef,publicStats(result.profile)).catch(()=>{});
+      return result;
+    }
+    try{await update(slotRef,{name:result.profile.displayName,home:result.profile.home,...publicStats(result.profile),updatedAt:Date.now()})}
     catch(e){if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกแล้ว แต่ซิงก์ชุมชนไม่สำเร็จ: '+e.message})}
     return result;
   }
@@ -149,9 +163,12 @@ export class FirebaseGame {
     const profile=sanitizeState(result.snapshot.val());this.profile=profile;
     const background=backgroundAction(action.type);
     this.emit({type:'profile',profile,notice:lastResult.message,background});
-    if(action.type==='needsTick')return lastResult;
+    if(action.type==='needsTick'){
+      await update(slotRef,publicStats(profile)).catch(()=>{});
+      return lastResult;
+    }
     try{
-      await update(slotRef,{name:profile.displayName,home:profile.home,updatedAt:Date.now()});
+      await update(slotRef,{name:profile.displayName,home:profile.home,...publicStats(profile),updatedAt:Date.now()});
     }catch(e){
       if(this.slotRef===slotRef)this.emit({type:'notice',message:'บันทึกเซฟแล้ว แต่ซิงก์ข้อมูลในชุมชนไม่สำเร็จ: '+e.message});
     }
@@ -187,7 +204,8 @@ export class FirebaseGame {
     if(!slotRef||this.slotRef!==slotRef)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
     const result=await this.market(request);
     if(this.slotRef!==slotRef)return {ok:false,message:'การเชื่อมต่อสิ้นสุดแล้ว'};
-    if(result.profile)this.profile=result.profile;
+    if(result.marketSchema===2)this.marketSchema=2;
+    if(result.profile&&(!this.sheetsMarketUrl||this.marketSchema===2))this.profile=result.profile;
     return result;
   });
   this.profileWrites=pending.catch(()=>{});
@@ -197,9 +215,16 @@ export class FirebaseGame {
   if((!this.marketCall&&!this.sheetsMarketUrl)||!this.slotRef||this.ended)return {ok:false,message:'ร้านออนไลน์ยังไม่เปิดให้บริการ'};
   try{
     if(this.sheetsMarketUrl){
+      if(request.type!=='browse'&&this.marketSchema!==2)
+        return {ok:false,message:'ร้านค้ากำลังอัปเดต กรุณารอให้เซิร์ฟเวอร์รองรับเซฟรุ่นใหม่'};
       const token=await this.currentUser()?.getIdToken();
       if(!token)return {ok:false,message:'กรุณาเข้าสู่ระบบใหม่'};
-      return await requestSheetsMarket(this.sheetsMarketUrl,token,{...request,room:this.room,slot:this.slot});
+      const result=await requestSheetsMarket(this.sheetsMarketUrl,token,{...request,room:this.room,slot:this.slot});
+      if(request.type==='browse'&&result.marketSchema!==2){
+        this.marketSchema=0;
+        return {ok:false,message:'ร้านค้าอยู่ระหว่างอัปเดตเซิร์ฟเวอร์ เกมส่วนอื่นเล่นได้ตามปกติ'};
+      }
+      return result;
     }
     return (await this.marketCall({...request,room:this.room,slot:this.slot})).data;
   }catch(error){
@@ -210,7 +235,10 @@ export class FirebaseGame {
  async leave(){
   const slot=this.slotRef;this.ended=true;
   this.unsubscribe?.();this.unsubConnected?.();this.unsubscribe=null;this.unsubConnected=null;
-  this.slotRef=null;this.uid='';this.room='';this.slot=-1;
+  this.slotRef=null;this.uid='';this.room='';this.slot=-1;this.social=null;
   if(slot){try{await onDisconnect(slot).cancel()}catch{};try{await remove(slot)}catch{}}
  }
 }
+
+
+

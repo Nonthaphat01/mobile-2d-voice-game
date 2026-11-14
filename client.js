@@ -1,9 +1,13 @@
-import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,applyAction,lots,WORLD,GROW_MS,HOME_GRID,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=v5-gardener-1';
-import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-hud-1';
+import {MAX_PLAYERS,ROOM_IDS,PLOT_COUNT,starter,sanitizeState,sanitizeFurniture,applyAction,lots,WORLD,GROW_MS,HOME_GRID,FURNITURE_TYPES,furnitureFootprint,isValidFurniturePlacement} from './shared/rules.js?v=v5-neighbors-1';
+import {drawClassicActor,resetAvatarMotion,buildAppearanceEditor,hasChosenAppearance,getChosenAppearance,useSavedAppearance} from './v4-avatar-bridge.js?v=v5-neighbors-1';
 import {grassTexture,roadTexture,soilTexture,woodTexture,roofTexture} from './v4-textures.js';
 import {MOVE_INTERVAL_MS,updateRemoteMotion,sampleRemoteMotion} from './shared/remote-motion.js?v=v5-smooth-1';
-import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-build-room-2';
-import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gradeOf,marketPrice} from './shared/farming.js?v=v5-gardener-1';
+import {drawFurniture, furnitureRect} from './home-furniture.js?v=v5-neighbors-1';
+import {GARDENER_PLANS,GARDENER_HEARTBEAT,MARKET_HOUR_MS,gardenerPosition,gardenerPost,gardenBoxPosition,gradeOf,marketPrice} from './shared/farming.js?v=v5-neighbors-1';
+import {furniturePose} from './shared/furniture.js?v=v5-neighbors-1';
+import {groupListings} from './shared/social.js?v=v5-neighbors-1';
+import {renderClassicAvatar} from './v4-character.js?v=v5-neighbors-1';
+import {installSocialUI} from './social-ui.js?v=v5-neighbors-1';
 import {weatherAt, drawWeather, sway} from './weather.js?v=v5-farm-1';
 import {fatigueOpacity,hungerOffset,LOW_NEED,NEEDS_STEP_MS} from './shared/needs.js?v=v5-hud-1';
 
@@ -12,6 +16,8 @@ const c=el('game'),ctx=c.getContext('2d');
 const cfg=window.GAME_CONFIG||{};
 const marketConfigured=cfg.onlineMarket===true||Boolean(cfg.sheetsMarketUrl);
 const remote=new Map();
+const gardenerVisuals=new Map();
+let visiting=null, houseEnteredAt=0;
 let w=innerWidth,h=innerHeight,dpr=1,lastFrame=performance.now(),lastMove=0;
 let sentMovement;
 let scene='outside',active=false,online=false,fbGame=null,session=null;
@@ -185,7 +191,7 @@ function showEntry(user, focus=false){
 async function firebaseClient(){
  if(!onlineReady)throw Error('Firebase is not configured');
  firebasePromise??=(async()=>{
-   const {FirebaseGame}=await import('./firebase-game.js?v=v5-sheets-1');
+   const {FirebaseGame}=await import('./firebase-game.js?v=v5-neighbors-1');
    const adapter=new FirebaseGame(cfg.firebase,onNetwork,cfg.onlineMarket===true,cfg.sheetsMarketUrl);
    await adapter.ready();
    return adapter;
@@ -303,11 +309,13 @@ el('playDemo').onclick=()=>{if(accountBusy||joining||active)return;online=false;
 function onJoined(){
  const l=lots[slot];
  scene='outside';renderedCamera=null;sentMovement=null;resetAvatarMotion();
+ visiting=null;gardenerVisuals.clear();
  me={x:l.x+247,y:slot<4?l.y+l.h-45:l.y+50,face:Math.PI/2,walking:false,text:'',until:0,pose:'stand'};
  active=true;nextNeedsAt=Date.now()+NEEDS_STEP_MS;needsPending=false;tiredSince=hungrySince=null;
  gardenerPending=false;gardenerRetryAt=0;gardenerResume=true;enteredGardenerPost=false;receiptSeen=0;
  el('lobby').hidden=true;
- for(const id of ['hud','joystick','chatPanel','bagBtn'])el(id).hidden=false;
+ for(const id of ['hud','joystick','chatPanel','bagBtn','socialButtons'])el(id).hidden=false;
+ if(online)socialUI.connect(fbGame.social,myId);
  el('chatLog').replaceChildren();
  el('chatInput').value='';
  setChatOpen(true);
@@ -322,13 +330,16 @@ function trackRemote(player,now){
  const motion=updateRemoteMotion(previous?.motion,player,now);
  remote.set(player.id,{...player,motion});
 }
-function onNetwork(m){if(!active&&!['rooms','players'].includes(m.type))return;
+function onNetwork(m){if(!active&&!['rooms','players','social'].includes(m.type))return;
+ if(m.type==='social'&&active&&online){socialUI.connect(fbGame.social,myId);return}
  if(m.type==='rooms'){serverRooms=m.rooms;renderRooms()}
  else if(m.type==='players'){
    const players=m.players||[],ids=new Set(players.map(p=>p.id)),now=performance.now();
    for(const id of remote.keys())if(!ids.has(id))remote.delete(id);
    for(const p of players)trackRemote(p,now);
+   if(visiting&&!remote.has(visiting.id)){interact({type:'exit'});notice('เจ้าของบ้านออกจากชุมชนแล้ว')}
    hud()
+   socialUI.refresh();
  }
  else if(m.type==='disconnected'){leaveGame('Firebase ขาดการเชื่อมต่อ กรุณาเข้าห้องใหม่')}
  else if(m.type==='player'){trackRemote(m.player,performance.now());hud()}
@@ -372,6 +383,7 @@ function action(a){if(['plant','water','harvest'].includes(a?.type)){
 async function leaveGame(message=''){
  if(!active)return;
  closeBuild(false);
+ socialUI.disconnect();
  accountBusy=true;
  active=false;
  online=false;
@@ -379,7 +391,7 @@ async function leaveGame(message=''){
  remote.clear();
  resetAvatarMotion();
  el('lobby').hidden=false;
- for(const id of ['hud','joystick','chatPanel','nearbyAction','bagBtn'])el(id).hidden=true;
+ for(const id of ['hud','joystick','chatPanel','nearbyAction','bagBtn','socialButtons'])el(id).hidden=true;
  dialogClose();
  keys.clear();
  joyReset();
@@ -424,18 +436,52 @@ function dialogClose(){el('dialog').close?.()}
 el('dialogClose').onclick=dialogClose;el('dialog').addEventListener('click',e=>{if(e.target===el('dialog'))dialogClose()});
 el('dialog').addEventListener('close',()=>clearTimeout(plotReadyTimer));
 let dialogType=null,dialogPlot=-1,buildDraft=null,buildSelection=null;
-function drawOpenDialog(){if(!el('dialog').open)return;if(dialogType==='inventory')inventory();else if(dialogType==='plot')openPlot(dialogPlot);else if(dialogType==='house')homeDialog();else if(dialogType==='shop')shopDialog();else if(dialogType==='garden')gardenDialog()}
+function drawOpenDialog(){if(!el('dialog').open)return;if(dialogType==='inventory')inventory();else if(dialogType==='plot')openPlot(dialogPlot);else if(dialogType==='house')homeDialog();else if(dialogType==='shop')shopDialog();else if(dialogType==='garden')gardenDialog();else if(dialogType==='box')gardenBoxDialog()}
+function avatarIcon(appearance,fallback='👤',label='ผู้เล่น'){
+ const icon=document.createElement('span');icon.className='player-avatar';icon.setAttribute('aria-hidden','true');
+ if(!appearance){icon.textContent=fallback;return icon}
+ const mini=document.createElement('canvas');mini.width=64;mini.height=64;
+ const painter=mini.getContext('2d');
+ painter.translate(-14,16);painter.scale(1.45,1.45);
+ renderClassicAvatar(painter,{x:32,y:39,scene:'preview',face:Math.PI/2,name:label,pose:'stand',appearance},0);
+ icon.append(mini);return icon;
+}
+const socialUI=installSocialUI({
+ el,showDialog,addButton,addText,avatarIcon,notice,
+ currentPlayers:()=>[...remote.values()].map(p=>({...p,room})),open:()=>{dialogType='social'},isOnline:()=>online
+});
 
 function furnitureLabel(type){const item=FURNITURE_TYPES[type];return item?item.emoji+' '+item.label:type}
 function cloneFurniture(list){return JSON.parse(JSON.stringify(Array.isArray(list)?list:[]))}
 function furnitureInventory(profile=ownProfile){return Object.fromEntries(Object.keys(FURNITURE_TYPES).map(type=>[type,Number(profile.inventory?.furniture?.[type])||0]))}
+function itemCell(grid,label,icon,count,type){
+ const tile=document.createElement('div');
+ tile.className='inventory-cell';
+ if(count){
+   tile.title=label+' × '+count;tile.setAttribute('aria-label',tile.title);tile.setAttribute('role','img');
+   if(type){
+     const def=FURNITURE_TYPES[type], mini=document.createElement('canvas');
+     mini.width=96;mini.height=80;
+     const painter=mini.getContext('2d'), scale=66/Math.max(def.width*48,def.height*48);
+     painter.translate(48-def.width*24*scale,45-def.height*24*scale);
+     painter.scale(scale,scale);painter.translate(-HOME_GRID.x,-HOME_GRID.y);
+     drawFurniture(painter,{type,col:0,row:0,rotation:0});tile.append(mini);
+   }else tile.append(icon);
+   const qty=document.createElement('small');qty.textContent=count;tile.append(qty);
+ }else tile.setAttribute('aria-hidden','true');
+ grid.append(tile);
+}
+function inventoryGrid(parent){
+ const grid=document.createElement('div');grid.className='inventory-cells';parent.append(grid);return grid;
+}
+function finishInventoryGrid(grid){while(grid.childElementCount<Math.max(18,Math.ceil(grid.childElementCount/6)*6))itemCell(grid,'','',0)}
 function inventory(){dialogType='inventory';showDialog('🎒 กระเป๋าของฉัน',d=>{
  addText(d,'เงิน '+ownProfile.money+' บาท · เลเวล '+ownProfile.level+' · EXP '+ownProfile.xp+'/'+ownProfile.level*30);
- const keys=[['hoe','⛏️ จอบเก่า'],['watering_can','💦 บัวรดน้ำ'],['tomato_seed','🌱 เมล็ดมะเขือเทศ'],['tomato','🍅 มะเขือเทศ']];
- const grid=document.createElement('div');grid.className='dialog-grid';for(const [key,label] of keys){const r=document.createElement('div');r.className='dialog-row';r.textContent=label+' × '+(ownProfile.inventory[key]||0);grid.append(r)}
- for(const type of Object.keys(FURNITURE_TYPES)){const r=document.createElement('div');r.className='dialog-row';r.textContent=furnitureLabel(type)+' ในคลัง × '+(ownProfile.inventory.furniture?.[type]||0);grid.append(r)}
- d.append(grid);
- appendProduce(d);
+ const grid=inventoryGrid(d);
+ for(const [key,icon,label] of [['hoe','⛏️','จอบ'],['watering_can','💦','บัวรดน้ำ'],['tomato_seed','🌱','เมล็ดมะเขือเทศ']])itemCell(grid,label,icon,ownProfile.inventory[key]);
+ for(const [key,count] of Object.entries(ownProfile.inventory.tomatoGrades))itemCell(grid,'มะเขือเทศ เกรด '+gradeOf(key).name+' '+key/100+'×','🍅',count);
+ for(const [type,def] of Object.entries(FURNITURE_TYPES))if(ownProfile.inventory.furniture[type])itemCell(grid,def.label,def.emoji,ownProfile.inventory.furniture[type],type);
+ finishInventoryGrid(grid);
  if(ownProfile.inventory.tomato)addButton(d,'🍅 กินมะเขือเทศ 1 ผล',()=>action({type:'eat'}));
  addButton(d,'🏡 ดูบ้านและร้านเฟอร์นิเจอร์',()=>homeDialog());
 })}
@@ -494,6 +540,7 @@ el('buildSave').onclick = saveBuild;
 new ResizeObserver(() => { buildCamera = null; }).observe(el('buildDock'));
 
 function buildHome() {
+  if(visiting){notice('ออกจากบ้านเพื่อนก่อนเข้าโหมดสร้างบ้าน');return}
   if (!active || buildDraft) return;
   buildDraft = {furniture: cloneFurniture(ownProfile.home.furniture), inventory: furnitureInventory()};
   dialogClose();
@@ -620,6 +667,7 @@ function cancelBuild() {
 function updateBuildControls() {
   const selected = selectedFurniture() || buildSelection;
   for (const [type, button] of stockButtons) {
+    button.hidden=buildDraft.inventory[type]===0;
     button.textContent = FURNITURE_TYPES[type].label + ' × ' + buildDraft.inventory[type];
     button.disabled = savingBuild || buildDraft.inventory[type] === 0;
     button.setAttribute('aria-pressed', String(buildSelection?.kind === 'new' && buildSelection.type === type));
@@ -671,11 +719,22 @@ function openPlot(i){if(i<0||i>=PLOT_COUNT)return;dialogType='plot';dialogPlot=i
 }
 
 function homeDialog(){dialogType='house';showDialog('🏡 บ้านของฉัน',d=>{
- const placed=ownProfile.home.furniture||[];const stock=furnitureInventory();addText(d,'ของที่วางแล้ว: '+(placed.map(item=>furnitureLabel(item.type)).join(', ')||'ยังไม่มี'));addText(d,'ของในคลัง: เตียง '+stock.bed+' · เก้าอี้ '+stock.chair);
+ const placed=ownProfile.home.furniture;const stock=furnitureInventory();addText(d,'วางแล้ว '+placed.length+' ชิ้น · ในกระเป๋า '+Object.values(stock).reduce((total,n)=>total+n,0)+' ชิ้น');
  addButton(d,'🏗️ เข้าโหมดสร้างบ้าน / จัดวาง',buildHome);
- addButton(d,'🛏️ ซื้อเตียง 45 บาท',()=>action({type:'buy',item:'bed'}),ownProfile.money<45);
- addButton(d,'🪑 ซื้อเก้าอี้ 25 บาท',()=>action({type:'buy',item:'chair'}),ownProfile.money<25)
+ const list=document.createElement('div');list.className='catalog-list';d.append(list);
+ const filter=document.createElement('input');filter.type='search';filter.placeholder='ค้นหาเฟอร์นิเจอร์';filter.setAttribute('aria-label','ค้นหาเฟอร์นิเจอร์');d.insertBefore(filter,list);
+ filter.value=furnitureSearch;
+ const render=()=>{
+   list.replaceChildren();
+   for(const [type,def] of Object.entries(FURNITURE_TYPES))if(def.label.includes(furnitureSearch)){
+     addButton(list,furnitureLabel(type)+' · '+def.price+' บาท',()=>action({type:'buy',item:type}),ownProfile.money<def.price);
+   }
+   if(!list.childElementCount)addText(list,'ไม่พบเฟอร์นิเจอร์');
+ };
+ filter.oninput=()=>{furnitureSearch=filter.value.trim();render()};
+ render();
 })}
+let furnitureSearch='';
 function gradeLabel(parent,key){
  const grade=gradeOf(key);
  const label=document.createElement('span');
@@ -705,17 +764,28 @@ function gardenDialog(){
  showDialog('จุดจ้างคนสวน',d=>{
    const worker=ownProfile.home.gardener;
    if(worker){
-     const labels={garden:'กำลังดูแลสวน',outbound:'กำลังเดินไปขายที่ตลาดกลาง',return:'กำลังเดินกลับบ้าน'};
+     const labels={garden:'กำลังดูแลสวน',deposit:'กำลังนำผลผลิตไปเก็บในกล่อง'};
      addText(d,labels[worker.phase]);
      const time=addText(d,'');
      time.id='gardenerTime';
      updateGardenerTime(Date.now());
    }else{
-     addText(d,'คนสวนใช้เมล็ดในกระเป๋าแล้วขายผลผลิตที่ตลาดกลาง เวลาเดินต่อแม้ปิดเกม และรับรายได้ช่วงนั้น 80%');
+     addText(d,'คนสวนใช้เมล็ดจากกระเป๋าและเก็บผลผลิตลงกล่องข้างสวน เวลาจ้างเดินต่อเมื่อปิดเกม');
      for(const [plan,{label,cost}] of Object.entries(GARDENER_PLANS)){
        addButton(d,label+' · '+cost.toLocaleString('th-TH')+' บาท',()=>action({type:'hireGardener',slot,plan}),ownProfile.money<cost);
      }
    }
+ });
+}
+function gardenBoxDialog(){
+ dialogType='box';
+ showDialog('📦 กล่องผลผลิตข้างสวน',d=>{
+   const box=ownProfile.home.gardenBox;
+   addText(d,box.tomato?'มะเขือเทศในกล่อง '+box.tomato+' ผล':'กล่องยังว่าง');
+   const grid=inventoryGrid(d);
+   for(const [key,count] of Object.entries(box.tomatoGrades))itemCell(grid,'เกรด '+gradeOf(key).name+' '+key/100+'×','🍅',count);
+   finishInventoryGrid(grid);
+   addButton(d,'รับผลผลิตเข้ากระเป๋า',()=>action({type:'collectGardenBox'}),box.tomato===0);
  });
 }
 function updateGardenerTime(now){
@@ -735,6 +805,10 @@ function showGardenerReceipt(){
    if(Number(localStorage.getItem(key))>=receipt.at)return;
    localStorage.setItem(key,String(receipt.at));
  }catch{}
+ if(receipt.stored||!receipt.gross){
+   notice('คนสวนเก็บผลผลิตช่วงออฟไลน์ '+receipt.stored+' ผล'+(receipt.ended?' · หมดเวลาจ้างแล้ว':''));
+   return;
+ }
  const baht=n=>n.toLocaleString('th-TH')+' บาท';
  notice('คนสวนช่วงออฟไลน์: ยอดขาย '+baht(receipt.gross)+' · หัก '+baht(receipt.gross-receipt.paid)+' · ได้สุทธิ '+baht(receipt.paid)+(receipt.ended?' · หมดเวลาจ้างแล้ว':''));
 }
@@ -752,7 +826,7 @@ function shopDialog(){
    addButton(d,'ร้านค้าออนไลน์ · ซื้อขายกับผู้เล่น',onlineMarket);
  });
 }
-let marketBusy=false;
+let marketBusy=false, selectedSeller=null;
 async function onlineMarket(){
  dialogType='onlineMarket';
  showDialog('ร้านค้าออนไลน์',d=>{
@@ -796,17 +870,33 @@ async function onlineMarket(){
    };
    d.append(form);
  }
- const list=document.createElement('div');list.className='produce-list';
- for(const row of response.listings){
-   const entry=document.createElement('div');entry.className='dialog-row';
-   gradeLabel(entry,row.key);
-   addText(entry,(row.own?'ของคุณ':row.name)+' · '+row.quantity+' ผล · '+row.unitPrice.toLocaleString('th-TH')+' บาท/ผล'+(row.expired?' · หมดอายุ':''));
-   const total=(row.quantity*row.unitPrice).toLocaleString('th-TH');
-   addButton(entry,row.own?'เก็บของคืน':'ซื้อ '+total+' บาท',()=>marketRequest({type:row.own?'cancel':'buy',id:row.id}));
-   list.append(entry);
- }
- if(!list.childElementCount)addText(d,'ยังไม่มีประกาศขาย');
- d.append(list);
+ const list=document.createElement('div');list.className='social-list';d.append(list);
+ const sellers=groupListings(response.listings);
+ const render=()=>{
+   list.replaceChildren();
+   const seller=sellers.find(p=>p.id===selectedSeller);
+   if(seller){
+     addButton(list,'‹ กลับรายชื่อผู้ขาย',()=>{selectedSeller=null;render()});
+     addText(list,seller.name);
+     for(const row of seller.items){
+       const entry=document.createElement('div');entry.className='dialog-row';
+       gradeLabel(entry,row.key);
+       addText(entry,row.quantity+' ผล · '+row.unitPrice.toLocaleString('th-TH')+' บาท/ผล'+(row.expired?' · หมดอายุ':''));
+       const total=(row.quantity*row.unitPrice).toLocaleString('th-TH');
+       addButton(entry,row.own?'เก็บของคืน':'ซื้อ '+total+' บาท',()=>marketRequest({type:row.own?'cancel':'buy',id:row.id}));
+       list.append(entry);
+     }
+     return;
+   }
+   for(const person of sellers){
+     const button=document.createElement('button');button.type='button';button.className='player-card';
+     const appearance=person.own?ownProfile.appearance:socialUI.player(person.id)?.appearance;
+     button.append(avatarIcon(appearance,'🏪',person.name),document.createTextNode(person.name+' · '+person.items.length+' รายการ'));
+     button.onclick=()=>{selectedSeller=person.id;render()};list.append(button);
+   }
+   if(!sellers.length)addText(list,'ยังไม่มีประกาศขาย');
+ };
+ render();
  addButton(d,'รีเฟรชรายการ',onlineMarket);
 }
 async function marketRequest(request){
@@ -835,13 +925,20 @@ function nearestInteract(){
  if(scene==='inside'){
    if(me.pose==='sit'||me.pose==='sleep')return {type:'stand',x:me.x,y:me.y};
    targets.push(point('exit',325,409,70));
-   for(const item of ownProfile.home.furniture){
-     targets.push(area(item.type==='bed'?'sleep':'sit',furnitureRect(item)));
+   for(const item of (visiting?.furniture||ownProfile.home.furniture)){
+     const pose=furniturePose(item);
+     if(pose)targets.push(area(pose,furnitureRect(item),{rotation:item.rotation}));
    }
  }else{
    const lot=localLot(),door=doorPos(lot);
    const post=gardenerPost(lot);
-   targets.push(point('door',door.x,door.y,95),point('gardener',post.x,post.y,58),area('shop',market));
+   const box=gardenBoxPosition(lot);
+   targets.push(point('door',door.x,door.y,85),point('gardener',post.x,post.y,48),point('box',box.x,box.y,47),area('shop',market));
+   for(const p of remote.values()){
+     if(!Number.isInteger(p.slot)||!lots[p.slot])continue;
+     const entry=doorPos(lots[p.slot]);
+     targets.push({...point('visit',entry.x,entry.y,75),owner:p.id});
+   }
    for(let plot=0;plot<PLOT_COUNT;plot++)targets.push(area('plot',plotRect(lot,plot),{plot}));
  }
  return targets.reduce((best,target)=>target.distance<=target.reach&&(!best||target.distance<best.distance)?target:best,null);
@@ -853,7 +950,7 @@ function interactionLabel(target){
    if(!p.watered)return ['💧','รดน้ำ'];
    return Date.now()-p.plantedAt>=GROW_MS?['🍅','เก็บเกี่ยว']:['🌿','ดูแปลง'];
  }
- return {stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],gardener:['🌾','จ้างคนสวน'],
+ return {stand:['↥','ลุกขึ้น'],exit:['🚪','ออกจากบ้าน'],door:['🏠','เข้าบ้าน'],gardener:['🌾','จ้างคนสวน'],box:['📦','กล่องผลผลิต'],visit:['🏠','เยี่ยมบ้าน'],
    shop:['🏪','ตลาดกลาง'],sleep:['🛏️','นอน'],sit:['🪑','นั่ง']}[target.type];
 }
 function updateNearby(){
@@ -872,12 +969,23 @@ function updateNearby(){
 function interact(act=nearestInteract()){
  if(!act)return;
  if(act.type==='stand'){me.pose='stand';me.onBed=false;notice('ลุกขึ้นยืนแล้ว');return}
- else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
- if(act.type==='exit'){me.pose='stand';me.onBed=false;scene='outside';const p=doorPos(localLot());me.x=p.x;me.y=p.y+45;notice('ออกจากบ้านแล้ว')}
- else if(act.type==='door'){scene='inside';me.x=325;me.y=300;notice('เข้าบ้านของคุณแล้ว')}
+ else if(act.type==='sit'||act.type==='sleep'){me.pose=act.type;me.onBed=act.type==='sleep';me.restAngle=(act.rotation||0)*Math.PI/180;me.x=act.x;me.y=act.y;me.walking=false;notice(act.type==='sleep'?'🛏️ นอนพักผ่อนแล้ว':'🪑 นั่งพักผ่อนแล้ว');return}
+ if(act.type==='exit'){
+   me.pose='stand';me.onBed=false;scene='outside';
+   const p=doorPos(lots[visiting?.slot]||localLot());me.x=p.x;me.y=p.y+45;
+   visiting=null;notice('ออกจากบ้านแล้ว');
+ }
+ else if(act.type==='door'||act.type==='visit'){
+   const host=act.type==='visit'?remote.get(act.owner):null;
+   if(act.type==='visit'&&(!host||!lots[host.slot]))return;
+   visiting=host?{id:host.id,slot:host.slot,name:host.name,furniture:sanitizeFurniture(host.home?.furniture)}:null;
+   scene='inside';houseEnteredAt=performance.now();me.x=325;me.y=357;me.pose='stand';
+   notice(visiting?'เข้าบ้านของ '+visiting.name:'เข้าบ้านของคุณแล้ว');
+ }
  else if(act.type==='plot')openPlot(act.plot);
  else if(act.type==='shop')shopDialog();
  else if(act.type==='gardener')gardenDialog();
+ else if(act.type==='box')gardenBoxDialog();
 }
 el('nearbyAction').onclick=()=>{if(active&&!buildDraft&&!el('dialog').open)interact()};
 async function toggleSound(){
@@ -963,14 +1071,28 @@ function drawPlot(l,i,plot,now){const r=plotRect(l,i);round(r.x,r.y,r.w,r.h,8,'#
  }else text('+',r.x+r.w/2,r.y+r.h/2+6,20,'#d0b888');
  text(String(i+1),r.x+10,r.y+15,10,'#dccfb6')}
 function drawEmpty(l){round(l.x,l.y,l.w,l.h,13,'#80a862');round(l.x+20,l.y+20,l.w-40,l.h-40,10,'#81ac67');text('🏡',l.x+l.w/2,l.y+170,42);text('แปลงบ้านว่าง',l.x+l.w/2,l.y+215,17,'#345338');text('รอผู้เล่นเข้าชุมชน',l.x+l.w/2,l.y+242,12,'#46604a');fence(l)}
-function worldDraw(now){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
+function worldDraw(now,preview=false){road(now);const lotsUsed=new Map([[slot,{name:ownProfile.displayName,home:ownProfile.home}]]);for(const p of remote.values())if(p?.slot>=0&&p?.slot<8)lotsUsed.set(p.slot,{name:p.name,home:p.home});
  for(const l of lots){const u=lotsUsed.get(l.slot);if(!u){drawEmpty(l);continue}round(l.x,l.y,l.w,l.h,12,'#8faf6a');for(let i=0;i<PLOT_COUNT;i++)drawPlot(l,i,u.home?.plots?.[i],now);drawHouse(l,u,now);fence(l)}
+ if(preview)return;
  drawGardenerPost(now);
+ const box=gardenBoxPosition(localLot());
+ round(box.x-15,box.y-12,30,23,3,'#644431');
+ round(box.x-15,box.y-15,30,12,3,'#c58e5c');
+ round(box.x-3,box.y-5,6,7,2,'#f1cd7d');
+ if(ownProfile.home.gardenBox.tomato)text(String(ownProfile.home.gardenBox.tomato),box.x,box.y+24,12,'#fff5bf');
  for(const [index, player] of lotsUsed){
    const worker=player.home?.gardener;
    if(!worker||worker.slot!==index||worker.contractUntil&&Date.now()>=worker.contractUntil)continue;
    const p=gardenerPosition(lots[index],worker,Date.now());
-   if(p)avatar({...p,id:'gardener-'+index,name:'คนสวน',scene:'outside',pose:'stand',positionInterpolated:true,appearance:{gender:2,skin:2,hair:2,style:0,outfit:3,accessory:1}},now,false);
+   if(p){
+     const old=gardenerVisuals.get(index);
+     const delta=old?Math.max(0,now-old.now):0;
+     const keep=old&&delta<700&&Math.hypot(old.x-p.x,old.y-p.y)<220;
+     const blend=1-Math.exp(-delta/140);
+     const x=keep?old.x+(p.x-old.x)*blend:p.x,y=keep?old.y+(p.y-old.y)*blend:p.y;
+     gardenerVisuals.set(index,{x,y,now});
+     avatar({...p,x,y,id:'gardener-'+index,name:'คนสวน',scene:'outside',pose:'stand',positionInterpolated:true,appearance:{gender:2,skin:2,hair:2,style:0,outfit:3,accessory:1}},now,false);
+   }
  }
  for(const p of remote.values()){
    if(p.scene==='outside')avatar({...p,...sampleRemoteMotion(p.motion,now),positionInterpolated:true},now,false);
@@ -1035,12 +1157,13 @@ function drawBuildPreview() {
  ctx.restore();
 }
 function indoors(now){round(0,0,650,430,0,'#d6b88e');woodTexture(ctx,0,0,650,430,.87);for(let y=36;y<430;y+=48)line(15,y,635,y,'#c29a76',1);round(0,0,650,43,0,'#836b61');round(0,0,21,430,0,'#927566');round(630,0,20,430,0,'#927566');round(300,408,55,22,3,'#634f45');text('🚪',325,415,21);
- const furniture=buildDraft?.furniture || ownProfile.home.furniture;
- text('บ้านของ '+ownProfile.displayName,325,90,22,'#4b443a');
+ const furniture=buildDraft?.furniture || visiting?.furniture || ownProfile.home.furniture;
+ text('บ้านของ '+(visiting?.name||ownProfile.displayName),325,90,22,'#4b443a');
  if(buildDraft)drawBuildGrid();
  else if(!furniture.length)text('ห้องยังว่างเปล่า — ซื้อของตกแต่งได้',325,170,16,'#7a6650');
  for(const item of [...furniture].sort((a,b) => (a.row+furnitureFootprint(a).h)-(b.row+furnitureFootprint(b).h)))drawFurniture(ctx,item);
  if(buildDraft){drawBuildPreview();return}
+ for(const p of nearbyPeople())if(scene==='inside')avatar({...p,...sampleRemoteMotion(p.motion,now),positionInterpolated:true},now,false);
  avatar({...me,name:ownProfile.displayName},now,true)
 }
 function avatar(p,now,local){
@@ -1049,14 +1172,24 @@ function avatar(p,now,local){
   ctx.save();
   ctx.translate(jitter,0);
   const actor={...p,scene:local?scene:p.scene,face:local?me.face:p.face,
-    unhappy:local&&ownProfile.needs.happiness<LOW_NEED};
+    onBed:p.pose==='sleep',unhappy:local&&ownProfile.needs.happiness<LOW_NEED};
   const {x,y}=drawClassicActor(ctx,actor,now,local,ownProfile.displayName,ownProfile.appearance);
   ctx.restore();
   const name=String(local?ownProfile.displayName:(p.name||'ผู้เล่น')).slice(0,18);
   round(x-62,y-65,124,20,9,local?'#fff2cf':'#effff5');text(name,x,y-50,11,'#30454b');
   if(p.text&&p.until>Date.now()){const msg=String(p.text).slice(0,40);round(x-119,y-107,238,31,11,'#fff8e9');text(msg,x,y-86,12,'#304849')}
 }
-function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRect(0,0,w,h);const camera=buildDraft?roomBuildCamera():scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)};
+function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRect(0,0,w,h);
+ const zoomProgress=reducedEffects.matches?1:Math.min(1,Math.max(0,(now-houseEnteredAt)/340));
+ const camera=buildDraft?roomBuildCamera():scene==='outside'?{x:me.x,y:me.y,zoom:Math.min(1.0,Math.max(.7,w/830))}:{x:325,y:215,zoom:Math.min(w/670,h/450,1.5)*(.85+.15*zoomProgress)};
+ if(scene==='inside'&&!buildDraft){
+   const door=doorPos(lots[visiting?.slot]||localLot());
+   ctx.save();
+   ctx.translate(w/2-door.x,h/2-door.y);
+   worldDraw(now,true);
+   ctx.restore();
+   ctx.fillStyle='#08111cba';ctx.fillRect(0,0,w,h);
+ }
  renderedCamera={...camera,scene,w,h};
  ctx.save();ctx.translate(w/2,camera.centerY??h/2);ctx.scale(camera.zoom,camera.zoom);ctx.translate(-camera.x,-camera.y);
  if(scene==='outside'&&!buildDraft)worldDraw(now);else indoors(now);ctx.restore();
@@ -1069,6 +1202,10 @@ function background(now){ctx.fillStyle=buildDraft?'#27423b':'#6b985e';ctx.fillRe
    if(opacity>0){ctx.fillStyle='rgba(0,0,0,'+opacity+')';ctx.fillRect(0,0,w,h)}
  }
 }
+function nearbyPeople(){
+ const homeId=visiting?.id||myId;
+ return [...remote.values()].filter(p=>p.scene===scene&&(scene!=='inside'||(p.house||p.uid||p.id)===homeId));
+}
 function tickNeeds(clock,now){
  const {energy,fullness}=ownProfile.needs;
  tiredSince=energy<LOW_NEED?(tiredSince??now):null;
@@ -1077,7 +1214,8 @@ function tickNeeds(clock,now){
  nextNeedsAt=clock+NEEDS_STEP_MS;
  const player=me;
  needsPending=true;
- Promise.resolve(action({type:'needsTick',pose:me.pose})).finally(()=>{
+ const nearPlayer=nearbyPeople().some(p=>Math.hypot(p.x-me.x,p.y-me.y)<=100);
+ Promise.resolve(action({type:'needsTick',pose:me.pose,nearPlayer})).finally(()=>{
    if(me===player)needsPending=false;
  });
 }
@@ -1097,8 +1235,10 @@ function tickGardener(now){
 document.addEventListener('visibilitychange',()=>{if(document.hidden)gardenerResume=true});
 function canMove(x,y){if(scene==='inside')return x>22&&y>55&&x<628&&y<399;
  if(x<22||y<22||x>WORLD.w-22||y>WORLD.h-22)return false;
- const l=localLot(),house=houseRect(l);
- if(x>house.x-14&&x<house.x+house.w+14&&y>house.y-15&&y<house.y+house.h+10)return false;
+ for(const l of lots){
+   const house=houseRect(l);
+   if(x>house.x-14&&x<house.x+house.w+14&&y>house.y-15&&y<house.y+house.h+10)return false;
+ }
  // Fences are collision walls, except for a 42px centered gate toward the road.
  for(const q of lots){const gx=q.x+225,gRight=gx+42,top=q.slot>=4;
    const insideX=x>=q.x-11&&x<=q.x+q.w+11;
@@ -1128,6 +1268,10 @@ function tick(now){const dt=Math.min(.05,(now-lastFrame)/1000);lastFrame=now;
     if(canMove(me.x,me.y+dy*speed*dt))me.y+=dy*speed*dt;
     me.face=Math.atan2(dy,dx);
     if(now-lastStep>210){lastStep=now;playV4Footstep()}
+    if(scene==='outside'){
+      const target=nearestInteract();
+      if(target?.type==='visit'&&target.distance<=18)interact(target);
+    }
   }
   if(online)publishMovement(now);
   checkGardenerPost();
@@ -1144,9 +1288,10 @@ requestAnimationFrame(tick);
 function publishMovement(now){
  const pose=me.pose||'stand';
  const x=Math.round(me.x),y=Math.round(me.y);
- const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose;
+ const house=scene==='inside'?(visiting?.id||myId):null;
+ const changedSceneOrPose=scene!==sentMovement?.scene||pose!==sentMovement?.pose||house!==sentMovement?.house;
  if(!changedSceneOrPose&&(now-lastMove<MOVE_INTERVAL_MS||(x===sentMovement.x&&y===sentMovement.y)))return;
- const movement={type:'move',x,y,scene,pose};
+ const movement={type:'move',x,y,scene,pose,house,restAngle:pose==='sleep'?me.restAngle:null};
  lastMove=now;sentMovement=movement;
  send(movement);
 }
@@ -1162,6 +1307,8 @@ c.addEventListener('pointerup',e=>{
    return;
  }
  const l=localLot();
+ const target=nearestInteract();
+ if(target&&['visit','box'].includes(target.type)&&Math.hypot(x-target.x,y-target.y)<34){interact(target);return}
  for(let i=0;i<PLOT_COUNT;i++){
    const r=plotRect(l,i);
    if(distanceToRect(x,y,r)!==0)continue;
@@ -1187,3 +1334,6 @@ if(onlineReady){
  }).catch(()=>{});
 }
 setInterval(()=>{if(session&&!active)refreshRooms()},12000);
+
+
+

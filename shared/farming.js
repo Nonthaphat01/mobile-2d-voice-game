@@ -4,8 +4,8 @@ export const GARDENER_PLANS = Object.freeze({
   day: {label:'24 ชั่วโมง',duration:86_400_000,cost:3000}
 });
 export const GARDENER_HEARTBEAT = 15_000;
-export const GARDENER_OFFLINE_RATE = .8;
-export const gardenerPost = lot => ({x:lot.x+164,y:lot.y+280});
+export const gardenerPost = lot => ({x:lot.x+63,y:lot.y+253});
+export const gardenBoxPosition = lot => ({x:lot.x+255,y:lot.y+278});
 export const GARDEN_STEP_MS = 4500;
 export const MAX_MONEY = 100_000_000;
 export const MAX_PRODUCE = 99999;
@@ -89,13 +89,18 @@ export function gardenerTravelMs(lot) {
 
 export function gardenerPosition(lot, worker, now) {
   const route = gardenerRoute(lot);
-  if (worker.phase === 'garden') {
+  if (worker.phase === 'garden' || worker.phase === 'deposit') {
     const index = worker.plot;
-    if (index < 0) return route[0];
-    const target = {x:lot.x+270+(index%2)*94, y:lot.y+98+Math.floor(index/2)*65};
-    const from = worker.fromPlot < 0 ? route[0] :
-      {x:lot.x+270+(worker.fromPlot%2)*94, y:lot.y+98+Math.floor(worker.fromPlot/2)*65};
-    const p = Math.max(0,Math.min(1,(now-worker.startedAt)/2600));
+    if (index < 0) return gardenBoxPosition(lot);
+    const plotAt = i => ({x:lot.x+274+(i%2)*94,y:lot.y+98+Math.floor(i/2)*65});
+    const target = plotAt(index);
+    const from = worker.fromPlot < 0 ? gardenBoxPosition(lot):plotAt(worker.fromPlot);
+    const elapsed=Math.max(0,now-worker.startedAt);
+    if(worker.phase==='deposit'&&elapsed>=2000){
+      const box=gardenBoxPosition(lot),p=Math.min(1,(elapsed-2000)/2200);
+      return {x:target.x+(box.x-target.x)*p,y:target.y+(box.y-target.y)*p,walking:p<1,face:Math.atan2(box.y-target.y,box.x-target.x)};
+    }
+    const p = Math.min(1,elapsed/(worker.phase==='deposit'?1800:2600));
     const moving=from.x!==target.x||from.y!==target.y;
     return {x:from.x+(target.x-from.x)*p,y:from.y+(target.y-from.y)*p,walking:moving&&p<1,face:Math.atan2(target.y-from.y,target.x-from.x)};
   }
